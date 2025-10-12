@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Question, Submission, ProjectQuestion, TestCase } from "@/types"; // FIX: Import all types from the central file
 import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { firestore } from "@/lib/firebase"; 
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 // FIX: Import Accordion components correctly from your UI library
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -134,7 +134,7 @@ export default function ProjectPage() {
       setPrompt(""); // Clear prompt after submission
 
       // Refresh the project question list
-      const newProjectQuestion: ProjectQuestion = { id: newQuestion.id!, title: newQuestion.title, difficulty: newQuestion.difficulty, tags: newQuestion.tags, generatedAt: serverTimestamp() };
+      const newProjectQuestion: ProjectQuestion = { id: newQuestion.id!, title: newQuestion.title, difficulty: newQuestion.difficulty, tags: newQuestion.tags, generatedAt: Timestamp.now() };
       const updatedQuestions = [...projectQuestions, newProjectQuestion];
       setProjectQuestions(updatedQuestions);
       setCurrentQuestionIndex(updatedQuestions.length - 1);
