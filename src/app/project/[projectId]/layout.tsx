@@ -3,14 +3,14 @@ import ProjectHeader from './_components/ProjectHeader';
 
 export default function ProjectLayout({
   children,
-  params,
+  params: { projectId },
 }: {
   children: ReactNode;
   params: { projectId: string };
 }) {
   return (
     <div className="flex flex-col h-screen w-screen">
-      <ProjectHeader projectId={params.projectId} />
+      <ProjectHeader projectId={projectId} />
       <main className="flex-grow overflow-hidden">
         {children}
       </main>

@@ -14,7 +14,7 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Submission } from '@/types';
 
-interface ProjectQuestion {
+export interface ProjectQuestion {
   id: string; // This is the questionId
   title: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
