@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // --- STRATEGY 1: Database First (Cost Saving) ---
     // A simple implementation: check for questions with matching tags.
     // A more advanced version could use embeddings for semantic search.
-    const promptKeywords = prompt.toLowerCase().split(' ').filter(word => word.length > 2);
+    const promptKeywords = prompt.toLowerCase().split(' ').filter((word: string) => word.length > 2);
     if (promptKeywords.length > 0) {
         const questionsRef = collection(firestore, "questions");
         // Let's create a query to find a question that has a tag matching a keyword in the prompt

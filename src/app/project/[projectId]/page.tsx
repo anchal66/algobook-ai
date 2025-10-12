@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+  PanelResizeHandle as ResizableHandle,
+  Panel as ResizablePanel,
+  PanelGroup as ResizablePanelGroup,
+} from "react-resizable-panels";
 import { Editor } from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; 
 import { useAuth } from "@/context/AuthContext";
 import { Question } from "@/types";
 import { Wand2, Loader2, Code, Play, Send } from "lucide-react";
@@ -89,7 +93,11 @@ export default function ProjectPage({ params }: { params: { projectId: string } 
           </form>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle className="relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1">
+          <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
+            <div className="h-2.5 w-1 rounded-full bg-muted-foreground" />
+          </div>
+        </ResizableHandle>
 
         {/* Right Panel: Code Editor */}
         <ResizablePanel defaultSize={60} minSize={30} className="flex flex-col h-full">
