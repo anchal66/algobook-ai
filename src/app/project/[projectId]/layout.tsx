@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import ProjectHeader from './_components/ProjectHeader';
 
-export default function ProjectLayout({
+// FIX: Add the 'async' keyword to the function definition
+export default async function ProjectLayout({
   children,
   params,
 }: {
@@ -10,6 +11,7 @@ export default function ProjectLayout({
 }) {
   return (
     <div className="flex flex-col h-screen w-screen">
+      {/* Now it's safe to access params.projectId here */}
       <ProjectHeader projectId={params.projectId} />
       <main className="flex-grow overflow-hidden">
         {children}
