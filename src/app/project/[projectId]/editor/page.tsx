@@ -10,12 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { Question, Submission, ProjectQuestion, TestCase } from "@/types";
-import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles } from "lucide-react";
+import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, History } from "lucide-react";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+// NEW: Import Tabs, Textarea, and Card
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDistanceToNow } from "date-fns";
 
 
 interface ExecutionResult {
@@ -40,18 +45,49 @@ export default function ProjectPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
-  // NEW: State for handling execution errors
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [projectQuestions, setProjectQuestions] = useState<ProjectQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
 
+  // --- NEW STATE for Console Tabs ---
+  const [activeConsoleTab, setActiveConsoleTab] = useState("test-result");
+  const [customInput, setCustomInput] = useState("");
+  const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [lastRunInput, setLastRunInput] = useState<string | null>(null);
+  // ---
+
   const editorRef = useRef<any>(null);
+
+  // --- NEW: Function to fetch submission history ---
+  const fetchSubmissionHistory = useCallback(async (questionId: string) => {
+    if (!user || !projectId) return;
+    setIsHistoryLoading(true);
+    try {
+      const q = query(
+        collection(firestore, "submissions"),
+        where("userId", "==", user.uid),
+        where("projectId", "==", projectId),
+        where("questionId", "==", questionId),
+        orderBy("submittedAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const history = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Submission[];
+      setSubmissionHistory(history);
+    } catch (err) {
+      console.error("Error fetching submission history:", err);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [user, projectId]);
 
   const loadQuestion = useCallback(async (questionId: string, questionsList: ProjectQuestion[]) => {
     setIsLoading(true);
     setQuestion(null);
     setExecutionResult(null);
     setExecutionError(null);
+    setCustomInput(""); // Reset custom input
+    setSubmissionHistory([]); // Clear old history
     try {
       const questionRef = doc(firestore, "questions", questionId);
       const questionSnap = await getDoc(questionRef);
@@ -59,12 +95,14 @@ export default function ProjectPage() {
       if (questionSnap.exists()) {
         const fullQuestionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
         if (!fullQuestionData.testCases) fullQuestionData.testCases = [];
-        // FIX: Ensure driverCode exists to prevent crashes
         if (!fullQuestionData.driverCode) fullQuestionData.driverCode = ""; 
         setQuestion(fullQuestionData);
         setCode(fullQuestionData.starterCode);
         const qIndex = questionsList.findIndex(q => q.id === questionId);
         setCurrentQuestionIndex(qIndex);
+        
+        // Fetch history for this new question
+        fetchSubmissionHistory(fullQuestionData.id!);
       } else {
         throw new Error(`Question with ID ${questionId} not found.`);
       }
@@ -74,7 +112,7 @@ export default function ProjectPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchSubmissionHistory]); // Add dependency
 
   useEffect(() => {
     if (!projectId) return;
@@ -94,8 +132,8 @@ export default function ProjectPage() {
 
   const handleEditorDidMount = (editor: any) => { editorRef.current = editor; };
   const formatCode = () => { if (editorRef.current) editorRef.current.getAction('editor.action.formatDocument').run(); };
-  
-  const handleNextQuestion = () => {
+
+const handleNextQuestion = () => {
     if (isLoading) return; // don't navigate while loading
     if (projectQuestions.length === 0) return;
 
@@ -175,18 +213,52 @@ export default function ProjectPage() {
     submitPrompt(nextPrompt);
   };
 
-  // FIX: Robust Run and Submit handlers with proper error feedback
+  
   const handleRunCode = async (isSubmission: boolean = false) => {
-    // FIX: Add checks for driverCode
-    if (!code || !question?.id || !question.driverCode || !question.testCases || question.testCases.length === 0) {
-        setExecutionError("Cannot run code. The question is missing test cases or driver code.");
+    if (!code || !question?.id || !question.driverCode) {
+        setExecutionError("Cannot run code. The question is missing driver code.");
         return;
     }
+    
     setIsExecuting(true);
     setExecutionResult(null);
     setExecutionError(null);
+    setLastRunInput(null);
+    setActiveConsoleTab("test-result"); // Switch to result tab
 
-    const testCasesToRun = isSubmission ? question.testCases : [question.testCases.find(tc => tc.isSample) || question.testCases[0]];
+    let testCasesToRun: TestCase[] = [];
+    let inputsToRun: string[] = [];
+
+    if (isSubmission) {
+      // SUBMIT: Run all test cases
+      if (question.testCases.length === 0) {
+        setExecutionError("Cannot submit. The question has no test cases.");
+        setIsExecuting(false);
+        return;
+      }
+      testCasesToRun = question.testCases;
+      inputsToRun = testCasesToRun.map(tc => tc.input);
+    } else {
+      // RUN: Use custom input or first sample test case
+      let inputToUse: string;
+      if (activeConsoleTab === "custom-input") {
+        inputToUse = customInput;
+        // Create a temporary test case for logic
+        testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
+      } else {
+        const sampleCase = question.testCases.find(tc => tc.isSample) || question.testCases[0];
+        if (!sampleCase) {
+           setExecutionError("Cannot run. The question has no sample test cases.");
+           setIsExecuting(false);
+           return;
+        }
+        testCasesToRun = [sampleCase];
+        inputToUse = sampleCase.input;
+      }
+      inputsToRun = [inputToUse];
+      setLastRunInput(inputToUse); // Set this so we can display it
+    }
+
     let allTestsPassed = true;
     let finalResult: ExecutionResult | null = null;
 
@@ -195,7 +267,6 @@ export default function ProjectPage() {
             const response = await fetch('/api/code/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // FIX: Send both userCode and driverCode
                 body: JSON.stringify({ 
                     userCode: code, 
                     driverCode: question.driverCode,
@@ -208,8 +279,11 @@ export default function ProjectPage() {
             }
             const result: ExecutionResult = await response.json();
             finalResult = result;
+            
+            // Set input for display, even for custom runs
+            setLastRunInput(testCase.input); 
 
-            if (result.status.id !== 3 || result.stdout?.trim() !== testCase.expectedOutput.trim()) {
+            if (result.status.id !== 3 || (testCase.expectedOutput !== "N/A (Custom Input)" && result.stdout?.trim() !== testCase.expectedOutput.trim())) {
                 allTestsPassed = false;
                 if (isSubmission) break;
             }
@@ -232,6 +306,8 @@ export default function ProjectPage() {
             status: allTestsPassed ? 'success' : 'fail',
             submittedAt: serverTimestamp(),
         });
+        // Refresh history tab after submission
+        fetchSubmissionHistory(question.id);
     }
     
     setIsExecuting(false);
@@ -241,7 +317,6 @@ export default function ProjectPage() {
   return (
     <main className="h-full w-full overflow-hidden bg-background text-foreground">
       <ResizablePanelGroup direction="horizontal">
-        {/* Left Panel */}
         <ResizablePanel defaultSize={40} minSize={30}>
           <div className="flex flex-col h-full">
             <div className="flex-shrink-0 flex items-center gap-2 p-2 border-b">
@@ -283,11 +358,12 @@ export default function ProjectPage() {
         </ResizablePanel>
 
         <ResizableHandle />
-
+        
         {/* Right Panel */}
         <ResizablePanel defaultSize={60} minSize={30}>
           <ResizablePanelGroup direction="vertical">
-            <ResizablePanel defaultSize={70} minSize={30}>
+            <ResizablePanel defaultSize={65} minSize={30}>
+                {/* Editor Panel: Unchanged */}
                 <Editor
                   height="100%" language="java" theme="vs-dark" value={code}
                   onMount={handleEditorDidMount} onChange={(value) => setCode(value || "")}
@@ -296,26 +372,80 @@ export default function ProjectPage() {
             
             <ResizableHandle />
 
-            <ResizablePanel defaultSize={30} minSize={15}>
-                <div className="flex flex-col h-full">
-                    <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-                        <span className="font-semibold text-lg">Console</span>
-                        <div className="flex items-center gap-2">
-                            <Button variant="secondary" onClick={formatCode} className="flex items-center gap-2"><Code className="h-4 w-4"/> Format</Button>
-                            <Button variant="outline" onClick={() => handleRunCode(false)} disabled={isExecuting || !question} className="flex items-center gap-2">
-                                {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Play className="h-4 w-4"/>} Run
-                            </Button>
-                            <Button onClick={() => handleRunCode(true)} disabled={isExecuting || !question} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
-                                {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>} Submit
-                            </Button>
-                        </div>
-                    </div>
-                    <div className="p-4 flex-grow overflow-y-auto bg-muted/20">
-                        {isExecuting && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Executing...</div>}
-                        {executionError && <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Error</h3><p className="text-xs whitespace-pre-wrap">{executionError}</p></div>}
-                        {executionResult && !executionError && <OutputDisplay result={executionResult} expectedOutput={question?.testCases.find(tc => tc.isSample)?.expectedOutput || question?.testCases[0]?.expectedOutput} />}
-                    </div>
+            {/* --- NEW: Upgraded Console Panel --- */}
+            <ResizablePanel defaultSize={35} minSize={20}>
+              <div className="flex flex-col h-full">
+                {/* Top bar with buttons */}
+                <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
+                  <span className="font-semibold text-lg">Console</span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary" onClick={formatCode} className="flex items-center gap-2"><Code className="h-4 w-4"/> Format</Button>
+                    <Button variant="outline" onClick={() => handleRunCode(false)} disabled={isExecuting || !question} className="flex items-center gap-2">
+                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Play className="h-4 w-4"/>} Run
+                    </Button>
+                    <Button onClick={() => handleRunCode(true)} disabled={isExecuting || !question} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
+                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>} Submit
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Tabbed Content Area */}
+                <Tabs value={activeConsoleTab} onValueChange={setActiveConsoleTab} className="flex-grow flex flex-col">
+                  <TabsList className="flex-shrink-0 rounded-none bg-transparent border-b justify-start">
+                    <TabsTrigger value="test-result">Test Result</TabsTrigger>
+                    <TabsTrigger value="custom-input">Custom Input</TabsTrigger>
+                    <TabsTrigger value="submissions">Submissions</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="test-result" className="flex-grow overflow-y-auto p-4">
+                    {isExecuting && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Executing...</div>}
+                    {executionError && <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Error</h3><p className="text-xs whitespace-pre-wrap">{executionError}</p></div>}
+                    {executionResult && !executionError && 
+                      <OutputDisplay 
+                        result={executionResult} 
+                        inputUsed={lastRunInput}
+                        expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput} 
+                      />}
+                    {!isExecuting && !executionResult && !executionError &&
+                      <div className="text-muted-foreground p-4">Click "Run" to see the output of your code against the first sample test case.</div>
+                    }
+                  </TabsContent>
+                  
+                  <TabsContent value="custom-input" className="flex-grow overflow-y-auto p-4 flex flex-col">
+                    <label htmlFor="custom-input" className="text-sm font-medium mb-2">Type your test case input below:</label>
+                    <Textarea 
+                      id="custom-input"
+                      value={customInput}
+                      onChange={(e) => setCustomInput(e.target.value)}
+                      placeholder="e.g., 2&#10;2 7&#10;9"
+                      className="flex-grow font-mono text-sm"
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="submissions" className="flex-grow overflow-y-auto p-4">
+                    {isHistoryLoading && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Loading history...</div>}
+                    {!isHistoryLoading && submissionHistory.length === 0 && <div className="text-muted-foreground">No submissions found for this question.</div>}
+                    {!isHistoryLoading && submissionHistory.length > 0 && (
+                      <div className="space-y-4">
+                        {submissionHistory.map((sub) => (
+                          <Card key={sub.id} className={sub.status === 'success' ? 'border-green-600' : 'border-red-600'}>
+                            <CardHeader className="p-4 flex flex-row items-center justify-between">
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                {sub.status === 'success' ? <CheckCircle2 className="text-green-500" /> : <XCircle className="text-red-500" />}
+                                {sub.status === 'success' ? 'Accepted' : 'Wrong Answer'}
+                              </CardTitle>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true })}
+                              </span>
+                            </CardHeader>
+                            {/* We could add a button to view the submitted code here */}
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>
@@ -362,7 +492,6 @@ const QuestionListSidebar = ({ questions, onQuestionSelect }: { questions: Proje
     </Sheet>
   );
 };
-
 const QuestionDisplay = ({ question }: { question: Question }) => (
   <article className="prose prose-invert max-w-none">
     <h1>{question.title}</h1>
@@ -403,27 +532,51 @@ const WelcomeMessage = () => (
   </div>
 );
 
-const OutputDisplay = ({ result, expectedOutput }: { result: ExecutionResult, expectedOutput?: string }) => {
+// --- UPDATED OutputDisplay component ---
+const OutputDisplay = ({ result, inputUsed, expectedOutput }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string }) => {
   const status = result.status.description;
   const isAccepted = result.status.id === 3; // 3 = Accepted
   const output = result.stdout?.trim();
   const isCorrect = isAccepted && output === expectedOutput?.trim();
 
+  // Handle compilation errors
   if (result.compile_output) {
-    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><XCircle /> Compilation Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.compile_output}</pre></div>;
+    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><XCircle/> Compilation Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.compile_output}</pre></div>;
   }
+  // Handle runtime errors
   if (result.stderr) {
-    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle /> Runtime Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.stderr}</pre></div>;
+    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Runtime Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.stderr}</pre></div>;
   }
+  // Handle successful runs (Accepted)
   if (isAccepted) {
     return (
-      <div>
-        <h3 className={`font-bold mb-2 flex items-center gap-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-          {isCorrect ? <CheckCircle2 /> : <XCircle />} {isCorrect ? 'Correct Answer' : 'Wrong Answer'}
-        </h3>
+      <div className="space-y-4">
+        {expectedOutput && expectedOutput !== "N/A (Custom Input)" && (
+          <h3 className={`font-bold text-xl flex items-center gap-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+            {isCorrect ? <CheckCircle2 /> : <XCircle />} {isCorrect ? 'Correct Answer' : 'Wrong Answer'}
+          </h3>
+        )}
+        {expectedOutput === "N/A (Custom Input)" && (
+          <h3 className="font-bold text-xl flex items-center gap-2 text-primary">
+            Custom Input Executed
+          </h3>
+        )}
+
         <div className="space-y-2 text-sm">
-          <div><p className="font-semibold">Your Output:</p><pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{result.stdout || '(no output)'}</pre></div>
-          <div><p className="font-semibold">Expected Output:</p><pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{expectedOutput}</pre></div>
+          <div>
+            <p className="font-semibold mb-1">Input:</p>
+            <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{inputUsed || 'N/A'}</pre>
+          </div>
+          <div>
+            <p className="font-semibold mb-1">Your Output:</p>
+            <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{result.stdout || '(no output)'}</pre>
+          </div>
+          {expectedOutput && expectedOutput !== "N/A (Custom Input)" && (
+            <div>
+              <p className="font-semibold mb-1">Expected Output:</p>
+              <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{expectedOutput}</pre>
+            </div>
+          )}
           <div className="flex gap-4 text-xs text-muted-foreground pt-2">
             <span><Clock className="inline h-3 w-3 mr-1" /> Time: {result.time}s</span>
             <span><Code className="inline h-3 w-3 mr-1" /> Memory: {result.memory} KB</span>
@@ -432,5 +585,6 @@ const OutputDisplay = ({ result, expectedOutput }: { result: ExecutionResult, ex
       </div>
     );
   }
+  // Handle other non-Accepted statuses (Time Limit, etc.)
   return <div className="text-yellow-400"><h3 className="font-bold">{status}</h3><p>Something went wrong during execution.</p></div>;
 };
