@@ -4,11 +4,24 @@ const JUDGE0_API_URL = `https://${process.env.NEXT_PUBLIC_RAPIDAPI_HOST}/submiss
 
 export async function POST(request: Request) {
   try {
-    const { sourceCode, languageId, stdin } = await request.json();
+    // --- MODIFICATION START ---
+    // Update destructured props. 'sourceCode' is now 'userCode'
+    const { userCode, driverCode, stdin } = await request.json();
 
-    if (!sourceCode || !languageId) {
-      return NextResponse.json({ error: "Missing source code or language ID" }, { status: 400 });
+    // Update the validation check
+    if (!userCode || !driverCode) {
+      return NextResponse.json({ error: "Missing user code or driver code" }, { status: 400 });
     }
+
+    // Combine the user's solution with the question's driver code
+    const fullSourceCode = `
+// User's Solution Code
+${userCode}
+
+// Driver Code
+${driverCode}
+    `;
+    // --- MODIFICATION END ---
 
     const options = {
       method: 'POST',
@@ -18,7 +31,10 @@ export async function POST(request: Request) {
         'X-RapidAPI-Host': process.env.NEXT_PUBLIC_RAPIDAPI_HOST!,
       },
       body: JSON.stringify({
-        source_code: sourceCode,
+        // --- MODIFICATION START ---
+        // Send the combined code
+        source_code: fullSourceCode,
+        // --- MODIFICATION END ---
         language_id: 62, // 62 is the ID for Java on Judge0
         stdin: stdin || "",
       }),
@@ -34,8 +50,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
 
-  } catch (error) {
+  } catch (error: any) { // Added 'any' type to error
     console.error("Error in run code API:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

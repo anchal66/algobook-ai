@@ -20,6 +20,7 @@ export interface Question {
   constraints: string[];
   starterCode: string;
   testCases: TestCase[];
+  driverCode: string;
   tags: string[];
   difficulty: "Easy" | "Medium" | "Hard";
   createdAt?: Timestamp;

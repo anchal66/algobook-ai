@@ -41,7 +41,9 @@ export async function POST(request: Request) {
         // --- STRATEGY 2: AI Fallback ---
         if (!questionToReturn) {
             console.log("No suitable question in DB, generating with AI...");
-
+            
+            // --- MODIFICATION START ---
+            // I've added the "driverCode" field to your existing prompt.
             const systemPrompt = `You are an expert programming challenge creator. Your task is to generate a high-quality coding problem for a user practicing for software engineering interviews.
       The user's request is: "${prompt}".
       Based on the user's request, generate a complete coding challenge.
@@ -66,18 +68,30 @@ export async function POST(request: Request) {
             "isSample": true
             }
         ],
+        
+        "driverCode": "A complete Java 'Main' class that acts as a driver. This code MUST read from System.in (stdin), parse the input, instantiate the 'Solution' class, call its method, and print the result to System.out (stdout). It must be a complete, runnable file.",
+
         "tags": ["An array of relevant topic tags, e.g., 'Array', 'Hash Table'"],
         "difficulty": "A string, either 'Easy', 'Medium', or 'Hard'."
       }
-      Example starter code format for Java:
-      class Solution {
-          public int[] twoSum(int[] nums, int target) {
-              // Your code here
-          }
-      }`;
+      
+      --- EXAMPLE for 'Two Sum' ---
+      "starterCode": "import java.util.*;\\n\\nclass Solution {\\n    public int[] twoSum(int[] nums, int target) {\\n        // Your code here\\n    }\\n}"
+      "testCases": [
+        {
+          "input": "2\\n2 7\\n9",
+          "expectedOutput": "0 1",
+          "isSample": true
+        }
+      ],
+      "driverCode": "import java.util.Scanner;\\nimport java.util.Arrays;\\n\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        int n = sc.nextInt();\\n        int[] nums = new int[n];\\n        for(int i = 0; i < n; i++) {\\n            nums[i] = sc.nextInt();\\n        }\\n        int target = sc.nextInt();\\n        sc.close();\\n\\n        Solution solution = new Solution();\\n        int[] result = solution.twoSum(nums, target);\\n        System.out.println(result[0] + \" \" + result[1]);\\n    }\\n}"
+      ---
+      Ensure the 'driverCode' correctly parses the 'input' from the 'testCases' and prints in the format of the 'expectedOutput'.
+      `;
+      // --- MODIFICATION END ---
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4-turbo-preview",
+                model: "gpt-4-turbo-preview", // Consider gpt-4o for speed and cost
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: prompt },
@@ -102,12 +116,12 @@ export async function POST(request: Request) {
             questionToReturn = { id: docRef.id, ...newQuestionData };
         }
 
-        // --- NEW LOGIC: Associate question with the project ---
+        // --- This logic is correct and unchanged ---
         if (questionToReturn.id) {
             const projectQuestionRef = doc(firestore, "projects", projectId, "projectQuestions", questionToReturn.id);
             await setDoc(projectQuestionRef, {
                 questionId: questionToReturn.id,
-                title: questionToReturn.title, // Store title for easy access
+                title: questionToReturn.title,
                 difficulty: questionToReturn.difficulty,
                 tags: questionToReturn.tags,
                 generatedAt: serverTimestamp(),

@@ -58,10 +58,9 @@ export default function ProjectPage() {
 
       if (questionSnap.exists()) {
         const fullQuestionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
-        // FIX: Ensure testCases is always an array to prevent crashes
-        if (!fullQuestionData.testCases) {
-          fullQuestionData.testCases = [];
-        }
+        if (!fullQuestionData.testCases) fullQuestionData.testCases = [];
+        // FIX: Ensure driverCode exists to prevent crashes
+        if (!fullQuestionData.driverCode) fullQuestionData.driverCode = ""; 
         setQuestion(fullQuestionData);
         setCode(fullQuestionData.starterCode);
         const qIndex = questionsList.findIndex(q => q.id === questionId);
@@ -71,7 +70,7 @@ export default function ProjectPage() {
       }
     } catch (error) {
       console.error("Error loading question:", error);
-      setExecutionError("Failed to load the question. It might have been deleted.");
+      setExecutionError("Failed to load the question. It might have been deleted or is missing data.");
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +83,6 @@ export default function ProjectPage() {
       const querySnapshot = await getDocs(q);
       const questions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectQuestion[];
       setProjectQuestions(questions);
-
       if (questions.length > 0) {
         loadQuestion(questions[0].id, questions);
       } else {
@@ -96,7 +94,7 @@ export default function ProjectPage() {
 
   const handleEditorDidMount = (editor: any) => { editorRef.current = editor; };
   const formatCode = () => { if (editorRef.current) editorRef.current.getAction('editor.action.formatDocument').run(); };
-
+  
   const handleNextQuestion = () => {
     if (isLoading) return; // don't navigate while loading
     if (projectQuestions.length === 0) return;
@@ -179,9 +177,10 @@ export default function ProjectPage() {
 
   // FIX: Robust Run and Submit handlers with proper error feedback
   const handleRunCode = async (isSubmission: boolean = false) => {
-    if (!code || !question?.id || !question.testCases || question.testCases.length === 0) {
-      setExecutionError("Cannot run code. The question is missing test cases.");
-      return;
+    // FIX: Add checks for driverCode
+    if (!code || !question?.id || !question.driverCode || !question.testCases || question.testCases.length === 0) {
+        setExecutionError("Cannot run code. The question is missing test cases or driver code.");
+        return;
     }
     setIsExecuting(true);
     setExecutionResult(null);
@@ -192,40 +191,49 @@ export default function ProjectPage() {
     let finalResult: ExecutionResult | null = null;
 
     for (const testCase of testCasesToRun) {
-      try {
-        const response = await fetch('/api/code/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceCode: code, languageId: 62, stdin: testCase.input }),
-        });
-        const result: ExecutionResult = await response.json();
-        finalResult = result; // Show the result of the last run test case
+        try {
+            const response = await fetch('/api/code/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // FIX: Send both userCode and driverCode
+                body: JSON.stringify({ 
+                    userCode: code, 
+                    driverCode: question.driverCode,
+                    stdin: testCase.input 
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "API request failed");
+            }
+            const result: ExecutionResult = await response.json();
+            finalResult = result;
 
-        if (result.status.id !== 3 || result.stdout?.trim() !== testCase.expectedOutput.trim()) {
-          allTestsPassed = false;
-          if (isSubmission) break; // Stop on first failure for submissions
+            if (result.status.id !== 3 || result.stdout?.trim() !== testCase.expectedOutput.trim()) {
+                allTestsPassed = false;
+                if (isSubmission) break;
+            }
+        } catch (error: any) {
+            console.error("Failed to execute code:", error);
+            setExecutionError(`An unexpected error occurred: ${error.message}`);
+            allTestsPassed = false;
+            break;
         }
-      } catch (error) {
-        console.error("Failed to execute code:", error);
-        setExecutionError("An unexpected error occurred while running your code.");
-        allTestsPassed = false;
-        break;
-      }
     }
-
+    
     setExecutionResult(finalResult);
 
     if (isSubmission && user) {
-      await addDoc(collection(firestore, "submissions"), {
-        userId: user.uid,
-        projectId,
-        questionId: question.id,
-        code,
-        status: allTestsPassed ? 'success' : 'fail',
-        submittedAt: serverTimestamp(),
-      });
+        await addDoc(collection(firestore, "submissions"), {
+            userId: user.uid,
+            projectId,
+            questionId: question.id,
+            code,
+            status: allTestsPassed ? 'success' : 'fail',
+            submittedAt: serverTimestamp(),
+        });
     }
-
+    
     setIsExecuting(false);
   };
 
@@ -280,39 +288,40 @@ export default function ProjectPage() {
         <ResizablePanel defaultSize={60} minSize={30}>
           <ResizablePanelGroup direction="vertical">
             <ResizablePanel defaultSize={70} minSize={30}>
-              <Editor
-                height="100%" language="java" theme="vs-dark" value={code}
-                onMount={handleEditorDidMount} onChange={(value) => setCode(value || "")}
-                options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on' }} />
+                <Editor
+                  height="100%" language="java" theme="vs-dark" value={code}
+                  onMount={handleEditorDidMount} onChange={(value) => setCode(value || "")}
+                  options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on' }} />
             </ResizablePanel>
-            <ResizableHandle withHandle />
+            
+            <ResizableHandle />
+
             <ResizablePanel defaultSize={30} minSize={15}>
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-                  <span className="font-semibold text-lg">Console</span>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" onClick={formatCode} className="flex items-center gap-2"><Code className="h-4 w-4" /> Format</Button>
-                    <Button variant="outline" onClick={() => handleRunCode(false)} disabled={isExecuting || !question} className="flex items-center gap-2">
-                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Run
-                    </Button>
-                    <Button onClick={() => handleRunCode(true)} disabled={isExecuting || !question} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
-                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit
-                    </Button>
-                  </div>
+                <div className="flex flex-col h-full">
+                    <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
+                        <span className="font-semibold text-lg">Console</span>
+                        <div className="flex items-center gap-2">
+                            <Button variant="secondary" onClick={formatCode} className="flex items-center gap-2"><Code className="h-4 w-4"/> Format</Button>
+                            <Button variant="outline" onClick={() => handleRunCode(false)} disabled={isExecuting || !question} className="flex items-center gap-2">
+                                {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Play className="h-4 w-4"/>} Run
+                            </Button>
+                            <Button onClick={() => handleRunCode(true)} disabled={isExecuting || !question} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
+                                {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>} Submit
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="p-4 flex-grow overflow-y-auto bg-muted/20">
+                        {isExecuting && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Executing...</div>}
+                        {executionError && <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Error</h3><p className="text-xs whitespace-pre-wrap">{executionError}</p></div>}
+                        {executionResult && !executionError && <OutputDisplay result={executionResult} expectedOutput={question?.testCases.find(tc => tc.isSample)?.expectedOutput || question?.testCases[0]?.expectedOutput} />}
+                    </div>
                 </div>
-                <div className="p-4 flex-grow overflow-y-auto bg-muted/20">
-                  {isExecuting && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Executing...</div>}
-                  {/* NEW: Display errors in the output panel */}
-                  {executionError && <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle /> Error</h3><p className="text-xs whitespace-pre-wrap">{executionError}</p></div>}
-                  {executionResult && !executionError && <OutputDisplay result={executionResult} expectedOutput={question?.testCases[0].expectedOutput} />}
-                </div>
-              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>
       </ResizablePanelGroup>
     </main>
-  );
+   );
 }
 
 // --- HELPER COMPONENTS ---
