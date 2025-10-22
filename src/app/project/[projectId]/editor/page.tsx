@@ -282,7 +282,7 @@ export default function ProjectPage() {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle />
 
         {/* Right Panel */}
         <ResizablePanel defaultSize={60} minSize={30}>

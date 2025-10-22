@@ -4,24 +4,47 @@ const JUDGE0_API_URL = `https://${process.env.NEXT_PUBLIC_RAPIDAPI_HOST}/submiss
 
 export async function POST(request: Request) {
   try {
-    // --- MODIFICATION START ---
-    // Update destructured props. 'sourceCode' is now 'userCode'
     const { userCode, driverCode, stdin } = await request.json();
 
-    // Update the validation check
     if (!userCode || !driverCode) {
       return NextResponse.json({ error: "Missing user code or driver code" }, { status: 400 });
     }
 
-    // Combine the user's solution with the question's driver code
+    // --- FIX START: This is the only line that needs to change ---
+    
+    // Regex to find all import statements, including wildcards (like .*)
+    // The key change is adding '\*' to the character class [\w\.\*]+
+    const importRegex = /import\s+[\w\.\*]+;?/g;
+
+    // --- FIX END ---
+
+    // 1. Extract imports from both code blocks
+    const userImports = userCode.match(importRegex) || [];
+    const driverImports = driverCode.match(importRegex) || [];
+
+    // 2. Remove imports from the code blocks
+    const userCodeWithoutImports = userCode.replace(importRegex, '').trim();
+    const driverCodeWithoutImports = driverCode.replace(importRegex, '').trim();
+
+    // 3. Combine and de-duplicate all imports
+    const allImports = [...new Set([...userImports, ...driverImports])];
+    const combinedImports = allImports.join('\n');
+
+    // 4. Create the final, valid Java file
     const fullSourceCode = `
+${combinedImports}
+
 // User's Solution Code
-${userCode}
+${userCodeWithoutImports}
 
 // Driver Code
-${driverCode}
+${driverCodeWithoutImports}
     `;
-    // --- MODIFICATION END ---
+
+    // DEBUG: Log the final code to check it
+    // console.log("--- FULL SOURCE CODE ---");
+    // console.log(fullSourceCode);
+    // console.log("------------------------");
 
     const options = {
       method: 'POST',
@@ -31,11 +54,8 @@ ${driverCode}
         'X-RapidAPI-Host': process.env.NEXT_PUBLIC_RAPIDAPI_HOST!,
       },
       body: JSON.stringify({
-        // --- MODIFICATION START ---
-        // Send the combined code
-        source_code: fullSourceCode,
-        // --- MODIFICATION END ---
-        language_id: 62, // 62 is the ID for Java on Judge0
+        source_code: fullSourceCode, // Send the new combined code
+        language_id: 62, // Java
         stdin: stdin || "",
       }),
     };
@@ -50,7 +70,7 @@ ${driverCode}
 
     return NextResponse.json(result);
 
-  } catch (error: any) { // Added 'any' type to error
+  } catch (error: any) { 
     console.error("Error in run code API:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
