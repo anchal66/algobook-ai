@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics"; // <-- Import Analytics
+import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -86,8 +87,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {/* Load Google Analytics */}
-        <GoogleAnalytics /> 
+        
+        {/* 2. WRAP GOOGLE ANALYTICS IN SUSPENSE */}
+        <Suspense fallback={null}>
+          <GoogleAnalytics /> 
+        </Suspense>
         
         <ThemeProvider
           attribute="class"
