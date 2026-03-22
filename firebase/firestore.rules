@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Projects ---
+    // Users can only read/write their own projects
+    match /projects/{projectId} {
+      allow read: if request.auth != null
+                  && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.userId == request.auth.uid;
+
+      // --- Project Questions (subcollection) ---
+      // Authenticated users can read project questions for projects they own.
+      // Writes are handled by firebase-admin in the API route (bypasses rules).
+      match /projectQuestions/{questionId} {
+        allow read: if request.auth != null
+                    && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
+      }
+    }
+
+    // --- Questions ---
+    // Any authenticated user can read questions.
+    // Writes are handled by firebase-admin in the API route (bypasses rules).
+    match /questions/{questionId} {
+      allow read: if request.auth != null;
+    }
+
+    // --- Submissions ---
+    // Users can only read/create their own submissions.
+    match /submissions/{submissionId} {
+      allow read: if request.auth != null
+                  && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}

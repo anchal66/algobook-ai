@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Panel as ResizablePanel, PanelGroup as ResizablePanelGroup, PanelResizeHandle as ResizableHandle } from "react-resizable-panels";
+import { Panel as ResizablePanel, Group as ResizablePanelGroup, Separator as ResizableHandle } from "react-resizable-panels";
 import { Editor } from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -316,7 +316,7 @@ const handleNextQuestion = () => {
 
   return (
     <main className="h-full w-full overflow-hidden bg-background text-foreground">
-      <ResizablePanelGroup direction="horizontal">
+      <ResizablePanelGroup orientation="horizontal">
         <ResizablePanel defaultSize={40} minSize={30}>
           <div className="flex flex-col h-full">
             <div className="flex-shrink-0 flex items-center gap-2 p-2 border-b">
@@ -361,7 +361,7 @@ const handleNextQuestion = () => {
         
         {/* Right Panel */}
         <ResizablePanel defaultSize={60} minSize={30}>
-          <ResizablePanelGroup direction="vertical">
+          <ResizablePanelGroup orientation="vertical">
             <ResizablePanel defaultSize={65} minSize={30}>
                 {/* Editor Panel: Unchanged */}
                 <Editor

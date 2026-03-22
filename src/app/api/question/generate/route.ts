@@ -1,50 +1,51 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { firestore } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, doc, setDoc } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { Question } from "@/types";
 
-// Initialize OpenAI client with the API key from your .env.local
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(request: Request) {
-    try {
-        const { prompt, projectId, userId } = await request.json();
+  try {
+    const { prompt, projectId, userId } = await request.json();
 
-        if (!prompt || !projectId || !userId) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-        }
+    if (!prompt || !projectId || !userId) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
 
-        let questionToReturn: Question | null = null;
+    let questionToReturn: Question | null = null;
 
-        // --- STRATEGY 1: Database First (Cost Saving) ---
-        const promptKeywords = prompt.toLowerCase().split(' ').filter((word: string) => word.length > 2);
-        if (promptKeywords.length > 0) {
-            const questionsRef = collection(firestore, "questions");
-            const q = query(
-                questionsRef,
-                where("tags", "array-contains-any", promptKeywords),
-                limit(1)
-            );
+    // --- STRATEGY 1: Database First (Cost Saving) ---
+    const promptKeywords = prompt
+      .toLowerCase()
+      .split(" ")
+      .filter((word: string) => word.length > 2);
 
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const doc = querySnapshot.docs[0];
-                questionToReturn = { id: doc.id, ...doc.data() } as Question;
-                console.log("Found existing question in DB:", questionToReturn.title);
-            }
-        }
+    if (promptKeywords.length > 0) {
+      const questionsRef = adminDb.collection("questions");
+      const snapshot = await questionsRef
+        .where("tags", "array-contains-any", promptKeywords)
+        .limit(1)
+        .get();
 
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        questionToReturn = { id: doc.id, ...doc.data() } as Question;
+        console.log("Found existing question in DB:", questionToReturn.title);
+      }
+    }
 
-        // --- STRATEGY 2: AI Fallback ---
-        if (!questionToReturn) {
-            console.log("No suitable question in DB, generating with AI...");
-            
-            // --- MODIFICATION START ---
-            // I've added the "driverCode" field to your existing prompt.
-            const systemPrompt = `You are an expert programming challenge creator. Your task is to generate a high-quality coding problem for a user practicing for software engineering interviews.
+    // --- STRATEGY 2: AI Fallback ---
+    if (!questionToReturn) {
+      console.log("No suitable question in DB, generating with AI...");
+
+      const systemPrompt = `You are an expert programming challenge creator. Your task is to generate a high-quality coding problem for a user practicing for software engineering interviews.
       The user's request is: "${prompt}".
       Based on the user's request, generate a complete coding challenge.
       You MUST respond with a single, minified JSON object and nothing else. Do not include any explanations or introductory text outside of the JSON.
@@ -84,55 +85,60 @@ export async function POST(request: Request) {
           "isSample": true
         }
       ],
-      "driverCode": "import java.util.Scanner;\\nimport java.util.Arrays;\\n\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        int n = sc.nextInt();\\n        int[] nums = new int[n];\\n        for(int i = 0; i < n; i++) {\\n            nums[i] = sc.nextInt();\\n        }\\n        int target = sc.nextInt();\\n        sc.close();\\n\\n        Solution solution = new Solution();\\n        int[] result = solution.twoSum(nums, target);\\n        System.out.println(result[0] + \" \" + result[1]);\\n    }\\n}"
+      "driverCode": "import java.util.Scanner;\\nimport java.util.Arrays;\\n\\npublic class Main {\\n    public static void main(String[] args) {\\n        Scanner sc = new Scanner(System.in);\\n        int n = sc.nextInt();\\n        int[] nums = new int[n];\\n        for(int i = 0; i < n; i++) {\\n            nums[i] = sc.nextInt();\\n        }\\n        int target = sc.nextInt();\\n        sc.close();\\n\\n        Solution solution = new Solution();\\n        int[] result = solution.twoSum(nums, target);\\n        System.out.println(result[0] + " " + result[1]);\\n    }\\n}"
       ---
       Ensure the 'driverCode' correctly parses the 'input' from the 'testCases' and prints in the format of the 'expectedOutput'.
       `;
-      // --- MODIFICATION END ---
 
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4-turbo-preview", // Consider gpt-4o for speed and cost
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: prompt },
-                ],
-                response_format: { type: "json_object" },
-            });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      });
 
-            const content = completion.choices[0].message.content;
-            if (!content) {
-                throw new Error("AI failed to generate a question.");
-            }
+      const content = completion.choices[0].message.content;
+      if (!content) {
+        throw new Error("AI failed to generate a question.");
+      }
 
-            const newQuestionData: Omit<Question, 'id'> = JSON.parse(content);
+      const newQuestionData: Omit<Question, "id"> = JSON.parse(content);
 
-            const questionsCollection = collection(firestore, "questions");
-            const docRef = await addDoc(questionsCollection, {
-                ...newQuestionData,
-                createdAt: serverTimestamp(),
-            });
+      const docRef = await adminDb.collection("questions").add({
+        ...newQuestionData,
+        createdAt: FieldValue.serverTimestamp(),
+      });
 
-            console.log("New question generated and saved with ID:", docRef.id);
-            questionToReturn = { id: docRef.id, ...newQuestionData };
-        }
-
-        // --- This logic is correct and unchanged ---
-        if (questionToReturn.id) {
-            const projectQuestionRef = doc(firestore, "projects", projectId, "projectQuestions", questionToReturn.id);
-            await setDoc(projectQuestionRef, {
-                questionId: questionToReturn.id,
-                title: questionToReturn.title,
-                difficulty: questionToReturn.difficulty,
-                tags: questionToReturn.tags,
-                generatedAt: serverTimestamp(),
-            });
-            console.log(`Associated question ${questionToReturn.id} with project ${projectId}`);
-        }
-
-        return NextResponse.json({ question: questionToReturn });
-
-    } catch (error) {
-        console.error("Error in generate question API:", error);
-        return NextResponse.json({ error: "Failed to generate question" }, { status: 500 });
+      console.log("New question generated and saved with ID:", docRef.id);
+      questionToReturn = { id: docRef.id, ...newQuestionData };
     }
+
+    if (questionToReturn.id) {
+      await adminDb
+        .collection("projects")
+        .doc(projectId)
+        .collection("projectQuestions")
+        .doc(questionToReturn.id)
+        .set({
+          questionId: questionToReturn.id,
+          title: questionToReturn.title,
+          difficulty: questionToReturn.difficulty,
+          tags: questionToReturn.tags,
+          generatedAt: FieldValue.serverTimestamp(),
+        });
+      console.log(
+        `Associated question ${questionToReturn.id} with project ${projectId}`
+      );
+    }
+
+    return NextResponse.json({ question: questionToReturn });
+  } catch (error) {
+    console.error("Error in generate question API:", error);
+    return NextResponse.json(
+      { error: "Failed to generate question" },
+      { status: 500 }
+    );
+  }
 }
