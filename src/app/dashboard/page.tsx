@@ -347,9 +347,9 @@ function getWeakestTopic(profile: UserProfile): string {
   for (const [topic, skill] of entries) {
     const total = skill.solved + skill.failed;
     if (total === 0) continue;
-    const passRate = skill.solved / total;
-    if (passRate < weakest.score) {
-      weakest = { topic, score: passRate };
+    const mastery = skill.masteryScore ?? Math.round((skill.solved / total) * 100);
+    if (mastery < weakest.score) {
+      weakest = { topic, score: mastery };
     }
   }
 

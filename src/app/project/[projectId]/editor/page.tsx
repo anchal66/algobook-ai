@@ -9,8 +9,12 @@ import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { Question, Submission, ProjectQuestion, TestCase } from "@/types";
-import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit, Lightbulb } from "lucide-react";
+import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason } from "@/types";
+import {
+  Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
+  AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
+  Lightbulb, Info,
+} from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -50,9 +54,19 @@ export default function ProjectPage() {
   const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [lastRunInput, setLastRunInput] = useState<string | null>(null);
+
+  // Hints state
   const [hints, setHints] = useState<string[]>([]);
+  const [hintLabels, setHintLabels] = useState<string[]>([]);
   const [revealedHintLevel, setRevealedHintLevel] = useState(0);
   const [isHintLoading, setIsHintLoading] = useState(false);
+  const hintsUsedRef = useRef(0);
+
+  // "Why this question?" reason
+  const [recommendationReason, setRecommendationReason] = useState<RecommendationReason | null>(null);
+
+  // Timing: track when user started working on a question
+  const questionStartTimeRef = useRef<number>(Date.now());
 
   const editorRef = useRef<any>(null);
 
@@ -85,7 +99,11 @@ export default function ProjectPage() {
     setCustomInput("");
     setSubmissionHistory([]);
     setHints([]);
+    setHintLabels([]);
     setRevealedHintLevel(0);
+    setRecommendationReason(null);
+    hintsUsedRef.current = 0;
+    questionStartTimeRef.current = Date.now();
     try {
       const questionRef = doc(firestore, "questions", questionId);
       const questionSnap = await getDoc(questionRef);
@@ -162,6 +180,11 @@ export default function ProjectPage() {
     setQuestion(null);
     setExecutionResult(null);
     setExecutionError(null);
+    setRecommendationReason(null);
+    setHints([]);
+    setHintLabels([]);
+    setRevealedHintLevel(0);
+    hintsUsedRef.current = 0;
     try {
       const response = await fetch('/api/question/generate', {
         method: 'POST',
@@ -174,7 +197,19 @@ export default function ProjectPage() {
       setQuestion(newQuestion);
       setCode(newQuestion.starterCode);
       setPrompt("");
-      const newProjectQuestion: ProjectQuestion = { id: newQuestion.id!, title: newQuestion.title, difficulty: newQuestion.difficulty, tags: newQuestion.tags, generatedAt: Timestamp.now() };
+      questionStartTimeRef.current = Date.now();
+
+      if (data.reason) {
+        setRecommendationReason(data.reason as RecommendationReason);
+      }
+
+      const newProjectQuestion: ProjectQuestion = {
+        id: newQuestion.id!,
+        title: newQuestion.title,
+        difficulty: newQuestion.difficulty,
+        tags: newQuestion.tags,
+        generatedAt: Timestamp.now(),
+      };
       const updatedQuestions = [...projectQuestions, newProjectQuestion];
       setProjectQuestions(updatedQuestions);
       setCurrentQuestionIndex(updatedQuestions.length - 1);
@@ -197,7 +232,7 @@ export default function ProjectPage() {
 
   const fetchHint = async (level: number) => {
     if (!question?.id || level < 1 || level > 3) return;
-    if (level > revealedHintLevel + 1) return; // must reveal sequentially
+    if (level > revealedHintLevel + 1) return;
 
     if (hints[level - 1]) {
       setRevealedHintLevel(level);
@@ -222,7 +257,13 @@ export default function ProjectPage() {
         updated[level - 1] = data.hint;
         return updated;
       });
+      setHintLabels((prev) => {
+        const updated = [...prev];
+        updated[level - 1] = data.label || HINT_LABELS_DEFAULT[level - 1];
+        return updated;
+      });
       setRevealedHintLevel(level);
+      hintsUsedRef.current = level;
     } catch (err) {
       console.error("Error fetching hint:", err);
     } finally {
@@ -231,12 +272,21 @@ export default function ProjectPage() {
   };
 
   const updateUserProfile = async (tags: string[], passed: boolean) => {
-    if (!user) return;
+    if (!user || !question) return;
+    const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
     try {
       await fetch("/api/profile/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.uid, tags, passed }),
+        body: JSON.stringify({
+          userId: user.uid,
+          tags,
+          passed,
+          difficulty: question.difficulty,
+          hintsUsed: hintsUsedRef.current,
+          timeSpentSeconds: timeSpent,
+          isFirstTry: submissionHistory.length === 0,
+        }),
       });
     } catch (err) {
       console.error("Profile update failed:", err);
@@ -318,6 +368,7 @@ export default function ProjectPage() {
     setExecutionResult(finalResult);
 
     if (isSubmission && user) {
+      const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
       const attemptNumber = submissionHistory.length + 1;
       await addDoc(collection(firestore, "submissions"), {
         userId: user.uid,
@@ -326,6 +377,9 @@ export default function ProjectPage() {
         code,
         status: allTestsPassed ? 'success' : 'fail',
         attemptNumber,
+        hintsUsed: hintsUsedRef.current,
+        timeSpentSeconds: timeSpent,
+        isFirstTry: attemptNumber === 1,
         submittedAt: serverTimestamp(),
       });
       fetchSubmissionHistory(question.id);
@@ -361,9 +415,13 @@ export default function ProjectPage() {
               )}
               {!isLoading && question && (
                 <>
+                  {recommendationReason && (
+                    <ReasonBadge reason={recommendationReason} />
+                  )}
                   <QuestionDisplay question={question} difficultyClass={difficultyClass} />
                   <HintsPanel
                     hints={hints}
+                    labels={hintLabels}
                     revealedLevel={revealedHintLevel}
                     isLoading={isHintLoading}
                     onRequestHint={fetchHint}
@@ -510,9 +568,13 @@ export default function ProjectPage() {
                               <CardTitle className="text-sm flex items-center gap-2 font-medium">
                                 {sub.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                                 {sub.status === 'success' ? 'Accepted' : 'Wrong Answer'}
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  #{sub.attemptNumber || '?'}
+                                  {sub.hintsUsed > 0 && ` · ${sub.hintsUsed} hint${sub.hintsUsed > 1 ? 's' : ''}`}
+                                </span>
                               </CardTitle>
                               <span className="text-[11px] text-muted-foreground">
-                                {formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true })}
+                                {sub.submittedAt?.toDate ? formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true }) : ''}
                               </span>
                             </CardHeader>
                           </Card>
@@ -530,7 +592,23 @@ export default function ProjectPage() {
   );
 }
 
-// --- HELPER COMPONENTS ---
+// ─── HELPER COMPONENTS ───
+
+const ReasonBadge = ({ reason }: { reason: RecommendationReason }) => (
+  <TooltipProvider delayDuration={200}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-primary/5 border border-primary/15 cursor-help">
+          <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="text-xs text-primary font-medium">{reason.short}</span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs">
+        <p className="text-xs">{reason.detail}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
 
 const QuestionListSidebar = ({ questions, onQuestionSelect, difficultyClass }: {
   questions: ProjectQuestion[],
@@ -603,20 +681,22 @@ const QuestionDisplay = ({ question, difficultyClass }: { question: Question, di
   </article>
 );
 
-const HINT_LABELS = ["Approach", "Algorithm", "Code Nudge"];
+const HINT_LABELS_DEFAULT = ["Pattern Recognition", "Algorithm Choice", "Implementation Trap"];
 const HINT_DESCRIPTIONS = [
-  "A high-level strategy hint",
-  "Which data structure or algorithm to use",
-  "A code-level insight (uses your current code)",
+  "What pattern or category does this problem belong to?",
+  "Which algorithm or data structure is the right fit?",
+  "What edge case or subtle trap will trip you up?",
 ];
 
 const HintsPanel = ({
   hints,
+  labels,
   revealedLevel,
   isLoading,
   onRequestHint,
 }: {
   hints: string[];
+  labels: string[];
   revealedLevel: number;
   isLoading: boolean;
   onRequestHint: (level: number) => void;
@@ -630,13 +710,14 @@ const HintsPanel = ({
         const isRevealed = level <= revealedLevel && hints[level - 1];
         const isNext = level === revealedLevel + 1;
         const isLocked = level > revealedLevel + 1;
+        const label = labels[level - 1] || HINT_LABELS_DEFAULT[level - 1];
 
         return (
           <div key={level} className="rounded-lg border border-border/40 overflow-hidden">
             {isRevealed ? (
               <div className="p-3 bg-amber-500/5">
                 <p className="text-xs font-medium text-amber-400 mb-1">
-                  Hint {level}: {HINT_LABELS[level - 1]}
+                  Hint {level}: {label}
                 </p>
                 <p className="text-sm text-foreground">{hints[level - 1]}</p>
               </div>
@@ -652,7 +733,7 @@ const HintsPanel = ({
               >
                 {isLoading && isNext ? (
                   <span className="flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading hint...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating hint...
                   </span>
                 ) : (
                   <span>
@@ -676,7 +757,7 @@ const WelcomeMessage = () => (
     </div>
     <h2 className="text-xl font-bold mb-2">Welcome to your AlgoBook</h2>
     <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-      Type a topic in the prompt below to generate an AI-powered coding challenge, or click the sparkle button for a quick suggestion.
+      Type a topic in the prompt below to generate an AI-powered coding challenge, or click the sparkle button for a smart recommendation.
     </p>
   </div>
 );

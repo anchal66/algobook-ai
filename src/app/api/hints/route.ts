@@ -2,9 +2,33 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { adminDb } from "@/lib/firebase-admin";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Cheap model for hints — no need for GPT-4o here
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const HINT_MODEL = "gpt-4o-mini";
+
+const HINT_STRUCTURE = {
+  1: {
+    label: "Pattern Recognition",
+    instruction:
+      "Identify the PATTERN or CATEGORY this problem belongs to. Name similar classic problems. " +
+      "Help the student recognize what type of problem this is so they can recall relevant techniques. " +
+      "Do NOT mention a specific algorithm or data structure yet. Keep it to 2-3 sentences.",
+  },
+  2: {
+    label: "Algorithm Choice",
+    instruction:
+      "Name the specific ALGORITHM or DATA STRUCTURE best suited for this problem and briefly explain WHY " +
+      "it is the right choice (e.g., time complexity advantage, natural fit for the constraints). " +
+      "Do NOT write any code or pseudocode. Keep it to 2-3 sentences.",
+  },
+  3: {
+    label: "Implementation Trap",
+    instruction:
+      "Point out a specific EDGE CASE, OFF-BY-ONE error, or subtle CONSTRAINT that will trip the student up " +
+      "during implementation. If the student provided code, identify the specific mistake or gap in their approach. " +
+      "Do NOT give the full solution. Keep it to 2-3 sentences.",
+  },
+} as const;
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check stored hints first
+    const level = hintLevel as 1 | 2 | 3;
     const questionSnap = await adminDb.collection("questions").doc(questionId).get();
     if (!questionSnap.exists) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -26,53 +50,54 @@ export async function POST(request: Request) {
     const questionData = questionSnap.data()!;
     const storedHints: string[] = questionData.hints || [];
 
-    // Return stored hint if available (levels 1 and 2 are always from stored)
-    if (storedHints[hintLevel - 1] && hintLevel <= 2) {
+    // Return cached hint for levels 1-2 if available
+    if (storedHints[level - 1] && level <= 2) {
       return NextResponse.json({
-        hint: storedHints[hintLevel - 1],
-        level: hintLevel,
+        hint: storedHints[level - 1],
+        level,
+        label: HINT_STRUCTURE[level].label,
         source: "stored",
       });
     }
 
-    // For level 3 or missing hints, generate contextually with AI
-    const hintPrompts: Record<number, string> = {
-      1: "Give a high-level approach hint. Suggest what general strategy or pattern to consider. Do NOT mention specific algorithms or data structures. Keep it to 1-2 sentences.",
-      2: "Give a specific algorithm/data structure hint. Name the exact technique or structure that would work well here. Keep it to 1-2 sentences.",
-      3: `Give a code-level hint. Point out a key insight, edge case, or implementation trick without writing the full solution. ${userCode ? "The user has written some code — guide them based on what they have so far." : ""}Keep it to 2-3 sentences.`,
-    };
+    // Generate contextual hint using cheap model
+    const hintSpec = HINT_STRUCTURE[level];
 
-    const systemPrompt = `You are a helpful coding tutor. The student is stuck on this problem and needs a hint. 
-    
-Problem: ${questionData.title}
+    const prompt = `You are a coding tutor helping a student who is stuck.
+
+PROBLEM: ${questionData.title}
 ${questionData.problemStatement}
 
-${userCode ? `Student's current code:\n\`\`\`\n${userCode}\n\`\`\`` : ""}
+DIFFICULTY: ${questionData.difficulty}
+TAGS: ${(questionData.tags || []).join(", ")}
 
-${hintPrompts[hintLevel]}
+${userCode ? `STUDENT'S CURRENT CODE:\n\`\`\`\n${userCode}\n\`\`\`\n` : ""}
+YOUR TASK (${hintSpec.label}):
+${hintSpec.instruction}
 
-Respond with ONLY the hint text, no labels or prefixes.`;
+Respond with ONLY the hint text. No labels, prefixes, or markdown formatting.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: systemPrompt }],
-      max_tokens: 200,
+      model: HINT_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 250,
+      temperature: 0.7,
     });
 
-    const hint = completion.choices[0].message.content?.trim() || "Try breaking the problem into smaller parts.";
+    const hint =
+      completion.choices[0].message.content?.trim() ||
+      "Try breaking the problem into smaller subproblems and solving each one independently.";
 
-    // Cache the generated hint on the question document
-    if (storedHints.length < hintLevel) {
-      while (storedHints.length < hintLevel - 1) {
-        storedHints.push("");
-      }
-      storedHints[hintLevel - 1] = hint;
-      await adminDb.collection("questions").doc(questionId).update({ hints: storedHints });
-    }
+    // Cache generated hint
+    const updatedHints = [...storedHints];
+    while (updatedHints.length < level) updatedHints.push("");
+    updatedHints[level - 1] = hint;
+    await adminDb.collection("questions").doc(questionId).update({ hints: updatedHints });
 
     return NextResponse.json({
       hint,
-      level: hintLevel,
+      level,
+      label: hintSpec.label,
       source: "generated",
     });
   } catch (error) {
