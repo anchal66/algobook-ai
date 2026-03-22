@@ -5,20 +5,23 @@ import path from "path";
 let adminApp: App;
 
 if (!getApps().length) {
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  let credential;
 
-  if (!serviceAccountPath) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    // Vercel / production: credentials passed as a JSON string
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    credential = cert(serviceAccount);
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+    // Local dev: credentials read from a file
+    const resolvedPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    credential = cert(resolvedPath);
+  } else {
     throw new Error(
-      "FIREBASE_SERVICE_ACCOUNT_PATH environment variable is not set. " +
-        "Point it to your service account JSON file."
+      "Either FIREBASE_SERVICE_ACCOUNT_KEY or FIREBASE_SERVICE_ACCOUNT_PATH must be set."
     );
   }
 
-  const resolvedPath = path.resolve(serviceAccountPath);
-
-  adminApp = initializeApp({
-    credential: cert(resolvedPath),
-  });
+  adminApp = initializeApp({ credential });
 } else {
   adminApp = getApps()[0];
 }

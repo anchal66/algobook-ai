@@ -9,7 +9,7 @@ import { Suspense } from "react";
 const inter = Inter({ subsets: ["latin"] });
 
 // --- NEW SEO-OPTIMIZED METADATA ---
-const siteUrl = "httpsS://algobook.ai"; // Change this to your actual domain
+const siteUrl = "https://algobook.ai";
 
 export const metadata: Metadata = {
   // --- Basic Info ---

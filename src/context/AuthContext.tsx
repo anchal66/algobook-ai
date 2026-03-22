@@ -1,10 +1,9 @@
 "use client";
 
-import { createContext, useContext, ReactNode, useEffect } from "react";
+import { createContext, useContext, ReactNode } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { User } from "firebase/auth";
-import { useRouter } from "next/navigation";
 
 // Define the shape of the context data
 interface AuthContextType {
@@ -16,17 +15,8 @@ interface AuthContextType {
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Create the provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, loading, error] = useAuthState(auth);
-  const router = useRouter();
-
-  useEffect(() => {
-    // If loading is finished and there's no user, redirect to login
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [user, loading, router]);
 
   const value = { user, loading, error };
 

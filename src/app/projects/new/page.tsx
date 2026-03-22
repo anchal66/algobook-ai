@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, Code2, Rocket } from "lucide-react";
 
 export default function NewProjectPage() {
   const { user } = useAuth();
@@ -39,8 +41,8 @@ export default function NewProjectPage() {
       return;
     }
     if (!title.trim() || !description.trim()) {
-        setError("Project title and description are required.");
-        return;
+      setError("Project title and description are required.");
+      return;
     }
 
     setIsLoading(true);
@@ -52,14 +54,12 @@ export default function NewProjectPage() {
         userId: user.uid,
         title,
         description,
-        duration, // in days
+        duration,
         purpose,
         createdAt: serverTimestamp(),
       });
-      
-      // Redirect to the newly created project's editor page
-      router.push(`/project/${newProjectDoc.id}`);
 
+      router.push(`/project/${newProjectDoc.id}`);
     } catch (err) {
       console.error("Error creating project: ", err);
       setError("Failed to create project. Please try again.");
@@ -68,75 +68,133 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-6 lg:p-8">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold">Create New Project</CardTitle>
-          <CardDescription>
-            Define your goals and start your personalized coding journey.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="title">Project Title</Label>
-              <Input
-                id="title"
-                placeholder="e.g., Mastering Dynamic Programming"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
+    <div className="min-h-screen bg-background">
+      {/* Top Bar */}
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-40">
+        <div className="mx-auto max-w-7xl flex items-center justify-between px-6 py-3">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Code2 className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="A brief description of what you want to achieve. This will help the AI tailor questions for you."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-              />
-            </div>
-             <div className="space-y-2">
-              <Label htmlFor="purpose">Optional Purpose</Label>
-              <Input
-                id="purpose"
-                placeholder="e.g., Prepare for FAANG Interviews"
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-              />
-            </div>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="duration">Practice Duration (Days)</Label>
-                <span className="text-lg font-semibold text-primary">{duration}</span>
+            <span className="text-lg font-bold tracking-tight">AlgoBook</span>
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Dashboard
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex items-center justify-center px-4 py-16 sm:py-24">
+        <motion.div
+          className="w-full max-w-2xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="overflow-hidden border-border/60">
+            <div className="h-2 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-xl bg-primary/10 p-2.5">
+                  <Rocket className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-bold">
+                    Create New Project
+                  </CardTitle>
+                  <CardDescription className="mt-0.5">
+                    Define your goals and the AI will tailor questions for you.
+                  </CardDescription>
+                </div>
               </div>
-              <Slider
-                id="duration"
-                min={7}
-                max={90}
-                step={1}
-                value={[duration]}
-                onValueChange={(value) => setDuration(value[0])}
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col items-start gap-4">
-             {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Start Coding"
-              )}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Project Title</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., Mastering Dynamic Programming"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="h-11"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe what you want to achieve. This helps the AI generate relevant questions."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="min-h-[100px]"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purpose">Purpose (optional)</Label>
+                  <Input
+                    id="purpose"
+                    placeholder="e.g., Prepare for FAANG Interviews"
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="duration">Practice Duration</Label>
+                    <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">
+                      {duration} days
+                    </span>
+                  </div>
+                  <Slider
+                    id="duration"
+                    min={7}
+                    max={90}
+                    step={1}
+                    value={[duration]}
+                    onValueChange={(value) => setDuration(value[0])}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>1 week</span>
+                    <span>3 months</span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-col items-stretch gap-4 pt-2">
+                {error && (
+                  <p className="text-sm text-destructive bg-destructive/10 px-4 py-2 rounded-lg">
+                    {error}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  className="w-full py-6 text-base gap-2 shadow-lg shadow-primary/20"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="h-4 w-4" />
+                      Start Coding
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </motion.div>
+      </main>
     </div>
   );
 }

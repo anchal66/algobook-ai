@@ -10,16 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { Question, Submission, ProjectQuestion, TestCase } from "@/types";
-import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, History } from "lucide-react";
+import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit } from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-// NEW: Import Tabs, Textarea, and Card
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 
 
@@ -32,13 +31,11 @@ interface ExecutionResult {
   memory: number;
 }
 
-// MAIN COMPONENT
 export default function ProjectPage() {
   const { user } = useAuth();
   const params = useParams();
   const projectId = params.projectId as string;
 
-  // State Management
   const [prompt, setPrompt] = useState("");
   const [question, setQuestion] = useState<Question | null>(null);
   const [code, setCode] = useState<string>("");
@@ -48,18 +45,14 @@ export default function ProjectPage() {
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [projectQuestions, setProjectQuestions] = useState<ProjectQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
-
-  // --- NEW STATE for Console Tabs ---
   const [activeConsoleTab, setActiveConsoleTab] = useState("test-result");
   const [customInput, setCustomInput] = useState("");
   const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [lastRunInput, setLastRunInput] = useState<string | null>(null);
-  // ---
 
   const editorRef = useRef<any>(null);
 
-  // --- NEW: Function to fetch submission history ---
   const fetchSubmissionHistory = useCallback(async (questionId: string) => {
     if (!user || !projectId) return;
     setIsHistoryLoading(true);
@@ -86,22 +79,19 @@ export default function ProjectPage() {
     setQuestion(null);
     setExecutionResult(null);
     setExecutionError(null);
-    setCustomInput(""); // Reset custom input
-    setSubmissionHistory([]); // Clear old history
+    setCustomInput("");
+    setSubmissionHistory([]);
     try {
       const questionRef = doc(firestore, "questions", questionId);
       const questionSnap = await getDoc(questionRef);
-
       if (questionSnap.exists()) {
         const fullQuestionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
         if (!fullQuestionData.testCases) fullQuestionData.testCases = [];
-        if (!fullQuestionData.driverCode) fullQuestionData.driverCode = ""; 
+        if (!fullQuestionData.driverCode) fullQuestionData.driverCode = "";
         setQuestion(fullQuestionData);
         setCode(fullQuestionData.starterCode);
         const qIndex = questionsList.findIndex(q => q.id === questionId);
         setCurrentQuestionIndex(qIndex);
-        
-        // Fetch history for this new question
         fetchSubmissionHistory(fullQuestionData.id!);
       } else {
         throw new Error(`Question with ID ${questionId} not found.`);
@@ -112,7 +102,7 @@ export default function ProjectPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchSubmissionHistory]); // Add dependency
+  }, [fetchSubmissionHistory]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -133,19 +123,16 @@ export default function ProjectPage() {
   const handleEditorDidMount = (editor: any) => { editorRef.current = editor; };
   const formatCode = () => { if (editorRef.current) editorRef.current.getAction('editor.action.formatDocument').run(); };
 
-const handleNextQuestion = () => {
-    if (isLoading) return; // don't navigate while loading
+  const handleNextQuestion = () => {
+    if (isLoading) return;
     if (projectQuestions.length === 0) return;
-
-    // If index not set but we have questions, go to first
     if (currentQuestionIndex < 0) {
       const first = projectQuestions[0];
       if (first) loadQuestion(first.id, projectQuestions);
       return;
     }
-
     const nextIndex = Math.min(currentQuestionIndex + 1, projectQuestions.length - 1);
-    if (nextIndex === currentQuestionIndex) return; // already at last
+    if (nextIndex === currentQuestionIndex) return;
     const nextQ = projectQuestions[nextIndex];
     if (nextQ) loadQuestion(nextQ.id, projectQuestions);
   };
@@ -153,20 +140,16 @@ const handleNextQuestion = () => {
   const handlePreviousQuestion = () => {
     if (isLoading) return;
     if (projectQuestions.length === 0) return;
-
-    // If index not set but we have questions, go to first
     if (currentQuestionIndex < 0) {
       const first = projectQuestions[0];
       if (first) loadQuestion(first.id, projectQuestions);
       return;
     }
-
     const prevIndex = Math.max(currentQuestionIndex - 1, 0);
-    if (prevIndex === currentQuestionIndex) return; // already at first
+    if (prevIndex === currentQuestionIndex) return;
     const prevQ = projectQuestions[prevIndex];
     if (prevQ) loadQuestion(prevQ.id, projectQuestions);
   };
-
 
   const submitPrompt = async (promptToSubmit: string) => {
     if (!promptToSubmit.trim() || !user) return;
@@ -186,7 +169,6 @@ const handleNextQuestion = () => {
       setQuestion(newQuestion);
       setCode(newQuestion.starterCode);
       setPrompt("");
-
       const newProjectQuestion: ProjectQuestion = { id: newQuestion.id!, title: newQuestion.title, difficulty: newQuestion.difficulty, tags: newQuestion.tags, generatedAt: Timestamp.now() };
       const updatedQuestions = [...projectQuestions, newProjectQuestion];
       setProjectQuestions(updatedQuestions);
@@ -204,241 +186,273 @@ const handleNextQuestion = () => {
     submitPrompt(prompt);
   };
 
-  // NEW: "Generate Next" shortcut handler
   const handleGenerateNext = () => {
-    let nextPrompt = "Give me a new easy question on arrays"; // Default fallback
+    let nextPrompt = "Give me a new easy question on arrays";
     if (question && question.tags.length > 0) {
       nextPrompt = `Give me another question related to ${question.tags.join(', ')} with a similar difficulty.`;
     }
     submitPrompt(nextPrompt);
   };
 
-  
   const handleRunCode = async (isSubmission: boolean = false) => {
     if (!code || !question?.id || !question.driverCode) {
-        setExecutionError("Cannot run code. The question is missing driver code.");
-        return;
+      setExecutionError("Cannot run code. The question is missing driver code.");
+      return;
     }
-    
+
     setIsExecuting(true);
     setExecutionResult(null);
     setExecutionError(null);
     setLastRunInput(null);
-    setActiveConsoleTab("test-result"); // Switch to result tab
+    setActiveConsoleTab("test-result");
 
     let testCasesToRun: TestCase[] = [];
-    let inputsToRun: string[] = [];
 
     if (isSubmission) {
-      // SUBMIT: Run all test cases
       if (question.testCases.length === 0) {
         setExecutionError("Cannot submit. The question has no test cases.");
         setIsExecuting(false);
         return;
       }
       testCasesToRun = question.testCases;
-      inputsToRun = testCasesToRun.map(tc => tc.input);
     } else {
-      // RUN: Use custom input or first sample test case
       let inputToUse: string;
       if (activeConsoleTab === "custom-input") {
         inputToUse = customInput;
-        // Create a temporary test case for logic
         testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
       } else {
         const sampleCase = question.testCases.find(tc => tc.isSample) || question.testCases[0];
         if (!sampleCase) {
-           setExecutionError("Cannot run. The question has no sample test cases.");
-           setIsExecuting(false);
-           return;
+          setExecutionError("Cannot run. The question has no sample test cases.");
+          setIsExecuting(false);
+          return;
         }
         testCasesToRun = [sampleCase];
         inputToUse = sampleCase.input;
       }
-      inputsToRun = [inputToUse];
-      setLastRunInput(inputToUse); // Set this so we can display it
+      setLastRunInput(inputToUse);
     }
 
     let allTestsPassed = true;
     let finalResult: ExecutionResult | null = null;
 
     for (const testCase of testCasesToRun) {
-        try {
-            const response = await fetch('/api/code/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    userCode: code, 
-                    driverCode: question.driverCode,
-                    stdin: testCase.input 
-                }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "API request failed");
-            }
-            const result: ExecutionResult = await response.json();
-            finalResult = result;
-            
-            // Set input for display, even for custom runs
-            setLastRunInput(testCase.input); 
-
-            if (result.status.id !== 3 || (testCase.expectedOutput !== "N/A (Custom Input)" && result.stdout?.trim() !== testCase.expectedOutput.trim())) {
-                allTestsPassed = false;
-                if (isSubmission) break;
-            }
-        } catch (error: any) {
-            console.error("Failed to execute code:", error);
-            setExecutionError(`An unexpected error occurred: ${error.message}`);
-            allTestsPassed = false;
-            break;
+      try {
+        const response = await fetch('/api/code/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userCode: code,
+            driverCode: question.driverCode,
+            stdin: testCase.input
+          }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "API request failed");
         }
+        const result: ExecutionResult = await response.json();
+        finalResult = result;
+        setLastRunInput(testCase.input);
+        if (result.status.id !== 3 || (testCase.expectedOutput !== "N/A (Custom Input)" && result.stdout?.trim() !== testCase.expectedOutput.trim())) {
+          allTestsPassed = false;
+          if (isSubmission) break;
+        }
+      } catch (error: any) {
+        console.error("Failed to execute code:", error);
+        setExecutionError(`An unexpected error occurred: ${error.message}`);
+        allTestsPassed = false;
+        break;
+      }
     }
-    
+
     setExecutionResult(finalResult);
 
     if (isSubmission && user) {
-        await addDoc(collection(firestore, "submissions"), {
-            userId: user.uid,
-            projectId,
-            questionId: question.id,
-            code,
-            status: allTestsPassed ? 'success' : 'fail',
-            submittedAt: serverTimestamp(),
-        });
-        // Refresh history tab after submission
-        fetchSubmissionHistory(question.id);
+      await addDoc(collection(firestore, "submissions"), {
+        userId: user.uid,
+        projectId,
+        questionId: question.id,
+        code,
+        status: allTestsPassed ? 'success' : 'fail',
+        submittedAt: serverTimestamp(),
+      });
+      fetchSubmissionHistory(question.id);
     }
-    
+
     setIsExecuting(false);
   };
 
+  const difficultyClass = (d: string) =>
+    d === 'Easy' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' :
+    d === 'Medium' ? 'bg-amber-500/15 text-amber-400 border-amber-500/20' :
+    'bg-red-500/15 text-red-400 border-red-500/20';
 
   return (
     <main className="h-full w-full overflow-hidden bg-background text-foreground">
       <ResizablePanelGroup orientation="horizontal">
-        <ResizablePanel defaultSize={40} minSize={30}>
+        {/* Left Panel — Problem */}
+        <ResizablePanel defaultSize={40} minSize={25}>
           <div className="flex flex-col h-full">
-            <div className="flex-shrink-0 flex items-center gap-2 p-2 border-b">
-              <QuestionListSidebar questions={projectQuestions} onQuestionSelect={(id) => loadQuestion(id, projectQuestions)} />
-              <h2 className="text-lg font-semibold truncate">Problem Description</h2>
+            <div className="flex-shrink-0 flex items-center gap-2.5 px-3 py-2 border-b border-border/50">
+              <QuestionListSidebar questions={projectQuestions} onQuestionSelect={(id) => loadQuestion(id, projectQuestions)} difficultyClass={difficultyClass} />
+              <h2 className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">Problem</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto">
-              {isLoading && <div className="flex flex-col items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="mt-4 text-muted-foreground">Loading...</p></div>}
-              {!isLoading && question && <QuestionDisplay question={question} />}
+            <div className="flex-grow p-5 overflow-y-auto">
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <div className="rounded-2xl bg-primary/10 p-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Generating question...</p>
+                </div>
+              )}
+              {!isLoading && question && <QuestionDisplay question={question} difficultyClass={difficultyClass} />}
               {!isLoading && !question && <WelcomeMessage />}
             </div>
-            <div className="flex-shrink-0 border-t p-4 space-y-4 bg-background">
+            <div className="flex-shrink-0 border-t border-border/50 p-3 space-y-3 bg-card/50">
               <div className="flex justify-between items-center">
-                <Button variant="outline" onClick={handlePreviousQuestion} disabled={currentQuestionIndex <= 0}>
-                  <ChevronLeft className="h-4 w-4 mr-2" /> Previous
+                <Button variant="ghost" size="sm" onClick={handlePreviousQuestion} disabled={currentQuestionIndex <= 0} className="gap-1 text-xs">
+                  <ChevronLeft className="h-3.5 w-3.5" /> Prev
                 </Button>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground font-medium tabular-nums">
                   {projectQuestions.length > 0 ? `${currentQuestionIndex + 1} / ${projectQuestions.length}` : 'No questions yet'}
                 </span>
-                <Button variant="outline" onClick={handleNextQuestion} disabled={currentQuestionIndex >= projectQuestions.length - 1}>
-                  Next <ChevronRight className="h-4 w-4 ml-2" />
+                <Button variant="ghost" size="sm" onClick={handleNextQuestion} disabled={currentQuestionIndex >= projectQuestions.length - 1} className="gap-1 text-xs">
+                  Next <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <form onSubmit={handlePromptSubmit} className="flex gap-2">
-                <Input placeholder="Generate a new question..." value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={isLoading} />
-                {/* NEW: Tooltip provider for shortcut button */}
+              <form onSubmit={handlePromptSubmit} className="flex gap-1.5">
+                <Input
+                  placeholder="Ask AI for a new question..."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={isLoading}
+                  className="h-9 text-sm bg-background"
+                />
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" type="button" onClick={handleGenerateNext} disabled={isLoading}><Sparkles className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" type="button" onClick={handleGenerateNext} disabled={isLoading} className="h-9 w-9 shrink-0">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Generate Next Question</p></TooltipContent>
+                    <TooltipContent><p>Generate Similar Question</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <Button type="submit" disabled={isLoading}><Wand2 className="h-4 w-4" /></Button>
+                <Button type="submit" size="icon" disabled={isLoading} className="h-9 w-9 shrink-0 shadow-sm shadow-primary/20">
+                  <Wand2 className="h-3.5 w-3.5" />
+                </Button>
               </form>
             </div>
           </div>
         </ResizablePanel>
 
-        <ResizableHandle />
-        
-        {/* Right Panel */}
+        <ResizableHandle className="w-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
+
+        {/* Right Panel — Editor + Console */}
         <ResizablePanel defaultSize={60} minSize={30}>
           <ResizablePanelGroup orientation="vertical">
             <ResizablePanel defaultSize={65} minSize={30}>
-                {/* Editor Panel: Unchanged */}
-                <Editor
-                  height="100%" language="java" theme="vs-dark" value={code}
-                  onMount={handleEditorDidMount} onChange={(value) => setCode(value || "")}
-                  options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on' }} />
+              <Editor
+                height="100%"
+                language="java"
+                theme="vs-dark"
+                value={code}
+                onMount={handleEditorDidMount}
+                onChange={(value) => setCode(value || "")}
+                options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', padding: { top: 12 }, scrollBeyondLastLine: false }}
+              />
             </ResizablePanel>
-            
-            <ResizableHandle />
 
-            {/* --- NEW: Upgraded Console Panel --- */}
+            <ResizableHandle className="h-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
+
+            {/* Console */}
             <ResizablePanel defaultSize={35} minSize={20}>
               <div className="flex flex-col h-full">
-                {/* Top bar with buttons */}
-                <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-                  <span className="font-semibold text-lg">Console</span>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" onClick={formatCode} className="flex items-center gap-2"><Code className="h-4 w-4"/> Format</Button>
-                    <Button variant="outline" onClick={() => handleRunCode(false)} disabled={isExecuting || !question} className="flex items-center gap-2">
-                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Play className="h-4 w-4"/>} Run
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 flex-shrink-0 bg-card/30">
+                  <span className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">Console</span>
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="ghost" size="sm" onClick={formatCode} className="gap-1.5 text-xs h-7">
+                      <Code className="h-3 w-3" /> Format
                     </Button>
-                    <Button onClick={() => handleRunCode(true)} disabled={isExecuting || !question} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
-                      {isExecuting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>} Submit
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRunCode(false)}
+                      disabled={isExecuting || !question}
+                      className="gap-1.5 text-xs h-7"
+                    >
+                      {isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Play className="h-3 w-3"/>} Run
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleRunCode(true)}
+                      disabled={isExecuting || !question}
+                      className="gap-1.5 text-xs h-7 shadow-sm shadow-primary/20"
+                    >
+                      {isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Send className="h-3 w-3"/>} Submit
                     </Button>
                   </div>
                 </div>
 
-                {/* Tabbed Content Area */}
                 <Tabs value={activeConsoleTab} onValueChange={setActiveConsoleTab} className="flex-grow flex flex-col">
-                  <TabsList className="flex-shrink-0 rounded-none bg-transparent border-b justify-start">
-                    <TabsTrigger value="test-result">Test Result</TabsTrigger>
-                    <TabsTrigger value="custom-input">Custom Input</TabsTrigger>
-                    <TabsTrigger value="submissions">Submissions</TabsTrigger>
+                  <TabsList className="flex-shrink-0 rounded-none bg-transparent border-b border-border/50 justify-start h-8 px-1">
+                    <TabsTrigger value="test-result" className="text-xs h-7 data-[state=active]:shadow-none">Test Result</TabsTrigger>
+                    <TabsTrigger value="custom-input" className="text-xs h-7 data-[state=active]:shadow-none">Custom Input</TabsTrigger>
+                    <TabsTrigger value="submissions" className="text-xs h-7 data-[state=active]:shadow-none">Submissions</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="test-result" className="flex-grow overflow-y-auto p-4">
-                    {isExecuting && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Executing...</div>}
-                    {executionError && <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Error</h3><p className="text-xs whitespace-pre-wrap">{executionError}</p></div>}
-                    {executionResult && !executionError && 
-                      <OutputDisplay 
-                        result={executionResult} 
+                    {isExecuting && (
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" /> Running your code...
+                      </div>
+                    )}
+                    {executionError && (
+                      <div className="text-red-400">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Error</h3>
+                        <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{executionError}</pre>
+                      </div>
+                    )}
+                    {executionResult && !executionError &&
+                      <OutputDisplay
+                        result={executionResult}
                         inputUsed={lastRunInput}
-                        expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput} 
+                        expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
                       />}
                     {!isExecuting && !executionResult && !executionError &&
-                      <div className="text-muted-foreground p-4">Click "Run" to see the output of your code against the first sample test case.</div>
+                      <p className="text-sm text-muted-foreground">Click &quot;Run&quot; to test your code against the sample test case, or &quot;Submit&quot; to check all test cases.</p>
                     }
                   </TabsContent>
-                  
+
                   <TabsContent value="custom-input" className="flex-grow overflow-y-auto p-4 flex flex-col">
-                    <label htmlFor="custom-input" className="text-sm font-medium mb-2">Type your test case input below:</label>
-                    <Textarea 
+                    <label htmlFor="custom-input" className="text-xs font-medium mb-2 text-muted-foreground">Custom stdin input:</label>
+                    <Textarea
                       id="custom-input"
                       value={customInput}
                       onChange={(e) => setCustomInput(e.target.value)}
-                      placeholder="e.g., 2&#10;2 7&#10;9"
-                      className="flex-grow font-mono text-sm"
+                      placeholder={"e.g.\n2\n2 7\n9"}
+                      className="flex-grow font-mono text-sm bg-background"
                     />
                   </TabsContent>
-                  
+
                   <TabsContent value="submissions" className="flex-grow overflow-y-auto p-4">
-                    {isHistoryLoading && <div className="flex items-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Loading history...</div>}
-                    {!isHistoryLoading && submissionHistory.length === 0 && <div className="text-muted-foreground">No submissions found for this question.</div>}
+                    {isHistoryLoading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading...</div>}
+                    {!isHistoryLoading && submissionHistory.length === 0 && <p className="text-sm text-muted-foreground">No submissions yet for this question.</p>}
                     {!isHistoryLoading && submissionHistory.length > 0 && (
-                      <div className="space-y-4">
+                      <div className="space-y-2">
                         {submissionHistory.map((sub) => (
-                          <Card key={sub.id} className={sub.status === 'success' ? 'border-green-600' : 'border-red-600'}>
-                            <CardHeader className="p-4 flex flex-row items-center justify-between">
-                              <CardTitle className="text-lg flex items-center gap-2">
-                                {sub.status === 'success' ? <CheckCircle2 className="text-green-500" /> : <XCircle className="text-red-500" />}
+                          <Card key={sub.id} className={`border ${sub.status === 'success' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                            <CardHeader className="p-3 flex flex-row items-center justify-between">
+                              <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                                {sub.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                                 {sub.status === 'success' ? 'Accepted' : 'Wrong Answer'}
                               </CardTitle>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-[11px] text-muted-foreground">
                                 {formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true })}
                               </span>
                             </CardHeader>
-                            {/* We could add a button to view the submitted code here */}
                           </Card>
                         ))}
                       </div>
@@ -451,140 +465,151 @@ const handleNextQuestion = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
     </main>
-   );
+  );
 }
 
 // --- HELPER COMPONENTS ---
 
-const QuestionListSidebar = ({ questions, onQuestionSelect }: { questions: ProjectQuestion[], onQuestionSelect: (id: string) => void }) => {
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon"><Menu className="h-4 w-4" /></Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-full sm:w-[400px]">
-        <SheetHeader>
-          <SheetTitle>Project Questions</SheetTitle>
-        </SheetHeader>
-        <div className="py-4">
-          {/* FIX: Use Accordion from shadcn which can be empty */}
-          <Accordion type="single" collapsible className="w-full">
-            {questions.map((q) => (
-              <AccordionItem value={q.id} key={q.id} className="border-none">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-left h-auto py-2 px-2"
-                  onClick={() => onQuestionSelect(q.id)}
-                >
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="font-normal">{q.title}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${q.difficulty === 'Easy' ? 'bg-green-800 text-green-200' :
-                        q.difficulty === 'Medium' ? 'bg-yellow-800 text-yellow-200' :
-                          'bg-red-800 text-red-200'
-                      }`}>{q.difficulty}</span>
+const QuestionListSidebar = ({ questions, onQuestionSelect, difficultyClass }: {
+  questions: ProjectQuestion[],
+  onQuestionSelect: (id: string) => void,
+  difficultyClass: (d: string) => string,
+}) => (
+  <Sheet>
+    <SheetTrigger asChild>
+      <Button variant="outline" size="icon" className="h-8 w-8">
+        <Menu className="h-3.5 w-3.5" />
+      </Button>
+    </SheetTrigger>
+    <SheetContent side="left" className="w-full sm:w-[380px]">
+      <SheetHeader>
+        <SheetTitle className="text-lg">Questions</SheetTitle>
+      </SheetHeader>
+      <div className="py-3 space-y-1">
+        <Accordion type="single" collapsible className="w-full">
+          {questions.map((q, i) => (
+            <AccordionItem value={q.id} key={q.id} className="border-none">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-left h-auto py-2.5 px-3 rounded-lg"
+                onClick={() => onQuestionSelect(q.id)}
+              >
+                <div className="flex items-center gap-3 w-full">
+                  <span className="text-xs text-muted-foreground font-mono w-5">{i + 1}.</span>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <span className="text-sm font-normal truncate">{q.title}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border w-fit font-medium ${difficultyClass(q.difficulty)}`}>
+                      {q.difficulty}
+                    </span>
                   </div>
-                </Button>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-};
-const QuestionDisplay = ({ question }: { question: Question }) => (
-  <article className="prose prose-invert max-w-none">
-    <h1>{question.title}</h1>
-    <div className="flex flex-wrap gap-2 my-4">
-      <span className={`px-2 py-1 text-xs rounded-full ${question.difficulty === 'Easy' ? 'bg-green-800 text-green-200' :
-          question.difficulty === 'Medium' ? 'bg-yellow-800 text-yellow-200' :
-            'bg-red-800 text-red-200'
-        }`}>{question.difficulty}</span>
+                </div>
+              </Button>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
+    </SheetContent>
+  </Sheet>
+);
+
+const QuestionDisplay = ({ question, difficultyClass }: { question: Question, difficultyClass: (d: string) => string }) => (
+  <article className="prose prose-invert max-w-none prose-headings:tracking-tight prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50">
+    <h1 className="text-2xl">{question.title}</h1>
+    <div className="flex flex-wrap gap-2 my-4 not-prose">
+      <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold ${difficultyClass(question.difficulty)}`}>
+        {question.difficulty}
+      </span>
       {question.tags.map(tag => (
-        <span key={tag} className="px-2 py-1 text-xs bg-muted rounded-full">{tag}</span>
+        <span key={tag} className="text-[11px] px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/15 font-medium">{tag}</span>
       ))}
     </div>
     <ReactMarkdown remarkPlugins={[remarkGfm]}>{question.problemStatement}</ReactMarkdown>
 
-    <h2 className="mt-6">Examples</h2>
+    <h2 className="text-lg mt-6">Examples</h2>
     {question.examples.map((ex, i) => (
-      <div key={i} className="bg-muted/50 p-4 rounded-md mb-4">
-        <p className="!my-1"><strong>Input:</strong> <code>{ex.input}</code></p>
-        <p className="!my-1"><strong>Output:</strong> <code>{ex.output}</code></p>
-        {ex.explanation && <p className="!my-1"><strong>Explanation:</strong> {ex.explanation}</p>}
+      <div key={i} className="bg-muted/30 border border-border/30 p-4 rounded-xl mb-4 not-prose">
+        <p className="text-sm mb-1"><span className="font-semibold text-muted-foreground">Input:</span> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{ex.input}</code></p>
+        <p className="text-sm mb-1"><span className="font-semibold text-muted-foreground">Output:</span> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{ex.output}</code></p>
+        {ex.explanation && <p className="text-sm text-muted-foreground"><span className="font-semibold">Explanation:</span> {ex.explanation}</p>}
       </div>
     ))}
 
-    <h2 className="mt-6">Constraints</h2>
-    <ul className="!my-2">
+    <h2 className="text-lg mt-6">Constraints</h2>
+    <ul className="!my-2 text-sm">
       {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
     </ul>
   </article>
 );
 
 const WelcomeMessage = () => (
-  <div className="flex flex-col items-center justify-center h-full text-center">
-    <Wand2 size={48} className="text-primary mb-4" />
-    <h2 className="text-2xl font-bold">Welcome to your AlgoBook</h2>
-    <p className="text-muted-foreground mt-2 max-w-md">
-      Generate a new question using the prompt box below, or select an existing one from the menu.
+  <div className="flex flex-col items-center justify-center h-full text-center px-6">
+    <div className="mb-5 rounded-2xl bg-primary/10 p-5">
+      <BrainCircuit className="h-10 w-10 text-primary" />
+    </div>
+    <h2 className="text-xl font-bold mb-2">Welcome to your AlgoBook</h2>
+    <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+      Type a topic in the prompt below to generate an AI-powered coding challenge, or click the sparkle button for a quick suggestion.
     </p>
   </div>
 );
 
-// --- UPDATED OutputDisplay component ---
 const OutputDisplay = ({ result, inputUsed, expectedOutput }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string }) => {
-  const status = result.status.description;
-  const isAccepted = result.status.id === 3; // 3 = Accepted
+  const isAccepted = result.status.id === 3;
   const output = result.stdout?.trim();
   const isCorrect = isAccepted && output === expectedOutput?.trim();
 
-  // Handle compilation errors
   if (result.compile_output) {
-    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><XCircle/> Compilation Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.compile_output}</pre></div>;
+    return (
+      <div className="text-red-400">
+        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><XCircle className="h-4 w-4" /> Compilation Error</h3>
+        <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{result.compile_output}</pre>
+      </div>
+    );
   }
-  // Handle runtime errors
   if (result.stderr) {
-    return <div className="text-red-400"><h3 className="font-bold mb-2 flex items-center gap-2"><AlertTriangle/> Runtime Error</h3><pre className="bg-background p-2 rounded-md text-xs whitespace-pre-wrap">{result.stderr}</pre></div>;
+    return (
+      <div className="text-red-400">
+        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Runtime Error</h3>
+        <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{result.stderr}</pre>
+      </div>
+    );
   }
-  // Handle successful runs (Accepted)
   if (isAccepted) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {expectedOutput && expectedOutput !== "N/A (Custom Input)" && (
-          <h3 className={`font-bold text-xl flex items-center gap-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-            {isCorrect ? <CheckCircle2 /> : <XCircle />} {isCorrect ? 'Correct Answer' : 'Wrong Answer'}
-          </h3>
+          <div className={`flex items-center gap-2 text-base font-semibold ${isCorrect ? 'text-emerald-500' : 'text-red-500'}`}>
+            {isCorrect ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+            {isCorrect ? 'Correct Answer' : 'Wrong Answer'}
+          </div>
         )}
         {expectedOutput === "N/A (Custom Input)" && (
-          <h3 className="font-bold text-xl flex items-center gap-2 text-primary">
-            Custom Input Executed
-          </h3>
+          <div className="flex items-center gap-2 text-base font-semibold text-primary">
+            <CheckCircle2 className="h-5 w-5" /> Custom Input Executed
+          </div>
         )}
-
         <div className="space-y-2 text-sm">
           <div>
-            <p className="font-semibold mb-1">Input:</p>
-            <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{inputUsed || 'N/A'}</pre>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
+            <pre className="bg-muted/50 border border-border/30 p-2.5 rounded-lg whitespace-pre-wrap text-xs">{inputUsed || 'N/A'}</pre>
           </div>
           <div>
-            <p className="font-semibold mb-1">Your Output:</p>
-            <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{result.stdout || '(no output)'}</pre>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Your Output</p>
+            <pre className="bg-muted/50 border border-border/30 p-2.5 rounded-lg whitespace-pre-wrap text-xs">{result.stdout || '(no output)'}</pre>
           </div>
           {expectedOutput && expectedOutput !== "N/A (Custom Input)" && (
             <div>
-              <p className="font-semibold mb-1">Expected Output:</p>
-              <pre className="bg-background p-2 rounded-md whitespace-pre-wrap">{expectedOutput}</pre>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Expected Output</p>
+              <pre className="bg-muted/50 border border-border/30 p-2.5 rounded-lg whitespace-pre-wrap text-xs">{expectedOutput}</pre>
             </div>
           )}
-          <div className="flex gap-4 text-xs text-muted-foreground pt-2">
-            <span><Clock className="inline h-3 w-3 mr-1" /> Time: {result.time}s</span>
-            <span><Code className="inline h-3 w-3 mr-1" /> Memory: {result.memory} KB</span>
+          <div className="flex gap-4 text-[11px] text-muted-foreground pt-1">
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {result.time}s</span>
+            <span className="flex items-center gap-1"><Code className="h-3 w-3" /> {result.memory} KB</span>
           </div>
         </div>
       </div>
     );
   }
-  // Handle other non-Accepted statuses (Time Limit, etc.)
-  return <div className="text-yellow-400"><h3 className="font-bold">{status}</h3><p>Something went wrong during execution.</p></div>;
+  return <div className="text-amber-400"><h3 className="font-semibold text-sm">{result.status.description}</h3><p className="text-xs text-muted-foreground mt-1">Execution did not complete successfully.</p></div>;
 };
