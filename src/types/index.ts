@@ -1,5 +1,26 @@
 import { Timestamp } from "firebase/firestore";
 
+export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
+export type GoalType = "learn-basics" | "daily-practice" | "interview-prep" | "returning-after-break";
+
+export interface TopicSkill {
+  solved: number;
+  failed: number;
+  lastSeen: Timestamp;
+}
+
+export interface UserProfile {
+  userId: string;
+  experienceLevel: ExperienceLevel;
+  goalType: GoalType;
+  topicSkills: Record<string, TopicSkill>;
+  totalSolved: number;
+  totalFailed: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate: string; // ISO date string YYYY-MM-DD for easy comparison
+}
+
 export interface Example {
   input: string;
   output: string;
@@ -23,6 +44,7 @@ export interface Question {
   driverCode: string;
   tags: string[];
   difficulty: "Easy" | "Medium" | "Hard";
+  hints?: string[];
   createdAt?: Timestamp;
 }
 
@@ -33,10 +55,10 @@ export interface Submission {
   questionId: string;
   code: string;
   status: "success" | "fail" | "pending";
+  attemptNumber: number;
   submittedAt: Timestamp;
 }
 
-// Add this interface here to centralize it
 export interface ProjectQuestion {
   id: string;
   title: string;

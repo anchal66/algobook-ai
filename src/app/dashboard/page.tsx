@@ -25,8 +25,13 @@ import {
   LogOut,
   Code2,
   ArrowRight,
+  Flame,
+  Trophy,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
+import type { UserProfile } from "@/types";
 
 interface Project {
   id: string;
@@ -53,6 +58,7 @@ export default function DashboardPage() {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -82,7 +88,20 @@ export default function DashboardPage() {
       }
     };
 
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`/api/profile?userId=${user.uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProfile(data.profile);
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      }
+    };
+
     fetchProjects();
+    fetchProfile();
   }, [user, authLoading, router]);
 
   useEffect(() => {
@@ -161,6 +180,41 @@ export default function DashboardPage() {
             </Link>
           </motion.div>
         </motion.div>
+
+        {/* Stats Row */}
+        {profile && (profile.totalSolved > 0 || profile.currentStreak > 0) && (
+          <motion.div
+            className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <StatsCard
+              icon={<Flame className="h-5 w-5 text-orange-400" />}
+              label="Current Streak"
+              value={`${profile.currentStreak} day${profile.currentStreak !== 1 ? "s" : ""}`}
+              accent="orange"
+            />
+            <StatsCard
+              icon={<Trophy className="h-5 w-5 text-amber-400" />}
+              label="Longest Streak"
+              value={`${profile.longestStreak} day${profile.longestStreak !== 1 ? "s" : ""}`}
+              accent="amber"
+            />
+            <StatsCard
+              icon={<CheckCircle2 className="h-5 w-5 text-emerald-400" />}
+              label="Total Solved"
+              value={String(profile.totalSolved)}
+              accent="emerald"
+            />
+            <StatsCard
+              icon={<AlertTriangle className="h-5 w-5 text-red-400" />}
+              label="Weak Topic"
+              value={getWeakestTopic(profile)}
+              accent="red"
+            />
+          </motion.div>
+        )}
 
         {/* Search */}
         <motion.div
@@ -259,4 +313,46 @@ export default function DashboardPage() {
       </main>
     </div>
   );
+}
+
+function StatsCard({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <Card className={`border-${accent}-500/20 bg-${accent}-500/5`}>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={`rounded-lg bg-${accent}-500/10 p-2`}>{icon}</div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function getWeakestTopic(profile: UserProfile): string {
+  const entries = Object.entries(profile.topicSkills || {});
+  if (entries.length === 0) return "None yet";
+
+  let weakest = { topic: "", score: Infinity };
+  for (const [topic, skill] of entries) {
+    const total = skill.solved + skill.failed;
+    if (total === 0) continue;
+    const passRate = skill.solved / total;
+    if (passRate < weakest.score) {
+      weakest = { topic, score: passRate };
+    }
+  }
+
+  if (weakest.topic === "") return "None yet";
+  return weakest.topic.charAt(0).toUpperCase() + weakest.topic.slice(1);
 }

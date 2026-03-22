@@ -37,5 +37,13 @@ service cloud.firestore {
       allow create: if request.auth != null
                     && request.resource.data.userId == request.auth.uid;
     }
+
+    // --- User Profiles ---
+    // Users can only read their own profile.
+    // Writes are handled by firebase-admin in the API routes (bypasses rules).
+    match /userProfiles/{userId} {
+      allow read: if request.auth != null
+                  && userId == request.auth.uid;
+    }
   }
 }

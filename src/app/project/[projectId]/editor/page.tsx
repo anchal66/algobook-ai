@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { Question, Submission, ProjectQuestion, TestCase } from "@/types";
-import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit } from "lucide-react";
+import { Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit, Lightbulb } from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -50,6 +50,9 @@ export default function ProjectPage() {
   const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [lastRunInput, setLastRunInput] = useState<string | null>(null);
+  const [hints, setHints] = useState<string[]>([]);
+  const [revealedHintLevel, setRevealedHintLevel] = useState(0);
+  const [isHintLoading, setIsHintLoading] = useState(false);
 
   const editorRef = useRef<any>(null);
 
@@ -81,6 +84,8 @@ export default function ProjectPage() {
     setExecutionError(null);
     setCustomInput("");
     setSubmissionHistory([]);
+    setHints([]);
+    setRevealedHintLevel(0);
     try {
       const questionRef = doc(firestore, "questions", questionId);
       const questionSnap = await getDoc(questionRef);
@@ -187,11 +192,55 @@ export default function ProjectPage() {
   };
 
   const handleGenerateNext = () => {
-    let nextPrompt = "Give me a new easy question on arrays";
-    if (question && question.tags.length > 0) {
-      nextPrompt = `Give me another question related to ${question.tags.join(', ')} with a similar difficulty.`;
+    submitPrompt("__auto_next__");
+  };
+
+  const fetchHint = async (level: number) => {
+    if (!question?.id || level < 1 || level > 3) return;
+    if (level > revealedHintLevel + 1) return; // must reveal sequentially
+
+    if (hints[level - 1]) {
+      setRevealedHintLevel(level);
+      return;
     }
-    submitPrompt(nextPrompt);
+
+    setIsHintLoading(true);
+    try {
+      const response = await fetch("/api/hints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: question.id,
+          hintLevel: level,
+          userCode: level === 3 ? code : undefined,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to get hint");
+      const data = await response.json();
+      setHints((prev) => {
+        const updated = [...prev];
+        updated[level - 1] = data.hint;
+        return updated;
+      });
+      setRevealedHintLevel(level);
+    } catch (err) {
+      console.error("Error fetching hint:", err);
+    } finally {
+      setIsHintLoading(false);
+    }
+  };
+
+  const updateUserProfile = async (tags: string[], passed: boolean) => {
+    if (!user) return;
+    try {
+      await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.uid, tags, passed }),
+      });
+    } catch (err) {
+      console.error("Profile update failed:", err);
+    }
   };
 
   const handleRunCode = async (isSubmission: boolean = false) => {
@@ -269,15 +318,18 @@ export default function ProjectPage() {
     setExecutionResult(finalResult);
 
     if (isSubmission && user) {
+      const attemptNumber = submissionHistory.length + 1;
       await addDoc(collection(firestore, "submissions"), {
         userId: user.uid,
         projectId,
         questionId: question.id,
         code,
         status: allTestsPassed ? 'success' : 'fail',
+        attemptNumber,
         submittedAt: serverTimestamp(),
       });
       fetchSubmissionHistory(question.id);
+      updateUserProfile(question.tags || [], allTestsPassed);
     }
 
     setIsExecuting(false);
@@ -307,7 +359,17 @@ export default function ProjectPage() {
                   <p className="text-sm text-muted-foreground">Generating question...</p>
                 </div>
               )}
-              {!isLoading && question && <QuestionDisplay question={question} difficultyClass={difficultyClass} />}
+              {!isLoading && question && (
+                <>
+                  <QuestionDisplay question={question} difficultyClass={difficultyClass} />
+                  <HintsPanel
+                    hints={hints}
+                    revealedLevel={revealedHintLevel}
+                    isLoading={isHintLoading}
+                    onRequestHint={fetchHint}
+                  />
+                </>
+              )}
               {!isLoading && !question && <WelcomeMessage />}
             </div>
             <div className="flex-shrink-0 border-t border-border/50 p-3 space-y-3 bg-card/50">
@@ -337,7 +399,7 @@ export default function ProjectPage() {
                         <Sparkles className="h-3.5 w-3.5" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Generate Similar Question</p></TooltipContent>
+                    <TooltipContent><p>Smart Next Question</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <Button type="submit" size="icon" disabled={isLoading} className="h-9 w-9 shrink-0 shadow-sm shadow-primary/20">
@@ -539,6 +601,72 @@ const QuestionDisplay = ({ question, difficultyClass }: { question: Question, di
       {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
     </ul>
   </article>
+);
+
+const HINT_LABELS = ["Approach", "Algorithm", "Code Nudge"];
+const HINT_DESCRIPTIONS = [
+  "A high-level strategy hint",
+  "Which data structure or algorithm to use",
+  "A code-level insight (uses your current code)",
+];
+
+const HintsPanel = ({
+  hints,
+  revealedLevel,
+  isLoading,
+  onRequestHint,
+}: {
+  hints: string[];
+  revealedLevel: number;
+  isLoading: boolean;
+  onRequestHint: (level: number) => void;
+}) => (
+  <div className="mt-6 border-t border-border/30 pt-5">
+    <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+      <Lightbulb className="h-4 w-4 text-amber-400" /> Hints
+    </h3>
+    <div className="space-y-2">
+      {[1, 2, 3].map((level) => {
+        const isRevealed = level <= revealedLevel && hints[level - 1];
+        const isNext = level === revealedLevel + 1;
+        const isLocked = level > revealedLevel + 1;
+
+        return (
+          <div key={level} className="rounded-lg border border-border/40 overflow-hidden">
+            {isRevealed ? (
+              <div className="p-3 bg-amber-500/5">
+                <p className="text-xs font-medium text-amber-400 mb-1">
+                  Hint {level}: {HINT_LABELS[level - 1]}
+                </p>
+                <p className="text-sm text-foreground">{hints[level - 1]}</p>
+              </div>
+            ) : (
+              <button
+                onClick={() => !isLocked && onRequestHint(level)}
+                disabled={isLocked || isLoading}
+                className={`w-full text-left p-3 text-sm transition-colors ${
+                  isLocked
+                    ? "text-muted-foreground/50 cursor-not-allowed"
+                    : "text-muted-foreground hover:bg-muted/30 cursor-pointer"
+                }`}
+              >
+                {isLoading && isNext ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading hint...
+                  </span>
+                ) : (
+                  <span>
+                    {isNext ? `Reveal Hint ${level}` : `Hint ${level}`}: {HINT_DESCRIPTIONS[level - 1]}
+                    {isLocked && " (reveal previous first)"}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </div>
 );
 
 const WelcomeMessage = () => (

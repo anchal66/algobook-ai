@@ -21,7 +21,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ArrowLeft, Code2, Rocket } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Code2,
+  Rocket,
+  GraduationCap,
+  Zap,
+  Briefcase,
+  RotateCcw,
+  Baby,
+  User,
+  Crown,
+} from "lucide-react";
+import type { ExperienceLevel, GoalType } from "@/types";
+
+const EXPERIENCE_OPTIONS: {
+  value: ExperienceLevel;
+  label: string;
+  description: string;
+  icon: typeof Baby;
+}[] = [
+  { value: "beginner", label: "Just Starting Out", description: "New to coding or data structures", icon: Baby },
+  { value: "intermediate", label: "I Code Regularly", description: "Comfortable with basics, building skills", icon: User },
+  { value: "advanced", label: "Experienced Developer", description: "Strong fundamentals, want harder challenges", icon: Crown },
+];
+
+const GOAL_OPTIONS: {
+  value: GoalType;
+  label: string;
+  description: string;
+  icon: typeof GraduationCap;
+}[] = [
+  { value: "learn-basics", label: "Learn the Basics", description: "Build a strong foundation", icon: GraduationCap },
+  { value: "daily-practice", label: "Daily Practice", description: "Stay sharp with regular coding", icon: Zap },
+  { value: "interview-prep", label: "Interview Prep", description: "Prepare for technical interviews", icon: Briefcase },
+  { value: "returning-after-break", label: "Getting Back Into It", description: "Rebuild skills after a break", icon: RotateCcw },
+];
 
 export default function NewProjectPage() {
   const { user } = useAuth();
@@ -31,6 +67,8 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(30);
   const [purpose, setPurpose] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("intermediate");
+  const [goalType, setGoalType] = useState<GoalType>("daily-practice");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,6 +94,8 @@ export default function NewProjectPage() {
         description,
         duration,
         purpose,
+        experienceLevel,
+        goalType,
         createdAt: serverTimestamp(),
       });
 
@@ -164,6 +204,60 @@ export default function NewProjectPage() {
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>1 week</span>
                     <span>3 months</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Your Experience Level</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {EXPERIENCE_OPTIONS.map((opt) => {
+                      const Icon = opt.icon;
+                      const selected = experienceLevel === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setExperienceLevel(opt.value)}
+                          className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
+                            selected
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <Icon className={`h-5 w-5 ${selected ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className={`text-sm font-medium ${selected ? "text-primary" : ""}`}>{opt.label}</span>
+                          <span className="text-xs text-muted-foreground">{opt.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>What&apos;s Your Goal?</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {GOAL_OPTIONS.map((opt) => {
+                      const Icon = opt.icon;
+                      const selected = goalType === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setGoalType(opt.value)}
+                          className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                            selected
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <Icon className={`h-5 w-5 shrink-0 ${selected ? "text-primary" : "text-muted-foreground"}`} />
+                          <div>
+                            <span className={`text-sm font-medium block ${selected ? "text-primary" : ""}`}>{opt.label}</span>
+                            <span className="text-xs text-muted-foreground">{opt.description}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
