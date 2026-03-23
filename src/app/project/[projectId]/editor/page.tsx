@@ -459,7 +459,14 @@ export default function ProjectPage() {
                     onClick={() => redirectToCheckout("pro-monthly")}
                     className="text-xs font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap"
                   >
-                    Upgrade
+                    ₹499/mo
+                  </button>
+                  <span className="text-amber-500/40">|</span>
+                  <button
+                    onClick={() => redirectToCheckout("pro-yearly")}
+                    className="text-xs font-semibold text-primary hover:text-primary/80 whitespace-nowrap"
+                  >
+                    ₹4,999/yr
                   </button>
                 </div>
               )}

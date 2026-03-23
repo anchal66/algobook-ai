@@ -150,7 +150,7 @@ export default function NewProjectPage() {
                 </div>
                 <h2 className="text-2xl font-bold mb-3">Pro Plan Required</h2>
                 <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                  Creating projects requires an active Pro subscription. Upgrade to unlock AI-powered question generation, code execution, and more.
+                  Creating projects requires an active Pro plan. Choose a plan below to unlock AI-powered question generation, code execution, and more.
                 </p>
                 <ul className="text-sm text-left max-w-xs mx-auto space-y-2.5 mb-8">
                   {[
@@ -165,16 +165,27 @@ export default function NewProjectPage() {
                     </li>
                   ))}
                 </ul>
+                <p className="text-xs text-muted-foreground mb-6">No auto-renewal — renew only when you want to.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <Button
                     onClick={() => redirectToCheckout("pro-monthly")}
+                    variant="outline"
+                    className="gap-2"
+                    size="lg"
+                  >
+                    <Sparkles className="h-4 w-4" /> ₹499 / month
+                  </Button>
+                  <Button
+                    onClick={() => redirectToCheckout("pro-yearly")}
                     className="gap-2 shadow-lg shadow-primary/20"
                     size="lg"
                   >
-                    <Sparkles className="h-4 w-4" /> Upgrade to Pro — ₹499/mo
+                    <Sparkles className="h-4 w-4" /> ₹4,999 / year &middot; Save 17%
                   </Button>
+                </div>
+                <div className="mt-4">
                   <Link href="/dashboard">
-                    <Button variant="outline" size="lg" className="gap-2">
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                       <ArrowLeft className="h-4 w-4" /> Back to Dashboard
                     </Button>
                   </Link>

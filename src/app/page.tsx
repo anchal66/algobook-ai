@@ -251,12 +251,12 @@ export default function Home() {
               Simple, transparent pricing
             </motion.h2>
             <motion.p variants={fadeUp} className="mt-4 text-muted-foreground text-lg">
-              One plan. Full access. Cancel anytime.
+              Full access. No auto-deduction. Renew only when you want to.
             </motion.p>
           </motion.div>
 
           <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto"
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
@@ -267,7 +267,6 @@ export default function Home() {
               <p className="text-sm font-medium text-muted-foreground mb-1">Free</p>
               <div className="flex items-baseline gap-1 mb-6">
                 <span className="text-4xl font-bold">&#8377;0</span>
-                <span className="text-muted-foreground">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
                 {[
@@ -286,23 +285,51 @@ export default function Home() {
               </Link>
             </motion.div>
 
-            {/* Pro tier */}
-            <motion.div variants={fadeUp} className="relative rounded-2xl border-2 border-primary bg-card p-8 flex flex-col shadow-xl shadow-primary/10">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
-                Most Popular
-              </div>
-              <p className="text-sm font-medium text-primary mb-1">Pro</p>
-              <div className="flex items-baseline gap-1 mb-6">
+            {/* Pro Monthly */}
+            <motion.div variants={fadeUp} className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col">
+              <p className="text-sm font-medium text-primary mb-1">Pro Monthly</p>
+              <div className="flex items-baseline gap-1 mb-2">
                 <span className="text-4xl font-bold">&#8377;499</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-muted-foreground text-sm">/month</span>
               </div>
+              <p className="text-xs text-muted-foreground mb-6">No auto-renewal &middot; renew manually</p>
               <ul className="space-y-3 mb-8 flex-grow">
                 {[
                   "Unlimited AI question generation",
                   "Full code editor & execution",
                   "Unlimited projects",
                   "Smart AI hints & recommendations",
-                  "Custom test case input",
+                  "Performance tracking & mastery",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm">
+                    <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/login">
+                <Button variant="outline" className="w-full">
+                  Get Started <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            </motion.div>
+
+            {/* Pro Yearly */}
+            <motion.div variants={fadeUp} className="relative rounded-2xl border-2 border-primary bg-card p-8 flex flex-col shadow-xl shadow-primary/10">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-primary-foreground">
+                Save 17%
+              </div>
+              <p className="text-sm font-medium text-primary mb-1">Pro Yearly</p>
+              <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-4xl font-bold">&#8377;4,999</span>
+                <span className="text-muted-foreground text-sm">/year</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-6">No auto-renewal &middot; renew manually</p>
+              <ul className="space-y-3 mb-8 flex-grow">
+                {[
+                  "Everything in Pro Monthly",
+                  "Save 17% vs paying monthly",
+                  "Full year of uninterrupted access",
                   "Performance tracking & mastery",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">

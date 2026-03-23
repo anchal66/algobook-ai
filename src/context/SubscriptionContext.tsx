@@ -6,7 +6,6 @@ import { useAuth } from "@/context/AuthContext";
 interface SubscriptionPlan {
   name: string;
   slug: string;
-  interval: string;
 }
 
 interface SubscriptionState {
@@ -45,8 +44,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         setActive(data.active ?? false);
         setPlan(data.plan ?? null);
-        setCurrentPeriodEnd(data.currentPeriodEnd ?? null);
-        setStatus(data.status ?? null);
+        setCurrentPeriodEnd(data.endDate ?? null);
+        setStatus(data.active ? "active" : "inactive");
       } else {
         setActive(false);
       }

@@ -148,12 +148,20 @@ export default function DashboardPage() {
                   <Crown className="h-3 w-3" /> {plan?.name || "Pro"}
                 </span>
               ) : (
-                <button
-                  onClick={() => redirectToCheckout("pro-monthly")}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-                >
-                  <Sparkles className="h-3 w-3" /> Upgrade to Pro
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => redirectToCheckout("pro-monthly")}
+                    className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                  >
+                    <Sparkles className="h-3 w-3" /> ₹499/mo
+                  </button>
+                  <button
+                    onClick={() => redirectToCheckout("pro-yearly")}
+                    className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                  >
+                    ₹4,999/yr
+                  </button>
+                </div>
               )
             )}
             {user?.photoURL && (
@@ -226,17 +234,27 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="font-semibold text-sm">Unlock the full AlgoBook experience</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Get AI question generation, code execution, smart hints, and unlimited projects.
+                    AI questions, code execution, smart hints & unlimited projects. No auto-renewal — renew only when you want.
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => redirectToCheckout("pro-monthly")}
-                className="gap-2 shadow-lg shadow-primary/20 shrink-0"
-                size="sm"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> Upgrade to Pro
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  onClick={() => redirectToCheckout("pro-monthly")}
+                  variant="outline"
+                  className="gap-1.5"
+                  size="sm"
+                >
+                  ₹499/mo
+                </Button>
+                <Button
+                  onClick={() => redirectToCheckout("pro-yearly")}
+                  className="gap-1.5 shadow-lg shadow-primary/20"
+                  size="sm"
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> ₹4,999/yr &middot; Save 17%
+                </Button>
+              </div>
             </div>
           </motion.div>
         )}

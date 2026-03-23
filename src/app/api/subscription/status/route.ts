@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkSubscription } from "@/lib/check-subscription";
+import { checkSubscriptionStatus } from "@/lib/subscription";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +9,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "userId is required" }, { status: 400 });
   }
 
-  const status = await checkSubscription(userId);
+  const status = await checkSubscriptionStatus(userId);
   return NextResponse.json(status);
 }
