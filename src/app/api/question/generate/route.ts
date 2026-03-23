@@ -4,6 +4,7 @@ import { getOrCreateProfile } from "@/lib/user-profile";
 import { recommend } from "@/lib/recommendation";
 import { getOrGenerateQuestion, linkQuestionToProject } from "@/lib/question-generator";
 import { computePracticeState } from "@/lib/practice-engine";
+import { checkSubscription } from "@/lib/check-subscription";
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +12,14 @@ export async function POST(request: Request) {
 
     if (!prompt || !projectId || !userId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const sub = await checkSubscription(userId);
+    if (!sub.active) {
+      return NextResponse.json(
+        { error: "Active subscription required", code: "SUBSCRIPTION_REQUIRED" },
+        { status: 403 }
+      );
     }
 
     // ── 1. GATHER CONTEXT ──

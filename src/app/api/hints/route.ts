@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { adminDb } from "@/lib/firebase-admin";
+import { checkSubscription } from "@/lib/check-subscription";
 
 // Cheap model for hints — no need for GPT-4o here
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -32,13 +33,23 @@ const HINT_STRUCTURE = {
 
 export async function POST(request: Request) {
   try {
-    const { questionId, hintLevel, userCode } = await request.json();
+    const { questionId, hintLevel, userCode, userId } = await request.json();
 
     if (!questionId || !hintLevel || hintLevel < 1 || hintLevel > 3) {
       return NextResponse.json(
         { error: "questionId and hintLevel (1-3) are required" },
         { status: 400 }
       );
+    }
+
+    if (userId) {
+      const sub = await checkSubscription(userId);
+      if (!sub.active) {
+        return NextResponse.json(
+          { error: "Active subscription required", code: "SUBSCRIPTION_REQUIRED" },
+          { status: 403 }
+        );
+      }
     }
 
     const level = hintLevel as 1 | 2 | 3;

@@ -9,11 +9,12 @@ import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason } from "@/types";
 import {
   Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
-  Lightbulb, Info,
+  Lightbulb, Info, Lock, Crown,
 } from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
@@ -37,6 +38,7 @@ interface ExecutionResult {
 
 export default function ProjectPage() {
   const { user } = useAuth();
+  const { active: hasSubscription, loading: subLoading, redirectToCheckout } = useSubscription();
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -191,6 +193,11 @@ export default function ProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: promptToSubmit, projectId, userId: user.uid }),
       });
+      if (response.status === 403) {
+        setExecutionError("You need an active subscription to generate questions. Upgrade to Pro to continue.");
+        setIsLoading(false);
+        return;
+      }
       if (!response.ok) throw new Error('Failed to fetch question from AI');
       const data = await response.json();
       const newQuestion = data.question as Question;
@@ -248,8 +255,14 @@ export default function ProjectPage() {
           questionId: question.id,
           hintLevel: level,
           userCode: level === 3 ? code : undefined,
+          userId: user?.uid,
         }),
       });
+      if (response.status === 403) {
+        setExecutionError("You need an active subscription to use hints. Upgrade to Pro to continue.");
+        setIsHintLoading(false);
+        return;
+      }
       if (!response.ok) throw new Error("Failed to get hint");
       const data = await response.json();
       setHints((prev) => {
@@ -343,9 +356,15 @@ export default function ProjectPage() {
           body: JSON.stringify({
             userCode: code,
             driverCode: question.driverCode,
-            stdin: testCase.input
+            stdin: testCase.input,
+            userId: user?.uid,
           }),
         });
+        if (response.status === 403) {
+          setExecutionError("You need an active subscription to run code. Upgrade to Pro to continue.");
+          setIsExecuting(false);
+          return;
+        }
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || "API request failed");
@@ -425,12 +444,25 @@ export default function ProjectPage() {
                     revealedLevel={revealedHintLevel}
                     isLoading={isHintLoading}
                     onRequestHint={fetchHint}
+                    disabled={!hasSubscription}
                   />
                 </>
               )}
               {!isLoading && !question && <WelcomeMessage />}
             </div>
             <div className="flex-shrink-0 border-t border-border/50 p-3 space-y-3 bg-card/50">
+              {!subLoading && !hasSubscription && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span className="text-xs text-amber-300 flex-1">Upgrade to Pro to generate questions, run code, and submit.</span>
+                  <button
+                    onClick={() => redirectToCheckout("pro-monthly")}
+                    className="text-xs font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap"
+                  >
+                    Upgrade
+                  </button>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <Button variant="ghost" size="sm" onClick={handlePreviousQuestion} disabled={currentQuestionIndex <= 0} className="gap-1 text-xs">
                   <ChevronLeft className="h-3.5 w-3.5" /> Prev
@@ -444,23 +476,23 @@ export default function ProjectPage() {
               </div>
               <form onSubmit={handlePromptSubmit} className="flex gap-1.5">
                 <Input
-                  placeholder="Ask AI for a new question..."
+                  placeholder={hasSubscription ? "Ask AI for a new question..." : "Upgrade to Pro to generate questions"}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || !hasSubscription}
                   className="h-9 text-sm bg-background"
                 />
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" type="button" onClick={handleGenerateNext} disabled={isLoading} className="h-9 w-9 shrink-0">
+                      <Button variant="outline" size="icon" type="button" onClick={handleGenerateNext} disabled={isLoading || !hasSubscription} className="h-9 w-9 shrink-0">
                         <Sparkles className="h-3.5 w-3.5" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Smart Next Question</p></TooltipContent>
+                    <TooltipContent><p>{hasSubscription ? "Smart Next Question" : "Upgrade to Pro"}</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <Button type="submit" size="icon" disabled={isLoading} className="h-9 w-9 shrink-0 shadow-sm shadow-primary/20">
+                <Button type="submit" size="icon" disabled={isLoading || !hasSubscription} className="h-9 w-9 shrink-0 shadow-sm shadow-primary/20">
                   <Wand2 className="h-3.5 w-3.5" />
                 </Button>
               </form>
@@ -500,18 +532,18 @@ export default function ProjectPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleRunCode(false)}
-                      disabled={isExecuting || !question}
+                      disabled={isExecuting || !question || !hasSubscription}
                       className="gap-1.5 text-xs h-7"
                     >
-                      {isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Play className="h-3 w-3"/>} Run
+                      {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Play className="h-3 w-3"/>} Run
                     </Button>
                     <Button
                       size="sm"
                       onClick={() => handleRunCode(true)}
-                      disabled={isExecuting || !question}
+                      disabled={isExecuting || !question || !hasSubscription}
                       className="gap-1.5 text-xs h-7 shadow-sm shadow-primary/20"
                     >
-                      {isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Send className="h-3 w-3"/>} Submit
+                      {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Send className="h-3 w-3"/>} Submit
                     </Button>
                   </div>
                 </div>
@@ -694,12 +726,14 @@ const HintsPanel = ({
   revealedLevel,
   isLoading,
   onRequestHint,
+  disabled,
 }: {
   hints: string[];
   labels: string[];
   revealedLevel: number;
   isLoading: boolean;
   onRequestHint: (level: number) => void;
+  disabled?: boolean;
 }) => (
   <div className="mt-6 border-t border-border/30 pt-5">
     <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
@@ -723,10 +757,10 @@ const HintsPanel = ({
               </div>
             ) : (
               <button
-                onClick={() => !isLocked && onRequestHint(level)}
-                disabled={isLocked || isLoading}
+                onClick={() => !isLocked && !disabled && onRequestHint(level)}
+                disabled={isLocked || isLoading || disabled}
                 className={`w-full text-left p-3 text-sm transition-colors ${
-                  isLocked
+                  isLocked || disabled
                     ? "text-muted-foreground/50 cursor-not-allowed"
                     : "text-muted-foreground hover:bg-muted/30 cursor-pointer"
                 }`}

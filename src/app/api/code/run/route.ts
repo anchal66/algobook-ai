@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
+import { checkSubscription } from "@/lib/check-subscription";
 
 const JUDGE0_API_URL = `https://${process.env.NEXT_PUBLIC_RAPIDAPI_HOST}/submissions?base64_encoded=false&wait=true`;
 
 export async function POST(request: Request) {
   try {
-    const { userCode, driverCode, stdin } = await request.json();
+    const body = await request.json();
+    const { userCode, driverCode, stdin, userId } = body;
 
     if (!userCode || !driverCode) {
       return NextResponse.json({ error: "Missing user code or driver code" }, { status: 400 });
+    }
+
+    if (userId) {
+      const sub = await checkSubscription(userId);
+      if (!sub.active) {
+        return NextResponse.json(
+          { error: "Active subscription required", code: "SUBSCRIPTION_REQUIRED" },
+          { status: 403 }
+        );
+      }
     }
 
     // --- FIX START: This is the only line that needs to change ---

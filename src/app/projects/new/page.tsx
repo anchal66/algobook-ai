@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
@@ -33,6 +34,10 @@ import {
   Baby,
   User,
   Crown,
+  Lock,
+  Sparkles,
+  Check,
+  ArrowRight,
 } from "lucide-react";
 import type { ExperienceLevel, GoalType } from "@/types";
 
@@ -61,6 +66,7 @@ const GOAL_OPTIONS: {
 
 export default function NewProjectPage() {
   const { user } = useAuth();
+  const { active: hasSubscription, loading: subLoading, redirectToCheckout } = useSubscription();
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -135,6 +141,47 @@ export default function NewProjectPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
+          {!subLoading && !hasSubscription ? (
+            <Card className="overflow-hidden border-border/60">
+              <div className="h-2 bg-gradient-to-r from-amber-500/60 via-amber-500 to-amber-500/60" />
+              <CardContent className="py-16 text-center">
+                <div className="mx-auto mb-6 inline-flex items-center justify-center rounded-2xl bg-amber-500/10 p-5">
+                  <Lock className="h-10 w-10 text-amber-400" />
+                </div>
+                <h2 className="text-2xl font-bold mb-3">Pro Plan Required</h2>
+                <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                  Creating projects requires an active Pro subscription. Upgrade to unlock AI-powered question generation, code execution, and more.
+                </p>
+                <ul className="text-sm text-left max-w-xs mx-auto space-y-2.5 mb-8">
+                  {[
+                    "Unlimited AI question generation",
+                    "Full code editor & execution",
+                    "Unlimited projects",
+                    "Smart hints & recommendations",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Button
+                    onClick={() => redirectToCheckout("pro-monthly")}
+                    className="gap-2 shadow-lg shadow-primary/20"
+                    size="lg"
+                  >
+                    <Sparkles className="h-4 w-4" /> Upgrade to Pro — ₹499/mo
+                  </Button>
+                  <Link href="/dashboard">
+                    <Button variant="outline" size="lg" className="gap-2">
+                      <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="overflow-hidden border-border/60">
             <div className="h-2 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
             <CardHeader className="pb-4">
@@ -287,6 +334,7 @@ export default function NewProjectPage() {
               </CardFooter>
             </form>
           </Card>
+          )}
         </motion.div>
       </main>
     </div>

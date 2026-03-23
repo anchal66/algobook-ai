@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics"; // <-- Import Analytics
 import { Suspense } from "react";
@@ -99,7 +100,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <SubscriptionProvider>{children}</SubscriptionProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -266,14 +266,14 @@ export default function Home() {
             <motion.div variants={fadeUp} className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col">
               <p className="text-sm font-medium text-muted-foreground mb-1">Free</p>
               <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-bold">$0</span>
+                <span className="text-4xl font-bold">&#8377;0</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
                 {[
-                  "Browse AI-generated questions",
-                  "View problem descriptions",
-                  "1 project",
+                  "Sign in & view dashboard",
+                  "Browse existing projects",
+                  "View submission history",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <Check className="h-4 w-4 text-muted-foreground/60 mt-0.5 shrink-0" />
@@ -293,7 +293,7 @@ export default function Home() {
               </div>
               <p className="text-sm font-medium text-primary mb-1">Pro</p>
               <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-bold">$12</span>
+                <span className="text-4xl font-bold">&#8377;499</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
@@ -301,9 +301,9 @@ export default function Home() {
                   "Unlimited AI question generation",
                   "Full code editor & execution",
                   "Unlimited projects",
-                  "Submission history & tracking",
+                  "Smart AI hints & recommendations",
                   "Custom test case input",
-                  "Priority AI generation",
+                  "Performance tracking & mastery",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
                     <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -313,7 +313,7 @@ export default function Home() {
               </ul>
               <Link href="/login">
                 <Button className="w-full shadow-lg shadow-primary/20">
-                  Start Free Trial <ArrowRight className="h-4 w-4 ml-1" />
+                  Get Started <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
             </motion.div>

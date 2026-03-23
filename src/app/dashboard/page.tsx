@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { firestore, auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
@@ -29,6 +30,8 @@ import {
   Trophy,
   AlertTriangle,
   CheckCircle2,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { UserProfile } from "@/types";
@@ -53,6 +56,7 @@ const stagger = {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const { active: hasSubscription, loading: subLoading, plan, redirectToCheckout } = useSubscription();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
@@ -138,6 +142,20 @@ export default function DashboardPage() {
             <span className="text-lg font-bold tracking-tight">AlgoBook</span>
           </Link>
           <div className="flex items-center gap-3">
+            {!subLoading && (
+              hasSubscription ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <Crown className="h-3 w-3" /> {plan?.name || "Pro"}
+                </span>
+              ) : (
+                <button
+                  onClick={() => redirectToCheckout("pro-monthly")}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                >
+                  <Sparkles className="h-3 w-3" /> Upgrade to Pro
+                </button>
+              )
+            )}
             {user?.photoURL && (
               <img
                 src={user.photoURL}
@@ -173,13 +191,55 @@ export default function DashboardPage() {
                   : "Ready to start your coding practice journey?"}
               </p>
             </div>
-            <Link href="/projects/new">
-              <Button className="gap-2 shadow-lg shadow-primary/20">
+            {hasSubscription ? (
+              <Link href="/projects/new">
+                <Button className="gap-2 shadow-lg shadow-primary/20">
+                  <PlusCircle className="h-4 w-4" /> New Project
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => redirectToCheckout("pro-monthly")}
+              >
                 <PlusCircle className="h-4 w-4" /> New Project
+                <Crown className="h-3.5 w-3.5 text-amber-400" />
               </Button>
-            </Link>
+            )}
           </motion.div>
         </motion.div>
+
+        {/* Upgrade Banner */}
+        {!subLoading && !hasSubscription && (
+          <motion.div
+            className="mb-8 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 p-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-primary/10 p-2.5">
+                  <Crown className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Unlock the full AlgoBook experience</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Get AI question generation, code execution, smart hints, and unlimited projects.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => redirectToCheckout("pro-monthly")}
+                className="gap-2 shadow-lg shadow-primary/20 shrink-0"
+                size="sm"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Upgrade to Pro
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Stats Row */}
         {profile && (profile.totalSolved > 0 || profile.currentStreak > 0) && (
