@@ -23,8 +23,15 @@ export async function POST(request: Request) {
     const driverImports = driverCode.match(importRegex) || [];
 
     // 2. Remove imports from the code blocks
-    const userCodeWithoutImports = userCode.replace(importRegex, '').trim();
+    let userCodeWithoutImports = userCode.replace(importRegex, '').trim();
     const driverCodeWithoutImports = driverCode.replace(importRegex, '').trim();
+
+    // Judge0 compiles into Main.java — only one public class allowed per file.
+    // Strip "public" from any non-Main class (e.g. "public class Solution" → "class Solution")
+    userCodeWithoutImports = userCodeWithoutImports.replace(
+      /public\s+(class\s+(?!Main\b)\w+)/g,
+      '$1'
+    );
 
     // 3. Combine and de-duplicate all imports
     const allImports = [...new Set([...userImports, ...driverImports])];
