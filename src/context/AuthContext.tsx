@@ -1,9 +1,8 @@
 "use client";
 
-import { createContext, useContext, ReactNode } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { User } from "firebase/auth";
 
 // Define the shape of the context data
 interface AuthContextType {
@@ -16,7 +15,36 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, loading, error] = useAuthState(auth);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | undefined>();
+
+  useEffect(() => {
+    // Set a timeout so the UI is never blocked for more than 4 seconds
+    // even if Firebase Auth is slow to initialize
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (firebaseUser) => {
+        clearTimeout(timeout);
+        setUser(firebaseUser);
+        setLoading(false);
+      },
+      (err) => {
+        clearTimeout(timeout);
+        setError(err);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, []);
 
   const value = { user, loading, error };
 

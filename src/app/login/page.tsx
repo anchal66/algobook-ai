@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { useAuth } from "@/context/AuthContext";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Code2, ArrowLeft, Sparkles, Shield, Zap } from "lucide-react";
@@ -13,7 +13,7 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [user, loading] = useAuthState(auth);
+  const { user, loading } = useAuth();
 
   const handleSignIn = async () => {
     try {

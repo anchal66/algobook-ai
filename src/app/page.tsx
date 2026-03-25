@@ -7,7 +7,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2,
   Sparkles,
   Code2,
   BarChart3,
@@ -38,15 +37,9 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (user) return null;
+  // Don't block rendering while auth is loading — show the landing page immediately.
+  // Only hide if we've confirmed the user is logged in (to avoid flash before redirect).
+  if (!loading && user) return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">

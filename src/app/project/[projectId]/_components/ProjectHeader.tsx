@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { firestore, auth } from "@/lib/firebase";
+import { firestore } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ interface ProjectData {
 
 export default function ProjectHeader({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectData | null>(null);
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const pathname = usePathname();
 
   useEffect(() => {
