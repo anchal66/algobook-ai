@@ -21,6 +21,10 @@ function toDate(v: unknown): Date {
   return new Date(v as string);
 }
 
+function isValidDate(d: Date): boolean {
+  return d instanceof Date && !Number.isNaN(d.getTime());
+}
+
 function docToSubscription(doc: FirebaseFirestore.DocumentSnapshot): Subscription | null {
   if (!doc.exists) return null;
   const d = doc.data()!;
@@ -39,19 +43,51 @@ function docToSubscription(doc: FirebaseFirestore.DocumentSnapshot): Subscriptio
   };
 }
 
-export async function getActiveSubscription(userId: string): Promise<Subscription | null> {
-  const now = Timestamp.now();
-  const snap = await adminDb
-    .collection("subscriptions")
-    .where("userId", "==", userId)
-    .where("status", "==", "active")
-    .where("endDate", ">", now)
-    .orderBy("endDate", "desc")
-    .limit(1)
-    .get();
+function isFirestoreIndexError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const err = e as { code?: number | string; message?: string };
+  const code = err.code;
+  const msg = String(err.message ?? "").toLowerCase();
+  return (
+    code === 9 ||
+    code === "failed-precondition" ||
+    msg.includes("index") ||
+    msg.includes("requires an index")
+  );
+}
 
-  if (snap.empty) return null;
-  return docToSubscription(snap.docs[0]);
+/** Prefer indexed compound query; if index is missing/building, fall back so prod does not 500. */
+export async function getActiveSubscription(userId: string): Promise<Subscription | null> {
+  const nowTs = Timestamp.now();
+  const nowDate = new Date();
+
+  try {
+    const snap = await adminDb
+      .collection("subscriptions")
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
+      .where("endDate", ">", nowTs)
+      .orderBy("endDate", "desc")
+      .limit(1)
+      .get();
+
+    if (snap.empty) return null;
+    return docToSubscription(snap.docs[0]);
+  } catch (e: unknown) {
+    if (!isFirestoreIndexError(e)) throw e;
+    console.warn("[subscription] compound query failed (index?), using userId-only fallback", e);
+
+    const snap = await adminDb.collection("subscriptions").where("userId", "==", userId).get();
+    let best: Subscription | null = null;
+    for (const doc of snap.docs) {
+      const sub = docToSubscription(doc);
+      if (!sub || sub.status !== "active" || !isValidDate(sub.endDate) || sub.endDate <= nowDate) {
+        continue;
+      }
+      if (!best || sub.endDate > best.endDate) best = sub;
+    }
+    return best;
+  }
 }
 
 export async function hasActiveSubscription(userId: string): Promise<boolean> {
@@ -104,10 +140,14 @@ export async function checkSubscriptionStatus(userId: string): Promise<Subscript
     return { active: false, reason: "no_active_subscription" };
   }
 
+  if (!isValidDate(sub.endDate)) {
+    return { active: false, reason: "invalid_subscription_data" };
+  }
+
   return {
     active: true,
     plan: { name: sub.planName, slug: sub.planSlug },
-    startDate: sub.startDate.toISOString(),
+    startDate: isValidDate(sub.startDate) ? sub.startDate.toISOString() : undefined,
     endDate: sub.endDate.toISOString(),
   };
 }
