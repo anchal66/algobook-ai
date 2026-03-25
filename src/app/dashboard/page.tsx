@@ -34,8 +34,11 @@ import {
   MoreVertical,
   BarChart3,
   ExternalLink,
+  BookOpen,
+  Clock,
+  Target,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import type { UserProfile } from "@/types";
 import {
   DropdownMenu,
@@ -54,6 +57,13 @@ interface Project {
   purpose?: string;
   duration?: number;
   createdAt: { seconds: number; nanoseconds: number };
+}
+
+interface ProjectProgress {
+  totalQuestions: number;
+  totalSubmissions: number;
+  successfulSubmissions: number;
+  lastActivity: Date | null;
 }
 
 const fadeUp = {
@@ -75,6 +85,7 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activityProject, setActivityProject] = useState<{ id: string; title: string } | null>(null);
+  const [projectProgress, setProjectProgress] = useState<Record<string, ProjectProgress>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,8 +127,52 @@ export default function DashboardPage() {
       }
     };
 
-    fetchProjects();
+    fetchProjects().then(() => fetchProjectProgress());
     fetchProfile();
+
+    async function fetchProjectProgress() {
+      if (!user) return;
+      try {
+        const projQuery = query(
+          collection(firestore, "projects"),
+          where("userId", "==", user.uid)
+        );
+        const projSnap = await getDocs(projQuery);
+        const projectIds = projSnap.docs.map((d) => d.id);
+        if (projectIds.length === 0) return;
+
+        const progressMap: Record<string, ProjectProgress> = {};
+
+        // Fetch question counts and submissions per project in parallel
+        await Promise.all(
+          projectIds.map(async (pid) => {
+            const [qSnap, subSnap] = await Promise.all([
+              getDocs(collection(firestore, "projects", pid, "projectQuestions")),
+              getDocs(
+                query(
+                  collection(firestore, "submissions"),
+                  where("userId", "==", user.uid),
+                  where("projectId", "==", pid),
+                  orderBy("submittedAt", "desc")
+                )
+              ),
+            ]);
+            const subs = subSnap.docs.map((d) => d.data());
+            const successCount = subs.filter((s) => s.status === "success").length;
+            const lastSub = subs[0]?.submittedAt;
+            progressMap[pid] = {
+              totalQuestions: qSnap.size,
+              totalSubmissions: subs.length,
+              successfulSubmissions: successCount,
+              lastActivity: lastSub?.toDate ? lastSub.toDate() : null,
+            };
+          })
+        );
+        setProjectProgress(progressMap);
+      } catch (err) {
+        console.error("Error fetching project progress:", err);
+      }
+    }
   }, [user, authLoading, router]);
 
   useEffect(() => {
@@ -170,14 +225,6 @@ export default function DashboardPage() {
                   </button>
                 </div>
               )
-            )}
-            {user?.photoURL && (
-              <img
-                src={user.photoURL}
-                alt=""
-                className="h-8 w-8 rounded-full ring-2 ring-border"
-                referrerPolicy="no-referrer"
-              />
             )}
             <UserMenu />
           </div>
@@ -322,70 +369,117 @@ export default function DashboardPage() {
             animate="visible"
             variants={stagger}
           >
-            {filteredProjects.map((project) => (
-              <motion.div key={project.id} variants={fadeUp}>
-                <Card className="group h-full flex flex-col overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-                  <div className="h-1.5 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <Link href={`/project/${project.id}/editor`} className="flex-1 min-w-0">
-                        <CardTitle className="text-lg group-hover:text-primary transition-colors cursor-pointer">
-                          {project.title}
-                        </CardTitle>
-                      </Link>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-1 rounded-md hover:bg-accent transition-colors -mr-1" onClick={(e) => e.stopPropagation()}>
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/project/${project.id}/editor`} className="gap-2">
-                              <ExternalLink className="h-4 w-4" /> Open Project
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="gap-2"
-                            onClick={() => setActivityProject({ id: project.id, title: project.title })}
-                          >
-                            <BarChart3 className="h-4 w-4" /> View Activity
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <CardDescription>
-                      {format(
-                        new Date(project.createdAt.seconds * 1000),
-                        "PPP"
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <Link href={`/project/${project.id}/editor`} className="cursor-pointer">
-                    <CardContent className="flex-grow pt-0">
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                        {project.description}
+            {filteredProjects.map((project) => {
+              const progress = projectProgress[project.id];
+              const totalQ = progress?.totalQuestions || 0;
+              const successSubs = progress?.successfulSubmissions || 0;
+              const totalSubs = progress?.totalSubmissions || 0;
+              const successRate = totalSubs > 0 ? Math.round((successSubs / totalSubs) * 100) : 0;
+              const createdDate = new Date(project.createdAt.seconds * 1000);
+              const daysSinceCreation = Math.max(1, Math.ceil((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+              const durationProgress = project.duration ? Math.min(100, Math.round((daysSinceCreation / project.duration) * 100)) : null;
+
+              return (
+                <motion.div key={project.id} variants={fadeUp}>
+                  <Card className="group h-full flex flex-col overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
+                    <div className="h-1.5 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <Link href={`/project/${project.id}/editor`} className="flex-1 min-w-0">
+                          <CardTitle className="text-lg group-hover:text-primary transition-colors cursor-pointer">
+                            {project.title}
+                          </CardTitle>
+                        </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-1 rounded-md hover:bg-accent transition-colors -mr-1" onClick={(e) => e.stopPropagation()}>
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/project/${project.id}/editor`} className="gap-2">
+                                <ExternalLink className="h-4 w-4" /> Open Project
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2"
+                              onClick={() => setActivityProject({ id: project.id, title: project.title })}
+                            >
+                              <BarChart3 className="h-4 w-4" /> View Activity
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Created {format(createdDate, "MMM d, yyyy")}
+                        {progress?.lastActivity && (
+                          <> · Active {formatDistanceToNow(progress.lastActivity, { addSuffix: true })}</>
+                        )}
                       </p>
-                      {(project.purpose || project.duration) && (
-                        <div className="flex flex-wrap gap-2">
-                          {project.purpose && (
-                            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
-                              {project.purpose}
-                            </span>
-                          )}
-                          {project.duration && (
-                            <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
-                              {project.duration} days
-                            </span>
-                          )}
+                    </CardHeader>
+                    <Link href={`/project/${project.id}/editor`} className="cursor-pointer flex-grow">
+                      <CardContent className="pt-0 pb-4 flex flex-col h-full">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                          {project.description}
+                        </p>
+
+                        {/* Stats row */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                          <div className="rounded-lg bg-muted/50 p-2 text-center">
+                            <p className="text-base font-bold">{totalQ}</p>
+                            <p className="text-[10px] text-muted-foreground">Questions</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/50 p-2 text-center">
+                            <p className="text-base font-bold">{totalSubs}</p>
+                            <p className="text-[10px] text-muted-foreground">Submissions</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/50 p-2 text-center">
+                            <p className={`text-base font-bold ${successRate >= 70 ? 'text-emerald-500' : successRate >= 40 ? 'text-amber-500' : totalSubs > 0 ? 'text-red-400' : ''}`}>
+                              {totalSubs > 0 ? `${successRate}%` : '—'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Success</p>
+                          </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Link>
-                </Card>
-              </motion.div>
-            ))}
+
+                        {/* Duration progress bar */}
+                        {project.duration && (
+                          <div className="mt-auto">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Day {Math.min(daysSinceCreation, project.duration)} of {project.duration}
+                              </span>
+                              <span className="text-[10px] font-medium text-muted-foreground">{durationProgress}%</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  durationProgress! >= 100 ? 'bg-emerald-500' : durationProgress! >= 75 ? 'bg-amber-500' : 'bg-primary'
+                                }`}
+                                style={{ width: `${durationProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {(project.purpose || (project.duration && !project.duration)) && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {project.purpose && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                                {project.purpose}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Link>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </motion.div>
         ) : (
           <motion.div
