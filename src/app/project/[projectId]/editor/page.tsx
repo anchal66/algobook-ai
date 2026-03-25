@@ -17,7 +17,7 @@ import {
   Lightbulb, Info, Lock, Crown,
 } from "lucide-react";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, Timestamp, where } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, Timestamp, where, increment } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -401,6 +401,21 @@ export default function ProjectPage() {
         isFirstTry: attemptNumber === 1,
         submittedAt: serverTimestamp(),
       });
+
+      // Update today's attendance counters
+      const today = new Date().toISOString().slice(0, 10);
+      const attendanceRef = doc(firestore, "projects", projectId, "attendance", today);
+      const attendanceSnap = await getDoc(attendanceRef);
+      if (attendanceSnap.exists()) {
+        await setDoc(attendanceRef, {
+          totalSubmissions: increment(1),
+          ...(allTestsPassed
+            ? { successfulSubmissions: increment(1), questionsSolved: increment(1) }
+            : { failedSubmissions: increment(1) }),
+          timeSpentSeconds: increment(timeSpent),
+        }, { merge: true });
+      }
+
       fetchSubmissionHistory(question.id);
       updateUserProfile(question.tags || [], allTestsPassed);
     }

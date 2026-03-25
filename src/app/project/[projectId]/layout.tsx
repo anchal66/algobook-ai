@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import ProjectHeader from './_components/ProjectHeader';
+import AttendanceModal from './_components/AttendanceModal';
 
 // 1. FIX: The 'params' prop type is now a Promise
 export default async function ProjectLayout({
@@ -17,6 +18,7 @@ export default async function ProjectLayout({
     <div className="flex flex-col h-screen w-screen">
       {/* 3. FIX: Use the resolved value here */}
       <ProjectHeader projectId={resolvedParams.projectId} />
+      <AttendanceModal projectId={resolvedParams.projectId} />
       <main className="flex-grow overflow-hidden">
         {children}
       </main>

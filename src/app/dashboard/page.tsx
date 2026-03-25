@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { firestore, auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { firestore } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,9 +31,21 @@ import {
   CheckCircle2,
   Crown,
   Sparkles,
+  MoreVertical,
+  BarChart3,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { UserProfile } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import ActivitySheet from "@/components/ActivitySheet";
+import UserMenu from "@/components/UserMenu";
 
 interface Project {
   id: string;
@@ -63,6 +74,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activityProject, setActivityProject] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -114,11 +126,6 @@ export default function DashboardPage() {
     );
     setFilteredProjects(results);
   }, [searchTerm, projects]);
-
-  const handleSignOut = async () => {
-    await signOut(auth);
-    router.push("/");
-  };
 
   if (loading || authLoading) {
     return (
@@ -172,10 +179,7 @@ export default function DashboardPage() {
                 referrerPolicy="no-referrer"
               />
             )}
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-1.5 text-muted-foreground hover:text-foreground">
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign out</span>
-            </Button>
+            <UserMenu />
           </div>
         </div>
       </header>
@@ -320,23 +324,45 @@ export default function DashboardPage() {
           >
             {filteredProjects.map((project) => (
               <motion.div key={project.id} variants={fadeUp}>
-                <Link href={`/project/${project.id}/editor`}>
-                  <Card className="group h-full flex flex-col overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer">
-                    <div className="h-1.5 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                <Card className="group h-full flex flex-col overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
+                  <div className="h-1.5 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <Link href={`/project/${project.id}/editor`} className="flex-1 min-w-0">
+                        <CardTitle className="text-lg group-hover:text-primary transition-colors cursor-pointer">
                           {project.title}
                         </CardTitle>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-200" />
-                      </div>
-                      <CardDescription>
-                        {format(
-                          new Date(project.createdAt.seconds * 1000),
-                          "PPP"
-                        )}
-                      </CardDescription>
-                    </CardHeader>
+                      </Link>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1 rounded-md hover:bg-accent transition-colors -mr-1" onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/project/${project.id}/editor`} className="gap-2">
+                              <ExternalLink className="h-4 w-4" /> Open Project
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="gap-2"
+                            onClick={() => setActivityProject({ id: project.id, title: project.title })}
+                          >
+                            <BarChart3 className="h-4 w-4" /> View Activity
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardDescription>
+                      {format(
+                        new Date(project.createdAt.seconds * 1000),
+                        "PPP"
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <Link href={`/project/${project.id}/editor`} className="cursor-pointer">
                     <CardContent className="flex-grow pt-0">
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                         {project.description}
@@ -356,8 +382,8 @@ export default function DashboardPage() {
                         </div>
                       )}
                     </CardContent>
-                  </Card>
-                </Link>
+                  </Link>
+                </Card>
               </motion.div>
             ))}
           </motion.div>
@@ -389,6 +415,14 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </main>
+
+      {/* Activity Sheet */}
+      <ActivitySheet
+        open={!!activityProject}
+        onOpenChange={(open) => !open && setActivityProject(null)}
+        projectId={activityProject?.id || ""}
+        projectTitle={activityProject?.title || ""}
+      />
     </div>
   );
 }

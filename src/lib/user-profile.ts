@@ -3,6 +3,127 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { UserProfile, TopicSkill, ExperienceLevel, GoalType, PracticeState } from "@/types";
 
 const PROFILES_COLLECTION = "userProfiles";
+const USERNAMES_COLLECTION = "usernames";
+
+// ── USERNAME GENERATION ──
+
+const ADJECTIVES = [
+  "algo", "byte", "code", "data", "dev", "fast", "grid", "hash",
+  "loop", "meta", "nano", "node", "pixel", "query", "rust", "stack",
+  "sync", "tech", "turbo", "void", "zen", "cyber", "logic", "flux",
+  "delta", "sigma", "alpha", "omega", "neo", "quantum",
+];
+
+const NOUNS = [
+  "ninja", "hawk", "wolf", "fox", "coder", "wizard", "knight", "sage",
+  "pilot", "spark", "bolt", "blade", "craft", "drift", "forge", "pulse",
+  "rider", "scout", "tiger", "viper", "archer", "chief", "racer", "storm",
+  "shark", "eagle", "phoenix", "raven", "panther", "falcon",
+];
+
+export const RESERVED_USERNAMES = new Set([
+  "dashboard", "login", "project", "projects", "profile", "privacy",
+  "terms", "contact", "about", "settings", "api", "admin", "app",
+  "auth", "signup", "register", "explore", "search", "help", "support",
+  "new", "edit", "delete", "public", "static", "assets", "images",
+]);
+
+function generateUsername(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const num = Math.floor(Math.random() * 900) + 100; // 100-999
+  return `${adj}_${noun}_${num}`;
+}
+
+export function isValidUsername(username: string): boolean {
+  return /^[a-z][a-z0-9_]{2,19}$/.test(username) && !RESERVED_USERNAMES.has(username);
+}
+
+async function claimUsername(username: string, userId: string): Promise<boolean> {
+  const ref = adminDb.collection(USERNAMES_COLLECTION).doc(username);
+  try {
+    await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists) throw new Error("taken");
+      tx.set(ref, { userId });
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function generateAndClaimUsername(userId: string): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const candidate = generateUsername();
+    const claimed = await claimUsername(candidate, userId);
+    if (claimed) return candidate;
+  }
+  // Fallback: use userId suffix
+  const fallback = `coder_${userId.slice(0, 8).toLowerCase()}`;
+  await claimUsername(fallback, userId);
+  return fallback;
+}
+
+export async function checkUsernameAvailability(username: string): Promise<boolean> {
+  if (!isValidUsername(username)) return false;
+  const snap = await adminDb.collection(USERNAMES_COLLECTION).doc(username).get();
+  return !snap.exists;
+}
+
+export async function updateUsername(
+  userId: string,
+  newUsername: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isValidUsername(newUsername)) {
+    return { success: false, error: "Invalid username format" };
+  }
+
+  const profileRef = adminDb.collection(PROFILES_COLLECTION).doc(userId);
+  const profileSnap = await profileRef.get();
+  if (!profileSnap.exists) return { success: false, error: "Profile not found" };
+
+  const data = profileSnap.data()!;
+  const changesLeft = (data.usernameChangesLeft as number) ?? 0;
+  if (changesLeft <= 0) {
+    return { success: false, error: "No username changes remaining" };
+  }
+
+  const oldUsername = data.username as string;
+  if (oldUsername === newUsername) {
+    return { success: false, error: "Same as current username" };
+  }
+
+  // Atomically swap in a transaction
+  const oldRef = adminDb.collection(USERNAMES_COLLECTION).doc(oldUsername);
+  const newRef = adminDb.collection(USERNAMES_COLLECTION).doc(newUsername);
+
+  try {
+    await adminDb.runTransaction(async (tx) => {
+      const newSnap = await tx.get(newRef);
+      if (newSnap.exists) throw new Error("Username already taken");
+      tx.delete(oldRef);
+      tx.set(newRef, { userId });
+      tx.update(profileRef, {
+        username: newUsername,
+        usernameChangesLeft: FieldValue.increment(-1),
+      });
+    });
+    return { success: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Failed to update username";
+    return { success: false, error: msg };
+  }
+}
+
+export async function getProfileByUsername(username: string): Promise<UserProfile | null> {
+  const usernameSnap = await adminDb.collection(USERNAMES_COLLECTION).doc(username).get();
+  if (!usernameSnap.exists) return null;
+  const { userId } = usernameSnap.data()!;
+  const profileSnap = await adminDb.collection(PROFILES_COLLECTION).doc(userId).get();
+  if (!profileSnap.exists) return null;
+  return normalizeProfile(userId, profileSnap.data()!);
+}
 
 // ── MASTERY SCORE ──
 // Composite 0-100 score per topic based on:
@@ -62,7 +183,13 @@ function emptyTopicSkill(): Omit<TopicSkill, "lastSeen"> & { lastSeen: unknown }
 
 export async function getOrCreateProfile(
   userId: string,
-  defaults?: { experienceLevel?: ExperienceLevel; goalType?: GoalType }
+  defaults?: {
+    experienceLevel?: ExperienceLevel;
+    goalType?: GoalType;
+    displayName?: string;
+    email?: string;
+    photoURL?: string;
+  }
 ): Promise<UserProfile> {
   const ref = adminDb.collection(PROFILES_COLLECTION).doc(userId);
   const snap = await ref.get();
@@ -77,6 +204,15 @@ export async function getOrCreateProfile(
       if (defaults.goalType && data.goalType !== defaults.goalType) {
         updates.goalType = defaults.goalType;
       }
+      if (defaults.displayName && !data.displayName) {
+        updates.displayName = defaults.displayName;
+      }
+      if (defaults.email && !data.email) {
+        updates.email = defaults.email;
+      }
+      if (defaults.photoURL && !data.photoURL) {
+        updates.photoURL = defaults.photoURL;
+      }
       if (Object.keys(updates).length > 0) {
         await ref.update(updates);
         Object.assign(data, updates);
@@ -85,8 +221,22 @@ export async function getOrCreateProfile(
     return normalizeProfile(userId, data);
   }
 
+  const username = await generateAndClaimUsername(userId);
+
   const newProfile = {
     userId,
+    username,
+    usernameChangesLeft: 2,
+    displayName: defaults?.displayName || "",
+    email: defaults?.email || "",
+    photoURL: defaults?.photoURL || "",
+    bio: "",
+    company: "",
+    address: "",
+    college: "",
+    githubUrl: "",
+    linkedinUrl: "",
+    skills: [],
     experienceLevel: defaults?.experienceLevel || "intermediate",
     goalType: defaults?.goalType || "daily-practice",
     practiceState: "learning" as PracticeState,
@@ -101,12 +251,24 @@ export async function getOrCreateProfile(
   };
 
   await ref.set(newProfile);
-  return newProfile;
+  return normalizeProfile(userId, newProfile);
 }
 
 function normalizeProfile(userId: string, data: Record<string, unknown>): UserProfile {
   return {
     userId,
+    username: (data.username as string) || "",
+    usernameChangesLeft: (data.usernameChangesLeft as number) ?? 2,
+    displayName: (data.displayName as string) || "",
+    email: (data.email as string) || "",
+    photoURL: (data.photoURL as string) || "",
+    bio: (data.bio as string) || "",
+    company: (data.company as string) || "",
+    address: (data.address as string) || "",
+    college: (data.college as string) || "",
+    githubUrl: (data.githubUrl as string) || "",
+    linkedinUrl: (data.linkedinUrl as string) || "",
+    skills: (data.skills as string[]) || [],
     experienceLevel: (data.experienceLevel as ExperienceLevel) || "intermediate",
     goalType: (data.goalType as GoalType) || "daily-practice",
     practiceState: (data.practiceState as PracticeState) || "learning",
@@ -313,4 +475,26 @@ export function buildPerformanceSummary(profile: UserProfile): string {
   }
 
   return lines.join("\n");
+}
+
+// ── PROFILE FIELD UPDATES (bio, company, etc.) ──
+
+const ALLOWED_PROFILE_FIELDS = new Set([
+  "bio", "company", "address", "college", "githubUrl", "linkedinUrl",
+  "skills", "displayName", "photoURL",
+]);
+
+export async function updateProfileFields(
+  userId: string,
+  fields: Record<string, unknown>
+): Promise<void> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (ALLOWED_PROFILE_FIELDS.has(key)) {
+      sanitized[key] = value;
+    }
+  }
+  if (Object.keys(sanitized).length === 0) return;
+  const ref = adminDb.collection(PROFILES_COLLECTION).doc(userId);
+  await ref.update(sanitized);
 }

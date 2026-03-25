@@ -26,6 +26,18 @@ export interface TopicSkill {
 
 export interface UserProfile {
   userId: string;
+  username: string;
+  usernameChangesLeft: number;
+  displayName: string;
+  email: string;
+  photoURL: string;
+  bio: string;
+  company: string;
+  address: string;
+  college: string;
+  githubUrl: string;
+  linkedinUrl: string;
+  skills: string[];
   experienceLevel: ExperienceLevel;
   goalType: GoalType;
   practiceState: PracticeState;
