@@ -15,14 +15,13 @@ import {
   Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
   Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
+  Maximize2, Minimize2, TriangleAlert,
 } from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, Timestamp, where, increment } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 
@@ -51,8 +50,6 @@ export default function ProjectPage() {
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [projectQuestions, setProjectQuestions] = useState<ProjectQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
-  const [activeConsoleTab, setActiveConsoleTab] = useState("test-result");
-  const [customInput, setCustomInput] = useState("");
   const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [lastRunInput, setLastRunInput] = useState<string | null>(null);
@@ -77,6 +74,10 @@ export default function ProjectPage() {
   const [fontSize, setFontSize] = useState(14);
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions'>('testcase');
+  const [selectedCaseIndex, setSelectedCaseIndex] = useState(0);
+  const [editableInputs, setEditableInputs] = useState<Record<number, string>>({});
 
   // Elapsed timer for current question
   useEffect(() => {
@@ -128,7 +129,8 @@ export default function ProjectPage() {
     setQuestion(null);
     setExecutionResult(null);
     setExecutionError(null);
-    setCustomInput("");
+    setEditableInputs({});
+    setSelectedCaseIndex(0);
     setSubmissionHistory([]);
     setHints([]);
     setHintLabels([]);
@@ -264,6 +266,9 @@ export default function ProjectPage() {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
       runCodeRef.current?.(true);
     });
+    editor.addCommand(monaco.KeyCode.Escape, () => {
+      setIsFullscreen(false);
+    });
 
     // Java completion provider
     completionDisposableRef.current?.dispose();
@@ -351,11 +356,47 @@ export default function ProjectPage() {
   };
 
   const formatCode = () => {
-    editorRef.current?.getAction('editor.action.formatDocument')?.run();
+    const editor = editorRef.current;
+    if (!editor) return;
+    // Format using the built-in action
+    const action = editor.getAction('editor.action.formatDocument');
+    if (action) {
+      action.run();
+    } else {
+      // Fallback: trigger format via command
+      editor.trigger('keyboard', 'editor.action.formatDocument', null);
+    }
   };
 
   const resetCode = () => {
-    if (question?.starterCode) setCode(question.starterCode);
+    if (question?.starterCode) {
+      setCode(question.starterCode);
+      setEditableInputs({});
+    }
+  };
+
+  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+
+  // Parse test case inputs into labeled variables
+  const parseTestCaseInputs = (input: string): { name: string; value: string }[] => {
+    const lines = input.trim().split('\n');
+    return lines.map((line, i) => ({
+      name: `param${i + 1}`,
+      value: line,
+    }));
+  };
+
+  // Get the input for running — either edited or original
+  const getRunInput = (): string => {
+    if (activeBottomTab === 'testcase') {
+      if (editableInputs[selectedCaseIndex] !== undefined) {
+        return editableInputs[selectedCaseIndex];
+      }
+      const cases = question?.testCases.filter(tc => tc.isSample) || [];
+      const tc = cases[selectedCaseIndex] || question?.testCases[selectedCaseIndex];
+      return tc?.input || '';
+    }
+    return '';
   };
 
   const handleNextQuestion = () => {
@@ -526,7 +567,6 @@ export default function ProjectPage() {
     setExecutionResult(null);
     setExecutionError(null);
     setLastRunInput(null);
-    setActiveConsoleTab("test-result");
 
     let testCasesToRun: TestCase[] = [];
 
@@ -538,22 +578,18 @@ export default function ProjectPage() {
       }
       testCasesToRun = question.testCases;
     } else {
-      let inputToUse: string;
-      if (activeConsoleTab === "custom-input") {
-        inputToUse = customInput;
-        testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
-      } else {
-        const sampleCase = question.testCases.find(tc => tc.isSample) || question.testCases[0];
-        if (!sampleCase) {
-          setExecutionError("Cannot run. The question has no sample test cases.");
-          setIsExecuting(false);
-          return;
-        }
-        testCasesToRun = [sampleCase];
-        inputToUse = sampleCase.input;
+      const inputToUse = getRunInput();
+      testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
+      // Try matching to expected output if it's a known test case
+      const matchedCase = question.testCases.find(tc => tc.input === inputToUse);
+      if (matchedCase) {
+        testCasesToRun = [matchedCase];
       }
       setLastRunInput(inputToUse);
     }
+
+    // Switch to test-result on run
+    setActiveBottomTab('test-result');
 
     let allTestsPassed = true;
     let finalResult: ExecutionResult | null = null;
@@ -739,250 +775,407 @@ export default function ProjectPage() {
 
         {/* Right Panel — Editor + Console */}
         <ResizablePanel defaultSize={60} minSize={30}>
-          <ResizablePanelGroup orientation="vertical">
-            <ResizablePanel defaultSize={65} minSize={30}>
-              <div className="flex flex-col h-full">
-                {/* Editor Toolbar */}
-                <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#313244] bg-[#1e1e2e] flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">Java</span>
-                    {question && (
-                      <div className="flex items-center gap-1 text-[11px] text-[#a6adc8]">
-                        <Timer className="h-3 w-3" />
-                        <span className="font-mono tabular-nums">{formatElapsed(elapsedTime)}</span>
+          <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+            <ResizablePanelGroup orientation="vertical" className="flex-grow">
+              <ResizablePanel defaultSize={65} minSize={25}>
+                <div className="flex flex-col h-full">
+                  {/* Editor Toolbar */}
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#313244] bg-[#1e1e2e] flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#313244] border border-[#45475a]">
+                        <Code className="h-3 w-3 text-orange-400" />
+                        <span className="text-[11px] font-semibold text-[#cdd6f4]">Java</span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <div className="flex items-center gap-0.5 mr-1 px-1 py-0.5 rounded bg-[#313244]/50">
-                      <button onClick={() => setFontSize(s => Math.max(10, s - 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Decrease font size">
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <span className="text-[10px] text-[#a6adc8] font-mono w-4 text-center tabular-nums">{fontSize}</span>
-                      <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Increase font size">
-                        <Plus className="h-3 w-3" />
-                      </button>
+                      {question && (
+                        <div className="flex items-center gap-1 text-[11px] text-[#a6adc8]">
+                          <Timer className="h-3 w-3" />
+                          <span className="font-mono tabular-nums">{formatElapsed(elapsedTime)}</span>
+                        </div>
+                      )}
                     </div>
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button onClick={resetCode} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Reset to starter code</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
-                            <Keyboard className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">
-                          <div className="space-y-1">
-                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ Enter</kbd> Run Code</p>
-                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ ⇧ Enter</kbd> Submit</p>
-                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⇧ ⌥ F</kbd> Format Code</p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-
-                {/* Monaco Editor */}
-                <div className="flex-grow relative">
-                  <Editor
-                    height="100%"
-                    language="java"
-                    theme="algobook-dark"
-                    value={code}
-                    beforeMount={handleEditorBeforeMount}
-                    onMount={handleEditorDidMount}
-                    onChange={(value) => setCode(value || "")}
-                    options={{
-                      fontSize,
-                      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
-                      fontLigatures: true,
-                      minimap: { enabled: false },
-                      wordWrap: 'on',
-                      padding: { top: 16, bottom: 16 },
-                      scrollBeyondLastLine: false,
-                      smoothScrolling: true,
-                      cursorBlinking: 'smooth',
-                      cursorSmoothCaretAnimation: 'on',
-                      cursorWidth: 2,
-                      renderLineHighlight: 'all',
-                      renderLineHighlightOnlyWhenFocus: false,
-                      bracketPairColorization: { enabled: true },
-                      autoClosingBrackets: 'always',
-                      autoClosingQuotes: 'always',
-                      autoIndent: 'full',
-                      formatOnPaste: true,
-                      formatOnType: true,
-                      suggestOnTriggerCharacters: true,
-                      acceptSuggestionOnCommitCharacter: true,
-                      tabCompletion: 'on',
-                      wordBasedSuggestions: 'currentDocument',
-                      quickSuggestions: { other: true, comments: false, strings: true },
-                      parameterHints: { enabled: true },
-                      suggest: {
-                        showKeywords: true,
-                        showSnippets: true,
-                        showClasses: true,
-                        showFunctions: true,
-                        showVariables: true,
-                        showWords: true,
-                        preview: true,
-                        shareSuggestSelections: true,
-                      },
-                      lineNumbers: 'on',
-                      glyphMargin: false,
-                      folding: true,
-                      foldingHighlight: true,
-                      showFoldingControls: 'mouseover',
-                      matchBrackets: 'always',
-                      selectionHighlight: true,
-                      occurrencesHighlight: 'singleFile',
-                      renderWhitespace: 'selection',
-                      guides: {
-                        indentation: true,
-                        bracketPairs: true,
-                        highlightActiveBracketPair: true,
-                      },
-                      scrollbar: {
-                        verticalScrollbarSize: 8,
-                        horizontalScrollbarSize: 8,
-                        useShadows: false,
-                      },
-                      overviewRulerLanes: 0,
-                      hideCursorInOverviewRuler: true,
-                      overviewRulerBorder: false,
-                    }}
-                  />
-                </div>
-
-                {/* Status Bar */}
-                <div className="flex items-center justify-between px-3 py-1 border-t border-[#313244] bg-[#1e1e2e] flex-shrink-0">
-                  <div className="flex items-center gap-3 text-[10px] text-[#6c7086] font-mono">
-                    <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
-                    <span>UTF-8</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-[#6c7086]">
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Ready
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle className="h-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
-
-            {/* Console */}
-            <ResizablePanel defaultSize={35} minSize={20}>
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 flex-shrink-0 bg-card/30">
-                  <span className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">Console</span>
-                  <div className="flex items-center gap-1.5">
-                    <Button variant="ghost" size="sm" onClick={formatCode} className="gap-1.5 text-xs h-7">
-                      <Code className="h-3 w-3" /> Format
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRunCode(false)}
-                      disabled={isExecuting || !question || !hasSubscription}
-                      className="gap-1.5 text-xs h-7"
-                      title="Run Code (⌘ Enter)"
-                    >
-                      {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Play className="h-3 w-3"/>} Run
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleRunCode(true)}
-                      disabled={isExecuting || !question || !hasSubscription}
-                      className="gap-1.5 text-xs h-7 shadow-sm shadow-primary/20"
-                      title="Submit (⌘ ⇧ Enter)"
-                    >
-                      {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Send className="h-3 w-3"/>} Submit
-                    </Button>
-                  </div>
-                </div>
-
-                <Tabs value={activeConsoleTab} onValueChange={setActiveConsoleTab} className="flex-grow flex flex-col">
-                  <TabsList className="flex-shrink-0 rounded-none bg-transparent border-b border-border/50 justify-start h-8 px-1">
-                    <TabsTrigger value="test-result" className="text-xs h-7 data-[state=active]:shadow-none">Test Result</TabsTrigger>
-                    <TabsTrigger value="custom-input" className="text-xs h-7 data-[state=active]:shadow-none">Custom Input</TabsTrigger>
-                    <TabsTrigger value="submissions" className="text-xs h-7 data-[state=active]:shadow-none">Submissions</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="test-result" className="flex-grow overflow-y-auto p-4">
-                    {isExecuting && (
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" /> Running your code...
+                    <div className="flex items-center gap-0.5">
+                      <div className="flex items-center gap-0.5 mr-1 px-1 py-0.5 rounded bg-[#313244]/50">
+                        <button onClick={() => setFontSize(s => Math.max(10, s - 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Decrease font size">
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="text-[10px] text-[#a6adc8] font-mono w-4 text-center tabular-nums">{fontSize}</span>
+                        <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Increase font size">
+                          <Plus className="h-3 w-3" />
+                        </button>
                       </div>
-                    )}
-                    {executionError && (
-                      <div className="text-red-400">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Error</h3>
-                        <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{executionError}</pre>
-                      </div>
-                    )}
-                    {executionResult && !executionError &&
-                      <OutputDisplay
-                        result={executionResult}
-                        inputUsed={lastRunInput}
-                        expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
-                      />}
-                    {!isExecuting && !executionResult && !executionError &&
-                      <p className="text-sm text-muted-foreground">Click &quot;Run&quot; to test your code against the sample test case, or &quot;Submit&quot; to check all test cases.</p>
-                    }
-                  </TabsContent>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button onClick={formatCode} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                              <Code className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Format Code <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⇧⌥F</kbd></p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button onClick={resetCode} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Reset to starter code</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button onClick={toggleFullscreen} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                              <Keyboard className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            <div className="space-y-1">
+                              <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ Enter</kbd> Run Code</p>
+                              <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ ⇧ Enter</kbd> Submit</p>
+                              <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⇧ ⌥ F</kbd> Format Code</p>
+                              <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Esc</kbd> Exit Fullscreen</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
 
-                  <TabsContent value="custom-input" className="flex-grow overflow-y-auto p-4 flex flex-col">
-                    <label htmlFor="custom-input" className="text-xs font-medium mb-2 text-muted-foreground">Custom stdin input:</label>
-                    <Textarea
-                      id="custom-input"
-                      value={customInput}
-                      onChange={(e) => setCustomInput(e.target.value)}
-                      placeholder={"e.g.\n2\n2 7\n9"}
-                      className="flex-grow font-mono text-sm bg-background"
+                  {/* Monaco Editor */}
+                  <div className="flex-grow relative">
+                    <Editor
+                      height="100%"
+                      language="java"
+                      theme="algobook-dark"
+                      value={code}
+                      beforeMount={handleEditorBeforeMount}
+                      onMount={handleEditorDidMount}
+                      onChange={(value) => setCode(value || "")}
+                      options={{
+                        fontSize,
+                        fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+                        fontLigatures: true,
+                        minimap: { enabled: false },
+                        wordWrap: 'on',
+                        padding: { top: 16, bottom: 16 },
+                        scrollBeyondLastLine: false,
+                        smoothScrolling: true,
+                        cursorBlinking: 'smooth',
+                        cursorSmoothCaretAnimation: 'on',
+                        cursorWidth: 2,
+                        renderLineHighlight: 'all',
+                        renderLineHighlightOnlyWhenFocus: false,
+                        bracketPairColorization: { enabled: true },
+                        autoClosingBrackets: 'always',
+                        autoClosingQuotes: 'always',
+                        autoIndent: 'full',
+                        formatOnPaste: true,
+                        formatOnType: true,
+                        suggestOnTriggerCharacters: true,
+                        acceptSuggestionOnCommitCharacter: true,
+                        tabCompletion: 'on',
+                        wordBasedSuggestions: 'currentDocument',
+                        quickSuggestions: { other: true, comments: false, strings: true },
+                        parameterHints: { enabled: true },
+                        suggest: {
+                          showKeywords: true,
+                          showSnippets: true,
+                          showClasses: true,
+                          showFunctions: true,
+                          showVariables: true,
+                          showWords: true,
+                          preview: true,
+                          shareSuggestSelections: true,
+                        },
+                        lineNumbers: 'on',
+                        glyphMargin: false,
+                        folding: true,
+                        foldingHighlight: true,
+                        showFoldingControls: 'mouseover',
+                        matchBrackets: 'always',
+                        selectionHighlight: true,
+                        occurrencesHighlight: 'singleFile',
+                        renderWhitespace: 'selection',
+                        guides: {
+                          indentation: true,
+                          bracketPairs: true,
+                          highlightActiveBracketPair: true,
+                        },
+                        scrollbar: {
+                          verticalScrollbarSize: 8,
+                          horizontalScrollbarSize: 8,
+                          useShadows: false,
+                        },
+                        overviewRulerLanes: 0,
+                        hideCursorInOverviewRuler: true,
+                        overviewRulerBorder: false,
+                      }}
                     />
-                  </TabsContent>
+                  </div>
 
-                  <TabsContent value="submissions" className="flex-grow overflow-y-auto p-4">
-                    {isHistoryLoading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading...</div>}
-                    {!isHistoryLoading && submissionHistory.length === 0 && <p className="text-sm text-muted-foreground">No submissions yet for this question.</p>}
-                    {!isHistoryLoading && submissionHistory.length > 0 && (
-                      <div className="space-y-2">
-                        {submissionHistory.map((sub) => (
-                          <Card key={sub.id} className={`border ${sub.status === 'success' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-                            <CardHeader className="p-3 flex flex-row items-center justify-between">
-                              <CardTitle className="text-sm flex items-center gap-2 font-medium">
-                                {sub.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
-                                {sub.status === 'success' ? 'Accepted' : 'Wrong Answer'}
-                                <span className="text-[10px] text-muted-foreground font-normal">
-                                  #{sub.attemptNumber || '?'}
-                                  {sub.hintsUsed > 0 && ` · ${sub.hintsUsed} hint${sub.hintsUsed > 1 ? 's' : ''}`}
-                                </span>
-                              </CardTitle>
-                              <span className="text-[11px] text-muted-foreground">
-                                {sub.submittedAt?.toDate ? formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true }) : ''}
-                              </span>
-                            </CardHeader>
-                          </Card>
-                        ))}
+                  {/* Status Bar */}
+                  <div className="flex items-center justify-between px-3 py-1 border-t border-[#313244] bg-[#1e1e2e] flex-shrink-0">
+                    <div className="flex items-center gap-3 text-[10px] text-[#6c7086] font-mono">
+                      <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+                      <span>UTF-8</span>
+                      <span>Java</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-[#6c7086]">
+                      <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Ready
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </ResizablePanel>
+
+              <ResizableHandle className="h-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
+
+              {/* Bottom Panel — LeetCode-style Testcase / Test Result */}
+              <ResizablePanel defaultSize={35} minSize={15}>
+                <div className="flex flex-col h-full">
+                  {/* Tab Header */}
+                  <div className="flex items-center border-b border-border/50 flex-shrink-0 bg-card/30 px-1">
+                    <button
+                      onClick={() => setActiveBottomTab('testcase')}
+                      className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                        activeBottomTab === 'testcase'
+                          ? 'border-primary text-foreground'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        Testcase
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setActiveBottomTab('test-result')}
+                      className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                        activeBottomTab === 'test-result'
+                          ? 'border-primary text-foreground'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {executionResult ? (
+                          executionResult.status.id === 3 ? <Play className="h-3 w-3 text-emerald-500" /> : <TriangleAlert className="h-3 w-3 text-red-400" />
+                        ) : (
+                          <Play className="h-3 w-3" />
+                        )}
+                        Test Result
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setActiveBottomTab('submissions')}
+                      className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                        activeBottomTab === 'submissions'
+                          ? 'border-primary text-foreground'
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Submissions
+                    </button>
+                  </div>
+
+                  {/* Tab Content */}
+                  <div className="flex-grow overflow-y-auto">
+                    {/* Testcase Tab — LeetCode style */}
+                    {activeBottomTab === 'testcase' && (
+                      <div className="p-4">
+                        {question && question.testCases.length > 0 ? (
+                          <>
+                            {/* Case tabs */}
+                            <div className="flex items-center gap-1.5 mb-4">
+                              {question.testCases.filter(tc => tc.isSample).length > 0
+                                ? question.testCases.filter(tc => tc.isSample).map((_, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => setSelectedCaseIndex(i)}
+                                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                        selectedCaseIndex === i
+                                          ? 'bg-[#313244] text-foreground'
+                                          : 'text-muted-foreground hover:bg-[#313244]/50'
+                                      }`}
+                                    >
+                                      Case {i + 1}
+                                    </button>
+                                  ))
+                                : question.testCases.slice(0, 3).map((_, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => setSelectedCaseIndex(i)}
+                                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                        selectedCaseIndex === i
+                                          ? 'bg-[#313244] text-foreground'
+                                          : 'text-muted-foreground hover:bg-[#313244]/50'
+                                      }`}
+                                    >
+                                      Case {i + 1}
+                                    </button>
+                                  ))
+                              }
+                            </div>
+
+                            {/* Input fields for selected case */}
+                            {(() => {
+                              const sampleCases = question.testCases.filter(tc => tc.isSample);
+                              const cases = sampleCases.length > 0 ? sampleCases : question.testCases.slice(0, 3);
+                              const tc = cases[selectedCaseIndex];
+                              if (!tc) return null;
+                              const parsed = parseTestCaseInputs(tc.input);
+                              return (
+                                <div className="space-y-3">
+                                  {parsed.map((p, i) => (
+                                    <div key={i}>
+                                      <label className="text-xs text-muted-foreground font-medium mb-1.5 block">
+                                        {p.name} =
+                                      </label>
+                                      <div
+                                        className="bg-[#313244] rounded-lg px-3 py-2.5 font-mono text-sm text-[#cdd6f4] cursor-text border border-transparent focus-within:border-[#45475a] transition-colors"
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        onInput={(e) => {
+                                          const newVal = (e.target as HTMLDivElement).innerText;
+                                          const lines = (editableInputs[selectedCaseIndex] || tc.input).split('\\n');
+                                          lines[i] = newVal;
+                                          setEditableInputs(prev => ({ ...prev, [selectedCaseIndex]: lines.join('\\n') }));
+                                        }}
+                                        dangerouslySetInnerHTML={{ __html: p.value }}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No test cases available. Generate a question first.</p>
+                        )}
                       </div>
                     )}
-                  </TabsContent>
-                </Tabs>
+
+                    {/* Test Result Tab */}
+                    {activeBottomTab === 'test-result' && (
+                      <div className="p-4">
+                        {isExecuting && (
+                          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" /> Running your code...
+                          </div>
+                        )}
+                        {executionError && (
+                          <div className="text-red-400">
+                            <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Error</h3>
+                            <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{executionError}</pre>
+                          </div>
+                        )}
+                        {executionResult && !executionError &&
+                          <OutputDisplay
+                            result={executionResult}
+                            inputUsed={lastRunInput}
+                            expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
+                          />}
+                        {!isExecuting && !executionResult && !executionError &&
+                          <p className="text-sm text-muted-foreground">Click <strong>Run</strong> to test your code, or <strong>Submit</strong> to check all test cases.</p>
+                        }
+                      </div>
+                    )}
+
+                    {/* Submissions Tab */}
+                    {activeBottomTab === 'submissions' && (
+                      <div className="p-4">
+                        {isHistoryLoading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading...</div>}
+                        {!isHistoryLoading && submissionHistory.length === 0 && <p className="text-sm text-muted-foreground">No submissions yet for this question.</p>}
+                        {!isHistoryLoading && submissionHistory.length > 0 && (
+                          <div className="space-y-2">
+                            {submissionHistory.map((sub) => (
+                              <Card key={sub.id} className={`border ${sub.status === 'success' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                                <CardHeader className="p-3 flex flex-row items-center justify-between">
+                                  <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                                    {sub.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                                    {sub.status === 'success' ? 'Accepted' : 'Wrong Answer'}
+                                    <span className="text-[10px] text-muted-foreground font-normal">
+                                      #{sub.attemptNumber || '?'}
+                                      {sub.hintsUsed > 0 && ` · ${sub.hintsUsed} hint${sub.hintsUsed > 1 ? 's' : ''}`}
+                                    </span>
+                                  </CardTitle>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {sub.submittedAt?.toDate ? formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true }) : ''}
+                                  </span>
+                                </CardHeader>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+
+            {/* Bottom Action Bar — LeetCode style */}
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border/50 bg-card/50 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={formatCode} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors" aria-label="Format code">
+                        <Code className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Format <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⇧⌥F</kbd></p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={toggleFullscreen} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors" aria-label="Fullscreen">
+                        {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRunCode(false)}
+                  disabled={isExecuting || !question || !hasSubscription}
+                  className="gap-1.5 text-xs h-8 px-4"
+                >
+                  {!hasSubscription ? <Lock className="h-3.5 w-3.5"/> : isExecuting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Play className="h-3.5 w-3.5"/>}
+                  Run
+                  <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 rounded bg-muted/80 text-[9px] font-mono text-muted-foreground">⌘↵</kbd>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleRunCode(true)}
+                  disabled={isExecuting || !question || !hasSubscription}
+                  className="gap-1.5 text-xs h-8 px-4 shadow-sm shadow-primary/20 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {!hasSubscription ? <Lock className="h-3.5 w-3.5"/> : isExecuting ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Send className="h-3.5 w-3.5"/>}
+                  Submit
+                  <kbd className="hidden sm:inline-block ml-1 px-1 py-0.5 rounded bg-emerald-800/50 text-[9px] font-mono text-emerald-200/80">⌘⇧↵</kbd>
+                </Button>
+              </div>
+            </div>
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </main>
