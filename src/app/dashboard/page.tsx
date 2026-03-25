@@ -56,6 +56,7 @@ interface Project {
   description: string;
   purpose?: string;
   duration?: number;
+  activeDays?: number;
   createdAt: { seconds: number; nanoseconds: number };
 }
 
@@ -376,8 +377,8 @@ export default function DashboardPage() {
               const totalSubs = progress?.totalSubmissions || 0;
               const successRate = totalSubs > 0 ? Math.round((successSubs / totalSubs) * 100) : 0;
               const createdDate = new Date(project.createdAt.seconds * 1000);
-              const daysSinceCreation = Math.max(1, Math.ceil((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
-              const durationProgress = project.duration ? Math.min(100, Math.round((daysSinceCreation / project.duration) * 100)) : null;
+              const activeDays = project.activeDays || 0;
+              const durationProgress = project.duration ? Math.min(100, Math.round((activeDays / project.duration) * 100)) : null;
 
               return (
                 <motion.div key={project.id} variants={fadeUp}>
@@ -449,7 +450,7 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                Day {Math.min(daysSinceCreation, project.duration)} of {project.duration}
+                                Day {activeDays} of {project.duration}
                               </span>
                               <span className="text-[10px] font-medium text-muted-foreground">{durationProgress}%</span>
                             </div>

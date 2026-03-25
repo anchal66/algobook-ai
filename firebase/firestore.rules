@@ -20,6 +20,17 @@ service cloud.firestore {
         allow read: if request.auth != null
                     && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
       }
+
+      // --- Attendance (subcollection) ---
+      // Users can read/write attendance records for their own projects.
+      match /attendance/{dateId} {
+        allow read: if request.auth != null
+                    && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
+        allow create: if request.auth != null
+                      && request.resource.data.userId == request.auth.uid;
+        allow update: if request.auth != null
+                      && resource.data.userId == request.auth.uid;
+      }
     }
 
     // --- Questions ---
@@ -44,6 +55,13 @@ service cloud.firestore {
     match /userProfiles/{userId} {
       allow read: if request.auth != null
                   && userId == request.auth.uid;
+    }
+
+    // --- Usernames ---
+    // Anyone authenticated can check if a username exists.
+    // Writes are handled by firebase-admin (bypasses rules).
+    match /usernames/{username} {
+      allow read: if request.auth != null;
     }
   }
 }
