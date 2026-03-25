@@ -14,7 +14,7 @@ import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason }
 import {
   Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
-  Lightbulb, Info, Lock, Crown,
+  Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
 } from "lucide-react";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, Timestamp, where, increment } from "firebase/firestore";
@@ -71,6 +71,36 @@ export default function ProjectPage() {
   const questionStartTimeRef = useRef<number>(Date.now());
 
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const runCodeRef = useRef<((isSubmission: boolean) => Promise<void>) | undefined>(undefined);
+  const completionDisposableRef = useRef<any>(null);
+  const [fontSize, setFontSize] = useState(14);
+  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Elapsed timer for current question
+  useEffect(() => {
+    if (!question) { setElapsedTime(0); return; }
+    questionStartTimeRef.current = Date.now();
+    setElapsedTime(0);
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - questionStartTimeRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [question]);
+
+  // Cleanup completion provider on unmount
+  useEffect(() => {
+    return () => { completionDisposableRef.current?.dispose(); };
+  }, []);
+
+  const formatElapsed = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
 
   const fetchSubmissionHistory = useCallback(async (questionId: string) => {
     if (!user || !projectId) return;
@@ -145,8 +175,188 @@ export default function ProjectPage() {
     fetchProjectQuestions();
   }, [projectId, loadQuestion]);
 
-  const handleEditorDidMount = (editor: any) => { editorRef.current = editor; };
-  const formatCode = () => { if (editorRef.current) editorRef.current.getAction('editor.action.formatDocument').run(); };
+  const handleEditorBeforeMount = (monaco: any) => {
+    monacoRef.current = monaco;
+    monaco.editor.defineTheme('algobook-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'cba6f7', fontStyle: 'bold' },
+        { token: 'keyword.control', foreground: 'cba6f7', fontStyle: 'bold' },
+        { token: 'string', foreground: 'a6e3a1' },
+        { token: 'string.escape', foreground: '94e2d5' },
+        { token: 'number', foreground: 'fab387' },
+        { token: 'number.float', foreground: 'fab387' },
+        { token: 'comment', foreground: '6c7086', fontStyle: 'italic' },
+        { token: 'comment.doc', foreground: '6c7086', fontStyle: 'italic' },
+        { token: 'type', foreground: 'f9e2af' },
+        { token: 'type.identifier', foreground: 'f9e2af' },
+        { token: 'delimiter', foreground: '9399b2' },
+        { token: 'delimiter.bracket', foreground: '9399b2' },
+        { token: 'annotation', foreground: 'f9e2af' },
+        { token: 'variable', foreground: 'cdd6f4' },
+        { token: 'variable.predefined', foreground: 'f38ba8' },
+        { token: 'constant', foreground: 'fab387' },
+        { token: 'operator', foreground: '89dceb' },
+        { token: 'tag', foreground: '89b4fa' },
+        { token: 'attribute.name', foreground: 'f9e2af' },
+        { token: 'attribute.value', foreground: 'a6e3a1' },
+      ],
+      colors: {
+        'editor.background': '#1e1e2e',
+        'editor.foreground': '#cdd6f4',
+        'editor.lineHighlightBackground': '#28283d',
+        'editor.lineHighlightBorder': '#00000000',
+        'editor.selectionBackground': '#45475a80',
+        'editor.selectionHighlightBackground': '#45475a40',
+        'editorCursor.foreground': '#f5e0dc',
+        'editor.inactiveSelectionBackground': '#31324460',
+        'editorLineNumber.foreground': '#45475a',
+        'editorLineNumber.activeForeground': '#a6adc8',
+        'editorIndentGuide.background1': '#31324440',
+        'editorIndentGuide.activeBackground1': '#45475a60',
+        'editorBracketMatch.background': '#89b4fa15',
+        'editorBracketMatch.border': '#89b4fa40',
+        'editorBracketHighlight.foreground1': '#f38ba8',
+        'editorBracketHighlight.foreground2': '#fab387',
+        'editorBracketHighlight.foreground3': '#89b4fa',
+        'editorBracketHighlight.foreground4': '#a6e3a1',
+        'editorBracketHighlight.foreground5': '#f9e2af',
+        'editorBracketHighlight.foreground6': '#cba6f7',
+        'editorSuggestWidget.background': '#1e1e2e',
+        'editorSuggestWidget.border': '#313244',
+        'editorSuggestWidget.foreground': '#cdd6f4',
+        'editorSuggestWidget.highlightForeground': '#89b4fa',
+        'editorSuggestWidget.selectedBackground': '#45475a',
+        'editorSuggestWidget.selectedForeground': '#cdd6f4',
+        'editorWidget.background': '#1e1e2e',
+        'editorWidget.border': '#313244',
+        'editorHoverWidget.background': '#1e1e2e',
+        'editorHoverWidget.border': '#313244',
+        'scrollbarSlider.background': '#31324440',
+        'scrollbarSlider.hoverBackground': '#45475a60',
+        'scrollbarSlider.activeBackground': '#585b7080',
+        'editorGutter.background': '#1e1e2e',
+        'editorOverviewRuler.border': '#00000000',
+        'focusBorder': '#89b4fa40',
+        'list.hoverBackground': '#313244',
+        'list.activeSelectionBackground': '#45475a',
+        'input.background': '#313244',
+        'input.border': '#45475a',
+        'input.foreground': '#cdd6f4',
+      },
+    });
+  };
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    // Track cursor position
+    editor.onDidChangeCursorPosition((e: any) => {
+      setCursorPosition({ lineNumber: e.position.lineNumber, column: e.position.column });
+    });
+
+    // Keyboard shortcuts
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      runCodeRef.current?.(false);
+    });
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+      runCodeRef.current?.(true);
+    });
+
+    // Java completion provider
+    completionDisposableRef.current?.dispose();
+    completionDisposableRef.current = monaco.languages.registerCompletionItemProvider('java', {
+      provideCompletionItems: (model: any, position: any) => {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        };
+
+        const keywords = [
+          'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char',
+          'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum',
+          'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements',
+          'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+          'package', 'private', 'protected', 'public', 'return', 'short', 'static',
+          'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+          'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
+        ];
+
+        const types = [
+          'String', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character',
+          'Object', 'List', 'ArrayList', 'LinkedList', 'Map', 'HashMap', 'TreeMap',
+          'LinkedHashMap', 'Set', 'HashSet', 'TreeSet', 'Queue', 'PriorityQueue',
+          'Stack', 'Deque', 'ArrayDeque', 'Arrays', 'Collections', 'Math',
+          'StringBuilder', 'StringBuffer', 'System', 'Scanner', 'Optional',
+          'Stream', 'Comparator', 'Iterator', 'Iterable', 'Random', 'Pair',
+          'int[]', 'int[][]', 'String[]', 'char[]', 'boolean[]', 'long[]',
+        ];
+
+        const snippets = [
+          { label: 'for', insertText: 'for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {\n\t$0\n}', detail: 'For loop' },
+          { label: 'foreach', insertText: 'for (${1:int} ${2:item} : ${3:collection}) {\n\t$0\n}', detail: 'Enhanced for loop' },
+          { label: 'while', insertText: 'while (${1:condition}) {\n\t$0\n}', detail: 'While loop' },
+          { label: 'ifelse', insertText: 'if (${1:condition}) {\n\t$0\n} else {\n\t\n}', detail: 'If-else block' },
+          { label: 'trycatch', insertText: 'try {\n\t$0\n} catch (${1:Exception} ${2:e}) {\n\t${3:e.printStackTrace();}\n}', detail: 'Try-catch block' },
+          { label: 'sout', insertText: 'System.out.println(${1});', detail: 'Print to stdout' },
+          { label: 'soutf', insertText: 'System.out.printf("${1:%s}\\n", ${2});', detail: 'Formatted print' },
+          { label: 'main', insertText: 'public static void main(String[] args) {\n\t$0\n}', detail: 'Main method' },
+          { label: 'bsearch', insertText: 'int left = 0, right = ${1:arr}.length - 1;\nwhile (left <= right) {\n\tint mid = left + (right - left) / 2;\n\tif (${1:arr}[mid] == ${2:target}) return mid;\n\telse if (${1:arr}[mid] < ${2:target}) left = mid + 1;\n\telse right = mid - 1;\n}\nreturn -1;', detail: 'Binary Search' },
+          { label: 'bfs', insertText: 'Queue<${1:Integer}> queue = new LinkedList<>();\nqueue.offer(${2:start});\nSet<${1:Integer}> visited = new HashSet<>();\nvisited.add(${2:start});\nwhile (!queue.isEmpty()) {\n\t${1:Integer} curr = queue.poll();\n\t$0\n}', detail: 'BFS Template' },
+          { label: 'dfs', insertText: 'private void dfs(${1:int node}, ${2:boolean[] visited}) {\n\tvisited[${1:node}] = true;\n\t$0\n}', detail: 'DFS Template' },
+          { label: 'swap', insertText: 'int temp = ${1:arr}[${2:i}];\n${1:arr}[${2:i}] = ${1:arr}[${3:j}];\n${1:arr}[${3:j}] = temp;', detail: 'Swap elements' },
+          { label: 'hashmap', insertText: 'Map<${1:String}, ${2:Integer}> ${3:map} = new HashMap<>();', detail: 'New HashMap' },
+          { label: 'arraylist', insertText: 'List<${1:Integer}> ${2:list} = new ArrayList<>();', detail: 'New ArrayList' },
+          { label: 'sort', insertText: 'Arrays.sort(${1:arr});', detail: 'Sort array' },
+          { label: 'sortcmp', insertText: 'Arrays.sort(${1:arr}, (a, b) -> ${2:a - b});', detail: 'Sort with comparator' },
+          { label: 'maxmin', insertText: 'Math.max(${1:a}, ${2:b})', detail: 'Math.max' },
+          { label: 'matrix', insertText: 'int[][] ${1:matrix} = new int[${2:rows}][${3:cols}];', detail: '2D array' },
+        ];
+
+        const suggestions = [
+          ...keywords.map(k => ({
+            label: k,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: k,
+            range,
+            sortText: '1' + k,
+          })),
+          ...types.map(t => ({
+            label: t,
+            kind: monaco.languages.CompletionItemKind.Class,
+            insertText: t,
+            detail: 'Type',
+            range,
+            sortText: '0' + t,
+          })),
+          ...snippets.map(s => ({
+            label: s.label,
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: s.insertText,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            detail: s.detail,
+            range,
+            sortText: '00' + s.label,
+          })),
+        ];
+
+        return { suggestions };
+      },
+    });
+  };
+
+  const formatCode = () => {
+    editorRef.current?.getAction('editor.action.formatDocument')?.run();
+  };
+
+  const resetCode = () => {
+    if (question?.starterCode) setCode(question.starterCode);
+  };
 
   const handleNextQuestion = () => {
     if (isLoading) return;
@@ -423,6 +633,9 @@ export default function ProjectPage() {
     setIsExecuting(false);
   };
 
+  // Keep ref in sync for keyboard shortcuts
+  runCodeRef.current = handleRunCode;
+
   const difficultyClass = (d: string) =>
     d === 'Easy' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' :
     d === 'Medium' ? 'bg-amber-500/15 text-amber-400 border-amber-500/20' :
@@ -528,15 +741,143 @@ export default function ProjectPage() {
         <ResizablePanel defaultSize={60} minSize={30}>
           <ResizablePanelGroup orientation="vertical">
             <ResizablePanel defaultSize={65} minSize={30}>
-              <Editor
-                height="100%"
-                language="java"
-                theme="vs-dark"
-                value={code}
-                onMount={handleEditorDidMount}
-                onChange={(value) => setCode(value || "")}
-                options={{ minimap: { enabled: false }, fontSize: 14, wordWrap: 'on', padding: { top: 12 }, scrollBeyondLastLine: false }}
-              />
+              <div className="flex flex-col h-full">
+                {/* Editor Toolbar */}
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#313244] bg-[#1e1e2e] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/20">Java</span>
+                    {question && (
+                      <div className="flex items-center gap-1 text-[11px] text-[#a6adc8]">
+                        <Timer className="h-3 w-3" />
+                        <span className="font-mono tabular-nums">{formatElapsed(elapsedTime)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-0.5 mr-1 px-1 py-0.5 rounded bg-[#313244]/50">
+                      <button onClick={() => setFontSize(s => Math.max(10, s - 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Decrease font size">
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="text-[10px] text-[#a6adc8] font-mono w-4 text-center tabular-nums">{fontSize}</span>
+                      <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-0.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors" title="Increase font size">
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button onClick={resetCode} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Reset to starter code</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                            <Keyboard className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">
+                          <div className="space-y-1">
+                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ Enter</kbd> Run Code</p>
+                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⌘ ⇧ Enter</kbd> Submit</p>
+                            <p><kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">⇧ ⌥ F</kbd> Format Code</p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+
+                {/* Monaco Editor */}
+                <div className="flex-grow relative">
+                  <Editor
+                    height="100%"
+                    language="java"
+                    theme="algobook-dark"
+                    value={code}
+                    beforeMount={handleEditorBeforeMount}
+                    onMount={handleEditorDidMount}
+                    onChange={(value) => setCode(value || "")}
+                    options={{
+                      fontSize,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+                      fontLigatures: true,
+                      minimap: { enabled: false },
+                      wordWrap: 'on',
+                      padding: { top: 16, bottom: 16 },
+                      scrollBeyondLastLine: false,
+                      smoothScrolling: true,
+                      cursorBlinking: 'smooth',
+                      cursorSmoothCaretAnimation: 'on',
+                      cursorWidth: 2,
+                      renderLineHighlight: 'all',
+                      renderLineHighlightOnlyWhenFocus: false,
+                      bracketPairColorization: { enabled: true },
+                      autoClosingBrackets: 'always',
+                      autoClosingQuotes: 'always',
+                      autoIndent: 'full',
+                      formatOnPaste: true,
+                      formatOnType: true,
+                      suggestOnTriggerCharacters: true,
+                      acceptSuggestionOnCommitCharacter: true,
+                      tabCompletion: 'on',
+                      wordBasedSuggestions: 'currentDocument',
+                      quickSuggestions: { other: true, comments: false, strings: true },
+                      parameterHints: { enabled: true },
+                      suggest: {
+                        showKeywords: true,
+                        showSnippets: true,
+                        showClasses: true,
+                        showFunctions: true,
+                        showVariables: true,
+                        showWords: true,
+                        preview: true,
+                        shareSuggestSelections: true,
+                      },
+                      lineNumbers: 'on',
+                      glyphMargin: false,
+                      folding: true,
+                      foldingHighlight: true,
+                      showFoldingControls: 'mouseover',
+                      matchBrackets: 'always',
+                      selectionHighlight: true,
+                      occurrencesHighlight: 'singleFile',
+                      renderWhitespace: 'selection',
+                      guides: {
+                        indentation: true,
+                        bracketPairs: true,
+                        highlightActiveBracketPair: true,
+                      },
+                      scrollbar: {
+                        verticalScrollbarSize: 8,
+                        horizontalScrollbarSize: 8,
+                        useShadows: false,
+                      },
+                      overviewRulerLanes: 0,
+                      hideCursorInOverviewRuler: true,
+                      overviewRulerBorder: false,
+                    }}
+                  />
+                </div>
+
+                {/* Status Bar */}
+                <div className="flex items-center justify-between px-3 py-1 border-t border-[#313244] bg-[#1e1e2e] flex-shrink-0">
+                  <div className="flex items-center gap-3 text-[10px] text-[#6c7086] font-mono">
+                    <span>Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}</span>
+                    <span>UTF-8</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-[#6c7086]">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Ready
+                    </span>
+                  </div>
+                </div>
+              </div>
             </ResizablePanel>
 
             <ResizableHandle className="h-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
@@ -556,6 +897,7 @@ export default function ProjectPage() {
                       onClick={() => handleRunCode(false)}
                       disabled={isExecuting || !question || !hasSubscription}
                       className="gap-1.5 text-xs h-7"
+                      title="Run Code (⌘ Enter)"
                     >
                       {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Play className="h-3 w-3"/>} Run
                     </Button>
@@ -564,6 +906,7 @@ export default function ProjectPage() {
                       onClick={() => handleRunCode(true)}
                       disabled={isExecuting || !question || !hasSubscription}
                       className="gap-1.5 text-xs h-7 shadow-sm shadow-primary/20"
+                      title="Submit (⌘ ⇧ Enter)"
                     >
                       {!hasSubscription ? <Lock className="h-3 w-3"/> : isExecuting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Send className="h-3 w-3"/>} Submit
                     </Button>
