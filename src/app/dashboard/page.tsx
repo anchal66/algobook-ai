@@ -87,6 +87,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activityProject, setActivityProject] = useState<{ id: string; title: string } | null>(null);
   const [projectProgress, setProjectProgress] = useState<Record<string, ProjectProgress>>({});
+  const [rankData, setRankData] = useState<{ rank: number; percentile: number } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -130,6 +131,20 @@ export default function DashboardPage() {
 
     fetchProjects().then(() => fetchProjectProgress());
     fetchProfile();
+
+    async function fetchRank() {
+      if (!user) return;
+      try {
+        const res = await fetch(`/api/leaderboard?scope=global&userId=${user.uid}&limit=1`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.userRank !== null) {
+            setRankData({ rank: data.userRank, percentile: data.userPercentile ?? 0 });
+          }
+        }
+      } catch {}
+    }
+    fetchRank();
 
     async function fetchProjectProgress() {
       if (!user) return;
@@ -314,7 +329,7 @@ export default function DashboardPage() {
         {/* Stats Row */}
         {profile && (profile.totalSolved > 0 || profile.currentStreak > 0) && (
           <motion.div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
+            className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
@@ -343,6 +358,24 @@ export default function DashboardPage() {
               value={getWeakestTopic(profile)}
               accent="red"
             />
+            {rankData ? (
+              <Link href="/leaderboard">
+                <StatsCard
+                  icon={<Target className="h-5 w-5 text-primary" />}
+                  label="Global Rank"
+                  value={`#${rankData.rank}`}
+                  accent="primary"
+                  subtitle={`Top ${Math.max(1, 100 - rankData.percentile + 1)}%`}
+                />
+              </Link>
+            ) : (
+              <StatsCard
+                icon={<Target className="h-5 w-5 text-primary" />}
+                label="Global Rank"
+                value="—"
+                accent="primary"
+              />
+            )}
           </motion.div>
         )}
 
@@ -527,11 +560,13 @@ function StatsCard({
   label,
   value,
   accent,
+  subtitle,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   accent: string;
+  subtitle?: string;
 }) {
   return (
     <Card className={`border-${accent}-500/20 bg-${accent}-500/5`}>
@@ -540,6 +575,7 @@ function StatsCard({
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="text-lg font-bold">{value}</p>
+          {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
         </div>
       </CardContent>
     </Card>

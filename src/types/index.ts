@@ -22,6 +22,14 @@ export interface TopicSkill {
   firstTrySuccesses: number;
   avgTimeSeconds: number;
   masteryScore: number; // 0-100 composite score
+  // Spaced repetition (SM-2 inspired)
+  nextReviewDate: string;   // ISO YYYY-MM-DD — when this topic should be revisited
+  interval: number;         // days until next review (starts at 1)
+  easeFactor: number;       // SM-2 ease factor (starts at 2.5, min 1.3)
+  // Performance depth
+  timeEfficiency: number;   // rolling avg of expectedTime/actualTime, 1.0 = on-pace
+  totalHintsUsed: number;   // cumulative hints across all attempts on this topic
+  totalRunCount: number;    // cumulative Run-before-Submit clicks (struggle signal)
 }
 
 export interface UserProfile {
@@ -89,6 +97,7 @@ export interface Submission {
   hintsUsed: number;
   timeSpentSeconds: number;
   isFirstTry: boolean;
+  runCount: number;       // how many Run clicks before this Submit (struggle signal)
   submittedAt: Timestamp;
 }
 
@@ -109,4 +118,56 @@ export interface QuestionWithReason {
   question: Question;
   reason: RecommendationReason;
   source: "curated" | "generated";
+}
+
+// ── SOLUTION EXPLANATION (post-solve AI analysis) ──
+
+export interface SolutionExplanation {
+  analysis: string;          // What the user's code does
+  timeComplexity: string;    // Big-O time
+  spaceComplexity: string;   // Big-O space
+  optimalApproach: string;   // Description of optimal algorithm
+  improvements: string[];    // Specific improvements to user's code
+  alternativeApproaches: string[]; // Other valid strategies
+}
+
+// ── LEADERBOARD ──
+
+export interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  photoURL: string;
+  displayName: string;
+  score: number;
+  totalSolved: number;
+  currentStreak: number;
+  avgMastery: number;
+  rank: number;
+}
+
+// ── SESSION HEALTH (client-side fatigue detection) ──
+
+export interface SessionAttempt {
+  passed: boolean;
+  hintsUsed: number;
+  solveTimeSeconds: number;
+  timestamp: number; // Date.now()
+}
+
+export interface SessionHealth {
+  score: number;             // 0-100
+  problemsAttempted: number;
+  problemsSolved: number;
+  sessionMinutes: number;
+  trend: "improving" | "stable" | "declining";
+  suggestion: string | null;
+}
+
+// ── PREREQUISITE GRAPH ──
+
+export interface PrerequisiteGap {
+  topic: string;              // The prerequisite topic
+  requiredMastery: number;    // Minimum mastery needed (50)
+  currentMastery: number;     // User's current mastery
+  prerequisiteOf: string;     // The topic this is a prerequisite for
 }

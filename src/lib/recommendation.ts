@@ -1,8 +1,8 @@
 import type { UserProfile, RecommendationReason } from "@/types";
 import {
   getWeakTopics,
-  getStaleTopics,
   getRecommendedDifficulty,
+  getTopicDifficulty,
 } from "@/lib/user-profile";
 import {
   computePracticeState,
@@ -10,6 +10,8 @@ import {
   getStateGuidance,
   getDaysSinceActive,
 } from "@/lib/practice-engine";
+import { getDueTopics } from "@/lib/spaced-repetition";
+import { suggestPrerequisite } from "@/lib/prerequisite-graph";
 
 export interface Recommendation {
   difficulty: "Easy" | "Medium" | "Hard";
@@ -29,6 +31,11 @@ interface ExistingQuestion {
 /**
  * Core recommendation engine.
  * Decides difficulty, topic, and reason for the next question.
+ *
+ * Integrates:
+ *   - Spaced repetition (SM-2 due topics replace flat stale detection)
+ *   - Per-topic difficulty (topic mastery drives difficulty, not global rate)
+ *   - Prerequisite awareness (redirect to prerequisites if gaps exist)
  */
 export function recommend(
   profile: UserProfile,
@@ -62,7 +69,7 @@ export function recommend(
 
   // ── COLLECT SIGNALS ──
   const weak = getWeakTopics(profile);
-  const stale = getStaleTopics(profile);
+  const dueForReview = getDueTopics(profile); // SM-2 spaced repetition
   const baseDifficulty = getRecommendedDifficulty(profile);
   const guidance = getStateGuidance(state, profile.goalType);
 
@@ -100,19 +107,31 @@ export function recommend(
     }
 
     case "familiar": {
-      const familiar = allPracticedTopics.filter((t) => {
-        const s = profile.topicSkills[t];
-        return s && s.solved > 0;
-      });
-      suggestedTopics = familiar.length > 0
-        ? pickRandom(familiar, 2)
-        : pickRandom(CORE_TOPICS.slice(0, 3), 2);
-      reason = {
-        short: state === "revision" ? "Reviewing stale topic" : "Familiar warm-up",
-        detail: state === "revision"
-          ? `"${suggestedTopics[0]}" hasn't been practiced in over 14 days. A quick review keeps knowledge fresh.`
-          : `Warm-up on "${suggestedTopics[0]}" — a topic you know — to rebuild momentum.`,
-      };
+      // For revision state, prioritize SM-2 due topics over arbitrary "familiar"
+      if (state === "revision" && dueForReview.length > 0) {
+        const freshDue = dueForReview.filter((t) => !recentTags.includes(t));
+        suggestedTopics = freshDue.length > 0 ? freshDue.slice(0, 2) : dueForReview.slice(0, 2);
+        const skill = profile.topicSkills?.[suggestedTopics[0]];
+        const daysSinceReview = skill?.nextReviewDate
+          ? Math.max(0, Math.floor((Date.now() - new Date(skill.nextReviewDate).getTime()) / 86400000))
+          : 0;
+        reason = {
+          short: `Spaced review: ${suggestedTopics[0]}`,
+          detail: `"${suggestedTopics[0]}" is ${daysSinceReview > 0 ? `${daysSinceReview} days overdue` : "due"} for spaced review. Timely review strengthens long-term retention.`,
+        };
+      } else {
+        const familiar = allPracticedTopics.filter((t) => {
+          const s = profile.topicSkills[t];
+          return s && s.solved > 0;
+        });
+        suggestedTopics = familiar.length > 0
+          ? pickRandom(familiar, 2)
+          : pickRandom(CORE_TOPICS.slice(0, 3), 2);
+        reason = {
+          short: "Familiar warm-up",
+          detail: `Warm-up on "${suggestedTopics[0]}" — a topic you know — to rebuild momentum.`,
+        };
+      }
       break;
     }
 
@@ -131,11 +150,19 @@ export function recommend(
 
     case "mixed":
     default: {
-      if (stale.length > 0 && Math.random() < 0.3) {
-        suggestedTopics = pickRandom(stale, 2);
+      // Spaced repetition due topics get 60% priority (was 30% for stale)
+      if (dueForReview.length > 0 && Math.random() < 0.6) {
+        const freshDue = dueForReview.filter((t) => !recentTags.includes(t));
+        suggestedTopics = freshDue.length > 0
+          ? freshDue.slice(0, 2)
+          : dueForReview.slice(0, 2);
+        const skill = profile.topicSkills?.[suggestedTopics[0]];
+        const daysSinceReview = skill?.nextReviewDate
+          ? Math.max(0, Math.floor((Date.now() - new Date(skill.nextReviewDate).getTime()) / 86400000))
+          : 0;
         reason = {
-          short: "Refreshing stale knowledge",
-          detail: `"${suggestedTopics[0]}" hasn't been practiced in a while. Periodic review prevents skill decay.`,
+          short: `Spaced review: ${suggestedTopics[0]}`,
+          detail: `"${suggestedTopics[0]}" is ${daysSinceReview > 0 ? `${daysSinceReview} days overdue` : "due"} for spaced review. Periodic reviews prevent skill decay.`,
         };
       } else if (weak.length > 0 && Math.random() < 0.4) {
         suggestedTopics = pickRandom(weak, 2);
@@ -151,6 +178,38 @@ export function recommend(
         };
       }
       break;
+    }
+  }
+
+  // ── PER-TOPIC DIFFICULTY ──
+  // Override global difficulty with topic-specific difficulty for the primary topic
+  if (suggestedTopics.length > 0) {
+    const topicDiff = getTopicDifficulty(profile, suggestedTopics[0]);
+    if (topicDiff !== difficulty) {
+      const skill = profile.topicSkills?.[suggestedTopics[0].toLowerCase()];
+      const mastery = skill?.masteryScore ?? 0;
+      reason = {
+        ...reason,
+        detail: reason.detail + ` ${topicDiff} difficulty for "${suggestedTopics[0]}" because your mastery is ${mastery}%.`,
+      };
+      difficulty = topicDiff;
+    }
+  }
+
+  // ── PREREQUISITE CHECK ──
+  // If the selected topic has unmet prerequisites, redirect to the prerequisite
+  if (suggestedTopics.length > 0) {
+    const prereqSuggestion = suggestPrerequisite(profile, suggestedTopics[0]);
+    if (prereqSuggestion && prereqSuggestion.shouldRedirect) {
+      const originalTopic = suggestedTopics[0];
+      suggestedTopics = [prereqSuggestion.suggestedTopic];
+      difficulty = getTopicDifficulty(profile, prereqSuggestion.suggestedTopic);
+      reason = {
+        short: `Prerequisite: ${prereqSuggestion.suggestedTopic}`,
+        detail: prereqSuggestion.reason,
+      };
+      // Keep the original topic in avoid list so it comes up later
+      recentTags.push(originalTopic);
     }
   }
 

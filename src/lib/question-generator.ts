@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { Question, UserProfile, QuestionWithReason, RecommendationReason } from "@/types";
 import { buildPerformanceSummary } from "@/lib/user-profile";
+import { findPrerequisiteGaps } from "@/lib/prerequisite-graph";
 import type { Recommendation } from "@/lib/recommendation";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -106,6 +107,19 @@ async function generateWithAI(ctx: GenerationContext): Promise<Question> {
     ? `AVOID THESE TOPICS (user practiced them recently): ${recommendation.avoidTopics.join(", ")}`
     : "";
 
+  // Prerequisite context: tell AI about gaps so it can bridge topics
+  const primaryTopic = recommendation.suggestedTopics[0] || "";
+  const prereqGaps = primaryTopic ? findPrerequisiteGaps(profile, primaryTopic) : [];
+  const prereqDirective = prereqGaps.length > 0
+    ? `PREREQUISITE GAPS: User has weak prerequisites for "${primaryTopic}": ${prereqGaps.map((g) => `${g.topic} (mastery: ${Math.round(g.currentMastery)}%)`).join(", ")}. Design the problem to bridge from these foundational concepts toward the target topic.`
+    : "";
+
+  // Time/struggle context: inform AI about the user's speed tendencies
+  const topicSkill = profile.topicSkills?.[primaryTopic.toLowerCase()];
+  const timeContext = topicSkill
+    ? `TIME PERFORMANCE ON "${primaryTopic}": avg solve time ${topicSkill.avgTimeSeconds}s, speed factor ${(topicSkill.timeEfficiency || 1.0).toFixed(2)}x (1.0=expected, <1=slow, >1=fast). Avg runs before submit: ${topicSkill.totalRunCount && topicSkill.solved ? Math.round(topicSkill.totalRunCount / topicSkill.solved) : "N/A"}.`
+    : "";
+
   const systemPrompt = `You are an expert programming challenge creator for a personalized coding practice platform.
 
 USER CONTEXT:
@@ -116,6 +130,7 @@ USER CONTEXT:
 
 PERFORMANCE DATA:
 ${performanceSummary}
+${timeContext}
 
 ALREADY SOLVED IN THIS PROJECT (do NOT repeat these or generate very similar problems):
 ${existingTitles.length > 0 ? existingTitles.map((t) => `- ${t}`).join("\n") : "None yet (first question)"}
@@ -124,9 +139,12 @@ RECOMMENDATION:
 - Difficulty: ${recommendation.difficulty}
 ${topicDirective}
 ${avoidDirective}
+${prereqDirective}
 - Reason: ${recommendation.reason.detail}
 
 EXPERIENCE GUIDANCE: ${experienceGuidance[profile.experienceLevel] || experienceGuidance.intermediate}
+
+${recommendation.isCalibration ? "CALIBRATION MODE: This is a calibration question for a returning user. Keep it straightforward to assess their current level." : ""}
 
 The user's request: "${userPrompt}"
 

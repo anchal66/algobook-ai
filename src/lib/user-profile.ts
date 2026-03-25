@@ -1,6 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import type { UserProfile, TopicSkill, ExperienceLevel, GoalType, PracticeState } from "@/types";
+import { computeReviewQuality, updateSpacedRepetition } from "@/lib/spaced-repetition";
 
 const PROFILES_COLLECTION = "userProfiles";
 const USERNAMES_COLLECTION = "usernames";
@@ -126,17 +127,18 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
 }
 
 // ── MASTERY SCORE ──
-// Composite 0-100 score per topic based on:
-//   accuracy (40%), recency (20%), difficulty breadth (20%), first-try rate (20%)
+// Composite 0-100 score per topic based on 6 weighted factors:
+//   accuracy (30%), recency (15%), difficulty breadth (15%),
+//   first-try rate (15%), time efficiency (15%), hint independence (10%)
 
 export function computeMasteryScore(skill: TopicSkill): number {
   const total = skill.solved + skill.failed;
   if (total === 0) return 0;
 
-  // Accuracy: solved / total (0-1)
+  // 1. Accuracy: solved / total (0-1)
   const accuracy = skill.solved / total;
 
-  // Recency: decay based on days since last practice
+  // 2. Recency: decay based on days since last practice
   let recency = 0;
   if (skill.lastSeen) {
     const lastSeenMs = typeof skill.lastSeen === "object" && "toDate" in skill.lastSeen
@@ -148,17 +150,31 @@ export function computeMasteryScore(skill: TopicSkill): number {
     recency = Math.max(0, 1 - daysSince / 30); // decays to 0 over 30 days
   }
 
-  // Difficulty breadth: bonus for solving across Easy/Medium/Hard
+  // 3. Difficulty breadth: bonus for solving across Easy/Medium/Hard
   const diffLevels = [skill.easyCount > 0, skill.mediumCount > 0, skill.hardCount > 0];
   const diffBreadth = diffLevels.filter(Boolean).length / 3;
 
-  // First-try rate
+  // 4. First-try rate
   const firstTryRate = skill.totalAttempts > 0
     ? skill.firstTrySuccesses / Math.max(1, skill.solved)
     : 0;
 
+  // 5. Time efficiency: how fast vs expected (1.0 = on-pace, >1 = fast, <1 = slow)
+  const timeEff = Math.min(1, Math.max(0, (skill.timeEfficiency || 1.0)));
+
+  // 6. Hint independence: penalize heavy hint usage across attempts
+  const avgHintsPerSolve = skill.solved > 0
+    ? (skill.totalHintsUsed || 0) / skill.solved
+    : 0;
+  const hintIndependence = Math.max(0, Math.min(1, 1 - avgHintsPerSolve * 0.15));
+
   const score = Math.round(
-    accuracy * 40 + recency * 20 + diffBreadth * 20 + firstTryRate * 20
+    accuracy * 30 +
+    recency * 15 +
+    diffBreadth * 15 +
+    firstTryRate * 15 +
+    timeEff * 15 +
+    hintIndependence * 10
   );
 
   return Math.min(100, Math.max(0, score));
@@ -176,6 +192,14 @@ function emptyTopicSkill(): Omit<TopicSkill, "lastSeen"> & { lastSeen: unknown }
     firstTrySuccesses: 0,
     avgTimeSeconds: 0,
     masteryScore: 0,
+    // Spaced repetition defaults
+    nextReviewDate: "",
+    interval: 1,
+    easeFactor: 2.5,
+    // Performance depth defaults
+    timeEfficiency: 1.0,
+    totalHintsUsed: 0,
+    totalRunCount: 0,
   };
 }
 
@@ -285,6 +309,11 @@ function normalizeProfile(userId: string, data: Record<string, unknown>): UserPr
 
 // ── PROFILE UPDATE AFTER SUBMISSION ──
 
+// Expected solve times per difficulty (seconds) — used for time efficiency
+const EXPECTED_TIME: Record<string, number> = { Easy: 600, Medium: 1200, Hard: 2400 };
+// Expected run-before-submit counts per difficulty — used for struggle index
+const EXPECTED_RUNS: Record<string, number> = { Easy: 3, Medium: 5, Hard: 8 };
+
 export interface SubmissionMeta {
   tags: string[];
   passed: boolean;
@@ -292,6 +321,7 @@ export interface SubmissionMeta {
   hintsUsed: number;
   timeSpentSeconds: number;
   isFirstTry: boolean;
+  runCount: number;  // how many Run clicks before this Submit
 }
 
 export async function updateProfileAfterSubmission(
@@ -313,6 +343,19 @@ export async function updateProfileAfterSubmission(
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
 
+  // Compute time efficiency for this submission
+  const expectedTime = EXPECTED_TIME[meta.difficulty] || 1200;
+  const rawTimeEff = meta.timeSpentSeconds > 0
+    ? expectedTime / meta.timeSpentSeconds
+    : 1.0;
+  const timeEfficiency = Math.max(0.3, Math.min(2.0, rawTimeEff));
+
+  // Compute struggle index: runCount / expected runs
+  const expectedRuns = EXPECTED_RUNS[meta.difficulty] || 5;
+  const struggleIndex = meta.runCount > 0
+    ? meta.runCount / expectedRuns
+    : 1.0;
+
   for (const tag of meta.tags) {
     const key = tag.toLowerCase();
     if (!topicSkills[key]) {
@@ -321,6 +364,8 @@ export async function updateProfileAfterSubmission(
     const skill = topicSkills[key];
 
     skill.totalAttempts += 1;
+    skill.totalHintsUsed = (skill.totalHintsUsed || 0) + meta.hintsUsed;
+    skill.totalRunCount = (skill.totalRunCount || 0) + (meta.runCount || 0);
 
     if (meta.passed) {
       skill.solved += 1;
@@ -336,8 +381,36 @@ export async function updateProfileAfterSubmission(
     const prevTotal = skill.avgTimeSeconds * Math.max(1, skill.totalAttempts - 1);
     skill.avgTimeSeconds = Math.round((prevTotal + meta.timeSpentSeconds) / skill.totalAttempts);
 
+    // Rolling average time efficiency
+    const prevEffTotal = (skill.timeEfficiency || 1.0) * Math.max(1, skill.totalAttempts - 1);
+    skill.timeEfficiency = (prevEffTotal + timeEfficiency) / skill.totalAttempts;
+
     skill.lastSeen = FieldValue.serverTimestamp();
-    skill.masteryScore = computeMasteryScore(skill as unknown as TopicSkill);
+
+    // Compute mastery with struggle adjustment
+    let rawMastery = computeMasteryScore(skill as unknown as TopicSkill);
+    if (meta.passed) {
+      if (struggleIndex > 2.0) {
+        // High struggle: user ran code many times — discount mastery gain
+        rawMastery = Math.round(rawMastery * 0.85);
+      } else if (struggleIndex < 0.5 && meta.isFirstTry) {
+        // Low struggle + first try: boost mastery (max 100)
+        rawMastery = Math.min(100, Math.round(rawMastery * 1.1));
+      }
+    }
+    skill.masteryScore = rawMastery;
+
+    // Spaced repetition: update review schedule based on quality
+    const quality = computeReviewQuality(
+      meta.passed,
+      meta.hintsUsed,
+      meta.isFirstTry,
+      timeEfficiency
+    );
+    const sr = updateSpacedRepetition(skill as unknown as TopicSkill, quality);
+    skill.interval = sr.interval;
+    skill.easeFactor = sr.easeFactor;
+    skill.nextReviewDate = sr.nextReviewDate;
   }
 
   // Streak logic
@@ -451,9 +524,15 @@ export function buildPerformanceSummary(profile: UserProfile): string {
     const firstTryPct = skill.totalAttempts > 0
       ? Math.round((skill.firstTrySuccesses / Math.max(1, skill.solved)) * 100)
       : 0;
+    const timeEff = skill.timeEfficiency ? `${skill.timeEfficiency.toFixed(2)}x` : "N/A";
+    const avgHints = skill.solved > 0 ? ((skill.totalHintsUsed || 0) / skill.solved).toFixed(1) : "0";
+    const avgRuns = skill.solved > 0 ? ((skill.totalRunCount || 0) / skill.solved).toFixed(1) : "0";
+    const nextReview = skill.nextReviewDate || "not scheduled";
     lines.push(
       `  - ${topic}: ${skill.solved}/${total} passed, mastery ${mastery}/100, ` +
-      `first-try rate ${firstTryPct}%, avg time ${skill.avgTimeSeconds}s`
+      `first-try ${firstTryPct}%, avg time ${skill.avgTimeSeconds}s, ` +
+      `speed ${timeEff}, avg hints/solve ${avgHints}, avg runs/solve ${avgRuns}, ` +
+      `next review: ${nextReview}`
     );
   }
 
@@ -462,9 +541,10 @@ export function buildPerformanceSummary(profile: UserProfile): string {
     lines.push(`Weak areas (mastery < 50): ${weak.join(", ")}`);
   }
 
-  const stale = getStaleTopics(profile);
-  if (stale.length > 0) {
-    lines.push(`Stale topics (not practiced in 14+ days): ${stale.join(", ")}`);
+  const { getDueTopics } = require("@/lib/spaced-repetition");
+  const due = getDueTopics(profile);
+  if (due.length > 0) {
+    lines.push(`Topics due for spaced review: ${due.join(", ")}`);
   }
 
   const total = profile.totalSolved + profile.totalFailed;
@@ -475,6 +555,39 @@ export function buildPerformanceSummary(profile: UserProfile): string {
   }
 
   return lines.join("\n");
+}
+
+// ── PER-TOPIC DIFFICULTY ──
+// Uses topic-specific mastery + breadth + time efficiency instead of global pass rate
+
+export function getTopicDifficulty(
+  profile: UserProfile,
+  topic: string,
+): "Easy" | "Medium" | "Hard" {
+  const skill = profile.topicSkills?.[topic.toLowerCase()];
+
+  // Unpracticed topic: fall back to global recommendation
+  if (!skill || skill.solved + skill.failed === 0) {
+    return getRecommendedDifficulty(profile);
+  }
+
+  const mastery = skill.masteryScore ?? computeMasteryScore(skill);
+  const timeEff = skill.timeEfficiency || 1.0;
+
+  // If user is consistently slow on this topic, drop one difficulty level
+  const slowPenalty = timeEff < 0.5;
+
+  if (mastery >= 80 && skill.mediumCount >= 2 && !slowPenalty) {
+    return "Hard";
+  }
+  if (mastery >= 55 && skill.easyCount >= 2) {
+    return slowPenalty ? "Easy" : "Medium";
+  }
+  if (mastery < 40) {
+    return "Easy";
+  }
+
+  return slowPenalty ? "Easy" : "Medium";
 }
 
 // ── PROFILE FIELD UPDATES (bio, company, etc.) ──

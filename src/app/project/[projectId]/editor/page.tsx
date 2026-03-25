@@ -10,13 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason } from "@/types";
+import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason, SolutionExplanation, SessionHealth, PracticeState } from "@/types";
 import {
   Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
   Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
-  Maximize2, Minimize2, TriangleAlert,
+  Maximize2, Minimize2, TriangleAlert, Brain, Flame, BookOpen, Dumbbell,
+  RefreshCw, Target, Shield, FileText, Trophy,
 } from "lucide-react";
+import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
+import type { SessionState } from "@/lib/session-tracker";
 import { firestore } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, Timestamp, where, increment } from "firebase/firestore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -60,6 +63,7 @@ export default function ProjectPage() {
   const [revealedHintLevel, setRevealedHintLevel] = useState(0);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const hintsUsedRef = useRef(0);
+  const runCountRef = useRef(0);
 
   // "Why this question?" reason
   const [recommendationReason, setRecommendationReason] = useState<RecommendationReason | null>(null);
@@ -75,9 +79,22 @@ export default function ProjectPage() {
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions'>('testcase');
+  const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions' | 'solution'>('testcase');
   const [selectedCaseIndex, setSelectedCaseIndex] = useState(0);
   const [editableInputs, setEditableInputs] = useState<Record<number, string>>({});
+
+  // Session tracking (client-side fatigue detection)
+  const sessionRef = useRef<SessionState>(createSession());
+  const [sessionHealth, setSessionHealth] = useState<SessionHealth>({ score: 100, problemsAttempted: 0, problemsSolved: 0, sessionMinutes: 0, trend: 'stable', suggestion: null });
+
+  // Solution explanation (post-solve AI analysis)
+  const [solutionExplanation, setSolutionExplanation] = useState<SolutionExplanation | null>(null);
+  const [isSolutionLoading, setIsSolutionLoading] = useState(false);
+  const [hasSolvedCurrent, setHasSolvedCurrent] = useState(false);
+
+  // Practice state (fetched from profile)
+  const [practiceState, setPracticeState] = useState<PracticeState>('learning');
+  const [stateProgress, setStateProgress] = useState<string>('');
 
   // Elapsed timer for current question
   useEffect(() => {
@@ -94,6 +111,28 @@ export default function ProjectPage() {
   useEffect(() => {
     return () => { completionDisposableRef.current?.dispose(); };
   }, []);
+
+  // Fetch practice state from profile
+  useEffect(() => {
+    if (!user) return;
+    const fetchPracticeState = async () => {
+      try {
+        const res = await fetch(`/api/profile?userId=${user.uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile?.practiceState) setPracticeState(data.profile.practiceState);
+        }
+      } catch { /* silent */ }
+    };
+    fetchPracticeState();
+  }, [user]);
+
+  // Reset solution state when question changes
+  useEffect(() => {
+    setSolutionExplanation(null);
+    setIsSolutionLoading(false);
+    setHasSolvedCurrent(false);
+  }, [question?.id]);
 
   const formatElapsed = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -137,6 +176,7 @@ export default function ProjectPage() {
     setRevealedHintLevel(0);
     setRecommendationReason(null);
     hintsUsedRef.current = 0;
+    runCountRef.current = 0;
     questionStartTimeRef.current = Date.now();
     try {
       const questionRef = doc(firestore, "questions", questionId);
@@ -438,6 +478,7 @@ export default function ProjectPage() {
     setHintLabels([]);
     setRevealedHintLevel(0);
     hintsUsedRef.current = 0;
+    runCountRef.current = 0;
     try {
       const response = await fetch('/api/question/generate', {
         method: 'POST',
@@ -535,6 +576,26 @@ export default function ProjectPage() {
     }
   };
 
+  const fetchSolutionExplanation = async () => {
+    if (!user || !question?.id || !code || isSolutionLoading) return;
+    setIsSolutionLoading(true);
+    try {
+      const res = await fetch('/api/solution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: question.id, userCode: code, userId: user.uid }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSolutionExplanation(data);
+      }
+    } catch (err) {
+      console.error('Solution fetch failed:', err);
+    } finally {
+      setIsSolutionLoading(false);
+    }
+  };
+
   const updateUserProfile = async (tags: string[], passed: boolean) => {
     if (!user || !question) return;
     const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
@@ -550,6 +611,7 @@ export default function ProjectPage() {
           hintsUsed: hintsUsedRef.current,
           timeSpentSeconds: timeSpent,
           isFirstTry: submissionHistory.length === 0,
+          runCount: runCountRef.current,
         }),
       });
     } catch (err) {
@@ -578,6 +640,8 @@ export default function ProjectPage() {
       }
       testCasesToRun = question.testCases;
     } else {
+      // Count Run clicks (non-submission) for struggle tracking
+      runCountRef.current += 1;
       const inputToUse = getRunInput();
       testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
       // Try matching to expected output if it's a known test case
@@ -645,6 +709,7 @@ export default function ProjectPage() {
         hintsUsed: hintsUsedRef.current,
         timeSpentSeconds: timeSpent,
         isFirstTry: attemptNumber === 1,
+        runCount: runCountRef.current,
         submittedAt: serverTimestamp(),
       });
 
@@ -664,6 +729,22 @@ export default function ProjectPage() {
 
       fetchSubmissionHistory(question.id);
       updateUserProfile(question.tags || [], allTestsPassed);
+
+      // Session tracking: record this attempt for fatigue detection
+      sessionRef.current = recordAttempt(
+        sessionRef.current,
+        allTestsPassed,
+        hintsUsedRef.current,
+        timeSpent,
+      );
+      setSessionHealth(computeSessionHealth(sessionRef.current));
+
+      // On successful solve: mark solved, auto-switch to solution tab
+      if (allTestsPassed) {
+        setHasSolvedCurrent(true);
+        setActiveBottomTab('solution');
+        fetchSolutionExplanation();
+      }
     }
 
     setIsExecuting(false);
@@ -698,9 +779,12 @@ export default function ProjectPage() {
               )}
               {!isLoading && question && (
                 <>
-                  {recommendationReason && (
-                    <ReasonBadge reason={recommendationReason} />
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <PracticeStateBadge state={practiceState} progress={stateProgress} />
+                    {recommendationReason && (
+                      <ReasonBadge reason={recommendationReason} />
+                    )}
+                  </div>
                   <QuestionDisplay question={question} difficultyClass={difficultyClass} />
                   <HintsPanel
                     hints={hints}
@@ -791,6 +875,32 @@ export default function ProjectPage() {
                           <Timer className="h-3 w-3" />
                           <span className="font-mono tabular-nums">{formatElapsed(elapsedTime)}</span>
                         </div>
+                      )}
+                      {/* Session Health Indicator */}
+                      {sessionHealth.problemsAttempted > 0 && (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] ${
+                                sessionHealth.score >= 80 ? 'text-emerald-400' :
+                                sessionHealth.score >= 60 ? 'text-amber-400' :
+                                sessionHealth.score >= 30 ? 'text-orange-400 animate-pulse' :
+                                'text-red-400 animate-pulse'
+                              }`}>
+                                <Brain className="h-3 w-3" />
+                                <span className="font-mono tabular-nums">{sessionHealth.score}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs text-xs">
+                              <div className="space-y-1">
+                                <p className="font-medium">Session Health: {sessionHealth.score}/100</p>
+                                <p>{sessionHealth.sessionMinutes}min | {sessionHealth.problemsAttempted} attempted | {sessionHealth.problemsSolved} solved</p>
+                                <p className="capitalize">Trend: {sessionHealth.trend}</p>
+                                {sessionHealth.suggestion && <p className="text-amber-400 mt-1">{sessionHealth.suggestion}</p>}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                     <div className="flex items-center gap-0.5">
@@ -989,6 +1099,21 @@ export default function ProjectPage() {
                     >
                       Submissions
                     </button>
+                    {hasSolvedCurrent && (
+                      <button
+                        onClick={() => { setActiveBottomTab('solution'); if (!solutionExplanation && !isSolutionLoading) fetchSolutionExplanation(); }}
+                        className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                          activeBottomTab === 'solution'
+                            ? 'border-primary text-foreground'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="h-3 w-3 text-blue-400" />
+                          Solution
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Tab Content */}
@@ -1122,6 +1247,64 @@ export default function ProjectPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Solution Tab */}
+                    {activeBottomTab === 'solution' && (
+                      <div className="p-4">
+                        {isSolutionLoading && (
+                          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" /> Analyzing your solution...
+                          </div>
+                        )}
+                        {!isSolutionLoading && !solutionExplanation && (
+                          <div className="text-center py-6">
+                            <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground mb-3">Get an AI analysis of your solution</p>
+                            <Button size="sm" variant="outline" onClick={fetchSolutionExplanation} disabled={!hasSubscription}>
+                              {!hasSubscription ? <><Lock className="h-3 w-3 mr-1" /> Pro Only</> : 'Analyze My Code'}
+                            </Button>
+                          </div>
+                        )}
+                        {!isSolutionLoading && solutionExplanation && (
+                          <div className="space-y-4 text-sm">
+                            <div>
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Your Approach</h4>
+                              <p className="text-foreground">{solutionExplanation.analysis}</p>
+                            </div>
+                            <div className="flex gap-4">
+                              <div className="flex-1 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/15">
+                                <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Time Complexity</p>
+                                <p className="text-sm font-mono mt-0.5">{solutionExplanation.timeComplexity}</p>
+                              </div>
+                              <div className="flex-1 p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                                <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Space Complexity</p>
+                                <p className="text-sm font-mono mt-0.5">{solutionExplanation.spaceComplexity}</p>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Optimal Approach</h4>
+                              <p className="text-foreground">{solutionExplanation.optimalApproach}</p>
+                            </div>
+                            {solutionExplanation.improvements.length > 0 && (
+                              <div>
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Improvements</h4>
+                                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                                  {solutionExplanation.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {solutionExplanation.alternativeApproaches.length > 0 && (
+                              <div>
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Alternative Approaches</h4>
+                                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                                  {solutionExplanation.alternativeApproaches.map((alt, i) => <li key={i}>{alt}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </ResizablePanel>
@@ -1183,6 +1366,36 @@ export default function ProjectPage() {
 }
 
 // ─── HELPER COMPONENTS ───
+
+const PRACTICE_STATE_CONFIG: Record<string, { icon: typeof Flame; color: string; label: string }> = {
+  'warm-up': { icon: Flame, color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', label: 'Warm-up' },
+  'learning': { icon: BookOpen, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Learning' },
+  'strengthening': { icon: Dumbbell, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Strengthening' },
+  'revision': { icon: RefreshCw, color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', label: 'Revision' },
+  'interview-prep': { icon: Target, color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'Interview Prep' },
+  'maintenance': { icon: Shield, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', label: 'Maintenance' },
+};
+
+const PracticeStateBadge = ({ state, progress }: { state: PracticeState; progress: string }) => {
+  const cfg = PRACTICE_STATE_CONFIG[state] || PRACTICE_STATE_CONFIG.learning;
+  const Icon = cfg.icon;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg border cursor-help ${cfg.color}`}>
+            <Icon className="h-3 w-3 shrink-0" />
+            <span className="text-[11px] font-medium">{cfg.label}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-xs">
+          <p className="text-xs font-medium mb-1">{cfg.label} Phase</p>
+          {progress && <p className="text-xs text-muted-foreground">{progress}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 const ReasonBadge = ({ reason }: { reason: RecommendationReason }) => (
   <TooltipProvider delayDuration={200}>

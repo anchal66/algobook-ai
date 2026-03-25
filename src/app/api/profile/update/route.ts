@@ -4,7 +4,7 @@ import { updateProfileAfterSubmission, updateProfileFields } from "@/lib/user-pr
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, tags, passed, difficulty, hintsUsed, timeSpentSeconds, isFirstTry, fields } = body;
+    const { userId, tags, passed, difficulty, hintsUsed, timeSpentSeconds, isFirstTry, runCount, fields } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       hintsUsed: hintsUsed ?? 0,
       timeSpentSeconds: timeSpentSeconds ?? 0,
       isFirstTry: isFirstTry ?? true,
+      runCount: runCount ?? 0,
     });
 
     return NextResponse.json({ success: true });
