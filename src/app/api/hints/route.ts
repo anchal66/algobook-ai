@@ -3,9 +3,9 @@ import OpenAI from "openai";
 import { adminDb } from "@/lib/firebase-admin";
 import { checkSubscription } from "@/lib/check-subscription";
 
-// Cheap model for hints — no need for GPT-4o here
+// Cheap model for hints — no need for gpt-5.4 here
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const HINT_MODEL = "gpt-4o-mini";
+const HINT_MODEL = "gpt-5.4-mini";
 
 const HINT_STRUCTURE = {
   1: {

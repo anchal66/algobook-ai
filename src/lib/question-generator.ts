@@ -23,7 +23,7 @@ interface GenerationContext {
  * Three-tier question sourcing:
  *   1. Search curated pool (Firestore) → match topic + difficulty, exclude already-used
  *   2. If found, return as-is (fast, high quality, no API cost)
- *   3. If not found, generate via GPT-4o (expensive, but fully tailored)
+ *   3. If not found, generate via gpt-5.4 (expensive, but fully tailored)
  */
 export async function getOrGenerateQuestion(
   ctx: GenerationContext
@@ -179,7 +179,7 @@ IMPORTANT RULES:
 
   // Strong model for generation
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.4",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
