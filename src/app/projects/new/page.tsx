@@ -163,6 +163,23 @@ export default function NewProjectPage() {
         }
       }
 
+      // Generate AI-powered project insights (non-blocking)
+      fetch("/api/project/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: newProjectDoc.id,
+          userId: user.uid,
+          title,
+          description,
+          purpose,
+          duration,
+          experienceLevel,
+          goalType,
+          templateId: selectedTemplate?.id || null,
+        }),
+      }).catch((err) => console.error("Insights generation failed (non-blocking):", err));
+
       router.push(`/project/${newProjectDoc.id}`);
     } catch (err) {
       console.error("Error creating project: ", err);

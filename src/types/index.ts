@@ -197,3 +197,22 @@ export interface TemplatePoolEntry {
   linkedQuestionId?: string;  // ID of the generated question linked to this entry
   order: number;              // original order in the template
 }
+
+// ── PROJECT INSIGHTS (AI-generated on creation) ──
+
+export interface ProjectInsights {
+  totalRecommended: number;         // total questions recommended for this project
+  easyCount: number;                // recommended Easy questions
+  mediumCount: number;              // recommended Medium questions
+  hardCount: number;                // recommended Hard questions
+  estimatedHoursPerWeek: number;    // suggested weekly time commitment
+  keyTopics: string[];              // AI-identified focus topics
+  milestones: ProjectMilestone[];   // progressive goals
+  tip: string;                      // motivational/strategic tip
+}
+
+export interface ProjectMilestone {
+  label: string;                    // e.g. "Foundation", "Intermediate", "Advanced"
+  questionsTarget: number;          // cumulative questions to reach this milestone
+  description: string;              // what this milestone means
+}

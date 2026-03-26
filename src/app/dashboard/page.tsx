@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ActivitySheet from "@/components/ActivitySheet";
 import UserMenu from "@/components/UserMenu";
+import type { ProjectInsights } from "@/types";
 
 interface Project {
   id: string;
@@ -59,6 +60,7 @@ interface Project {
   duration?: number;
   activeDays?: number;
   templateId?: string;
+  insights?: ProjectInsights;
   createdAt: { seconds: number; nanoseconds: number };
 }
 
@@ -67,6 +69,10 @@ interface ProjectProgress {
   totalSubmissions: number;
   successfulSubmissions: number;
   lastActivity: Date | null;
+  easySolved: number;
+  mediumSolved: number;
+  hardSolved: number;
+  attempting: number;
 }
 
 const fadeUp = {
@@ -178,11 +184,38 @@ export default function DashboardPage() {
             const subs = subSnap.docs.map((d) => d.data());
             const successCount = subs.filter((s) => s.status === "success").length;
             const lastSub = subs[0]?.submittedAt;
+
+            // Per-difficulty solved counts
+            const solvedQuestionIds = new Set(
+              subs.filter((s) => s.status === "success").map((s) => s.questionId)
+            );
+            const attemptedNotSolvedIds = new Set(
+              subs.filter((s) => s.status !== "success").map((s) => s.questionId)
+            );
+            // Remove solved from attempting
+            solvedQuestionIds.forEach((id) => attemptedNotSolvedIds.delete(id));
+
+            // Map question IDs to difficulty
+            const qDiffById: Record<string, string> = {};
+            qSnap.docs.forEach((d) => { qDiffById[d.id] = d.data().difficulty || "Medium"; });
+
+            let easySolved = 0, mediumSolved = 0, hardSolved = 0;
+            solvedQuestionIds.forEach((qId) => {
+              const diff = qDiffById[qId];
+              if (diff === "Easy") easySolved++;
+              else if (diff === "Medium") mediumSolved++;
+              else if (diff === "Hard") hardSolved++;
+            });
+
             progressMap[pid] = {
               totalQuestions: qSnap.size,
               totalSubmissions: subs.length,
               successfulSubmissions: successCount,
               lastActivity: lastSub?.toDate ? lastSub.toDate() : null,
+              easySolved,
+              mediumSolved,
+              hardSolved,
+              attempting: attemptedNotSolvedIds.size,
             };
           })
         );
@@ -407,13 +440,20 @@ export default function DashboardPage() {
           >
             {filteredProjects.map((project) => {
               const progress = projectProgress[project.id];
+              const insights = project.insights;
               const totalQ = progress?.totalQuestions || 0;
-              const successSubs = progress?.successfulSubmissions || 0;
-              const totalSubs = progress?.totalSubmissions || 0;
-              const successRate = totalSubs > 0 ? Math.round((successSubs / totalSubs) * 100) : 0;
+              const totalSolved = (progress?.easySolved || 0) + (progress?.mediumSolved || 0) + (progress?.hardSolved || 0);
+              const totalTarget = insights?.totalRecommended || totalQ || 1;
+              const solvePercent = Math.min(100, Math.round((totalSolved / totalTarget) * 100));
+              const attempting = progress?.attempting || 0;
               const createdDate = new Date(project.createdAt.seconds * 1000);
               const activeDays = project.activeDays || 0;
               const durationProgress = project.duration ? Math.min(100, Math.round((activeDays / project.duration) * 100)) : null;
+
+              // SVG circular progress
+              const radius = 52;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference - (solvePercent / 100) * circumference;
 
               return (
                 <motion.div key={project.id} variants={fadeUp}>
@@ -443,12 +483,17 @@ export default function DashboardPage() {
                                 <ExternalLink className="h-4 w-4" /> Open Project
                               </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/project/${project.id}/insights`} className="gap-2">
+                                <BarChart3 className="h-4 w-4" /> Project Insights
+                              </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="gap-2"
                               onClick={() => setActivityProject({ id: project.id, title: project.title })}
                             >
-                              <BarChart3 className="h-4 w-4" /> View Activity
+                              <BookOpen className="h-4 w-4" /> View Activity
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -466,23 +511,66 @@ export default function DashboardPage() {
                           {project.description}
                         </p>
 
-                        {/* Stats row */}
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                          <div className="rounded-lg bg-muted/50 p-2 text-center">
-                            <p className="text-base font-bold">{totalQ}</p>
-                            <p className="text-[10px] text-muted-foreground">Questions</p>
+                        {/* Progress Section: Circular Ring + Difficulty Breakdown */}
+                        {insights ? (
+                          <div className="flex items-center gap-4 mb-4">
+                            {/* Circular Progress Ring */}
+                            <div className="relative shrink-0">
+                              <svg width="120" height="120" viewBox="0 0 120 120" className="transform -rotate-90">
+                                <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+                                <circle
+                                  cx="60" cy="60" r={radius} fill="none"
+                                  stroke="url(#progressGradient)"
+                                  strokeWidth="8"
+                                  strokeLinecap="round"
+                                  strokeDasharray={circumference}
+                                  strokeDashoffset={strokeDashoffset}
+                                  className="transition-all duration-700"
+                                />
+                                <defs>
+                                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="hsl(var(--primary))" />
+                                    <stop offset="100%" stopColor="#22c55e" />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-xl font-bold">{totalSolved}<span className="text-xs text-muted-foreground font-normal">/{totalTarget}</span></span>
+                                <span className="text-[10px] text-emerald-500 flex items-center gap-0.5">
+                                  <CheckCircle2 className="h-2.5 w-2.5" /> Solved
+                                </span>
+                                {attempting > 0 && (
+                                  <span className="text-[9px] text-muted-foreground">{attempting} Attempting</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Difficulty Breakdown */}
+                            <div className="flex flex-col gap-2 flex-1 min-w-0">
+                              <DifficultyBar label="Easy" solved={progress?.easySolved || 0} total={insights.easyCount} color="text-emerald-500" bg="bg-emerald-500" />
+                              <DifficultyBar label="Med." solved={progress?.mediumSolved || 0} total={insights.mediumCount} color="text-amber-500" bg="bg-amber-500" />
+                              <DifficultyBar label="Hard" solved={progress?.hardSolved || 0} total={insights.hardCount} color="text-red-400" bg="bg-red-500" />
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-muted/50 p-2 text-center">
-                            <p className="text-base font-bold">{totalSubs}</p>
-                            <p className="text-[10px] text-muted-foreground">Submissions</p>
+                        ) : (
+                          /* Fallback: original stats row when no insights */
+                          <div className="grid grid-cols-3 gap-2 mb-4">
+                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                              <p className="text-base font-bold">{totalQ}</p>
+                              <p className="text-[10px] text-muted-foreground">Questions</p>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                              <p className="text-base font-bold">{progress?.totalSubmissions || 0}</p>
+                              <p className="text-[10px] text-muted-foreground">Submissions</p>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                              <p className={`text-base font-bold ${(progress?.totalSubmissions || 0) > 0 ? (Math.round(((progress?.successfulSubmissions || 0) / (progress?.totalSubmissions || 1)) * 100) >= 70 ? 'text-emerald-500' : 'text-amber-500') : ''}`}>
+                                {(progress?.totalSubmissions || 0) > 0 ? `${Math.round(((progress?.successfulSubmissions || 0) / (progress?.totalSubmissions || 1)) * 100)}%` : '—'}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">Success</p>
+                            </div>
                           </div>
-                          <div className="rounded-lg bg-muted/50 p-2 text-center">
-                            <p className={`text-base font-bold ${successRate >= 70 ? 'text-emerald-500' : successRate >= 40 ? 'text-amber-500' : totalSubs > 0 ? 'text-red-400' : ''}`}>
-                              {totalSubs > 0 ? `${successRate}%` : '—'}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">Success</p>
-                          </div>
-                        </div>
+                        )}
 
                         {/* Duration progress bar */}
                         {project.duration && (
@@ -605,4 +693,19 @@ function getWeakestTopic(profile: UserProfile): string {
 
   if (weakest.topic === "") return "None yet";
   return weakest.topic.charAt(0).toUpperCase() + weakest.topic.slice(1);
+}
+
+function DifficultyBar({ label, solved, total, color, bg }: { label: string; solved: number; total: number; color: string; bg: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((solved / total) * 100)) : 0;
+  return (
+    <div className="rounded-lg bg-muted/40 px-3 py-1.5">
+      <div className="flex items-center justify-between mb-1">
+        <span className={`text-[11px] font-semibold ${color}`}>{label}</span>
+        <span className="text-[11px] font-bold">{solved}<span className="text-muted-foreground font-normal">/{total}</span></span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full ${bg} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
