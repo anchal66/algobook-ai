@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
@@ -38,8 +38,11 @@ import {
   Sparkles,
   Check,
   ArrowRight,
+  X,
+  Building2,
+  FileText,
 } from "lucide-react";
-import type { ExperienceLevel, GoalType } from "@/types";
+import type { ExperienceLevel, GoalType, TemplateInfo } from "@/types";
 
 const EXPERIENCE_OPTIONS: {
   value: ExperienceLevel;
@@ -78,6 +81,39 @@ export default function NewProjectPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Template state
+  const [templates, setTemplates] = useState<TemplateInfo[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateInfo | null>(null);
+
+  // Fetch available templates
+  useEffect(() => {
+    fetch("/api/templates")
+      .then((res) => res.json())
+      .then((data) => setTemplates(data.templates || []))
+      .catch(() => {})
+      .finally(() => setTemplatesLoading(false));
+  }, []);
+
+  const selectTemplate = (tmpl: TemplateInfo) => {
+    setSelectedTemplate(tmpl);
+    setTitle(tmpl.title);
+    setDescription(tmpl.description);
+    setPurpose(tmpl.purpose);
+    setGoalType("interview-prep");
+    // ~2 questions/day pace, capped at 90
+    setDuration(Math.min(90, Math.max(7, Math.ceil(tmpl.questionCount / 2))));
+  };
+
+  const clearTemplate = () => {
+    setSelectedTemplate(null);
+    setTitle("");
+    setDescription("");
+    setPurpose("");
+    setGoalType("daily-practice");
+    setDuration(30);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -93,8 +129,7 @@ export default function NewProjectPage() {
     setError("");
 
     try {
-      const projectsCollection = collection(firestore, "projects");
-      const newProjectDoc = await addDoc(projectsCollection, {
+      const projectData: Record<string, unknown> = {
         userId: user.uid,
         title,
         description,
@@ -103,7 +138,30 @@ export default function NewProjectPage() {
         experienceLevel,
         goalType,
         createdAt: serverTimestamp(),
-      });
+      };
+      if (selectedTemplate) {
+        projectData.templateId = selectedTemplate.id;
+      }
+
+      const projectsCollection = collection(firestore, "projects");
+      const newProjectDoc = await addDoc(projectsCollection, projectData);
+
+      // Seed template pool if a template was selected
+      if (selectedTemplate) {
+        try {
+          await fetch("/api/templates/seed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectId: newProjectDoc.id,
+              templateId: selectedTemplate.id,
+              userId: user.uid,
+            }),
+          });
+        } catch (seedErr) {
+          console.error("Template seed failed (non-blocking):", seedErr);
+        }
+      }
 
       router.push(`/project/${newProjectDoc.id}`);
     } catch (err) {
@@ -205,11 +263,73 @@ export default function NewProjectPage() {
                     Create New Project
                   </CardTitle>
                   <CardDescription className="mt-0.5">
-                    Define your goals and the AI will tailor questions for you.
+                    Pick a company template or start a custom project.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
+
+            {/* Template Picker */}
+            <CardContent className="pb-2">
+              <Label className="mb-3 block">Choose a Template</Label>
+              {templatesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Custom Project card */}
+                  <button
+                    type="button"
+                    onClick={clearTemplate}
+                    className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
+                      !selectedTemplate
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <FileText className={`h-6 w-6 ${!selectedTemplate ? "text-primary" : "text-muted-foreground"}`} />
+                    <span className={`text-xs font-medium ${!selectedTemplate ? "text-primary" : ""}`}>Custom</span>
+                  </button>
+
+                  {/* Company template cards */}
+                  {templates.map((tmpl) => {
+                    const isSelected = selectedTemplate?.id === tmpl.id;
+                    return (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => selectTemplate(tmpl)}
+                        className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        <Building2 className={`h-6 w-6 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                        <span className={`text-xs font-medium ${isSelected ? "text-primary" : ""}`}>{tmpl.company}</span>
+                        <span className="text-[10px] text-muted-foreground">{tmpl.questionCount} questions</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Selected template badge */}
+              {selectedTemplate && (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary text-xs font-medium px-3 py-1.5">
+                  <Building2 className="h-3 w-3" />
+                  {selectedTemplate.company} Template · {selectedTemplate.questionCount} questions
+                  <span className="text-[10px] text-primary/60">
+                    ({selectedTemplate.difficulties.easy}E · {selectedTemplate.difficulties.medium}M · {selectedTemplate.difficulties.hard}H)
+                  </span>
+                  <button type="button" onClick={clearTemplate} className="ml-1 hover:text-primary/70">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </CardContent>
+
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-6">
                 <div className="space-y-2">

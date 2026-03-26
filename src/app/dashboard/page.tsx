@@ -37,6 +37,7 @@ import {
   BookOpen,
   Clock,
   Target,
+  Building2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import type { UserProfile } from "@/types";
@@ -57,6 +58,7 @@ interface Project {
   purpose?: string;
   duration?: number;
   activeDays?: number;
+  templateId?: string;
   createdAt: { seconds: number; nanoseconds: number };
 }
 
@@ -423,6 +425,11 @@ export default function DashboardPage() {
                           <CardTitle className="text-lg group-hover:text-primary transition-colors cursor-pointer">
                             {project.title}
                           </CardTitle>
+                          {project.templateId && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <Building2 className="h-2.5 w-2.5" /> {project.templateId.charAt(0).toUpperCase() + project.templateId.slice(1)} Template
+                            </span>
+                          )}
                         </Link>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

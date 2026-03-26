@@ -17,6 +17,7 @@ import {
   Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
   Maximize2, Minimize2, TriangleAlert, Brain, Flame, BookOpen, Dumbbell,
   RefreshCw, Target, Shield, FileText, Trophy,
+  Building2,
 } from "lucide-react";
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
@@ -95,6 +96,9 @@ export default function ProjectPage() {
   // Practice state (fetched from profile)
   const [practiceState, setPracticeState] = useState<PracticeState>('learning');
   const [stateProgress, setStateProgress] = useState<string>('');
+
+  // Template progress (for template-based projects)
+  const [templateProgress, setTemplateProgress] = useState<{ total: number; used: number; company: string } | null>(null);
 
   // Elapsed timer for current question
   useEffect(() => {
@@ -216,6 +220,27 @@ export default function ProjectPage() {
     };
     fetchProjectQuestions();
   }, [projectId, loadQuestion]);
+
+  // Fetch template progress for template-based projects
+  useEffect(() => {
+    if (!projectId) return;
+    const fetchTemplateProgress = async () => {
+      try {
+        const projSnap = await getDoc(doc(firestore, "projects", projectId));
+        const templateId = projSnap.data()?.templateId as string | undefined;
+        if (!templateId) return;
+
+        const poolSnap = await getDocs(collection(firestore, "projects", projectId, "templatePool"));
+        if (poolSnap.empty) return;
+
+        const total = poolSnap.size;
+        const used = poolSnap.docs.filter((d) => d.data().status === "used").length;
+        const company = templateId.charAt(0).toUpperCase() + templateId.slice(1);
+        setTemplateProgress({ total, used, company });
+      } catch {}
+    };
+    fetchTemplateProgress();
+  }, [projectId]);
 
   const handleEditorBeforeMount = (monaco: any) => {
     monacoRef.current = monaco;
@@ -512,6 +537,11 @@ export default function ProjectPage() {
       const updatedQuestions = [...projectQuestions, newProjectQuestion];
       setProjectQuestions(updatedQuestions);
       setCurrentQuestionIndex(updatedQuestions.length - 1);
+
+      // Increment template progress counter if this is a template project
+      if (templateProgress) {
+        setTemplateProgress((prev) => prev ? { ...prev, used: prev.used + 1 } : prev);
+      }
     } catch (error) {
       console.error(error);
       setExecutionError("Sorry, I couldn't generate a question. Please try again.");
@@ -781,6 +811,9 @@ export default function ProjectPage() {
                 <>
                   <div className="flex items-center gap-2 flex-wrap">
                     <PracticeStateBadge state={practiceState} progress={stateProgress} />
+                    {templateProgress && (
+                      <TemplateProgressBadge progress={templateProgress} />
+                    )}
                     {recommendationReason && (
                       <ReasonBadge reason={recommendationReason} />
                     )}
@@ -1391,6 +1424,42 @@ const PracticeStateBadge = ({ state, progress }: { state: PracticeState; progres
         <TooltipContent side="bottom" className="max-w-xs">
           <p className="text-xs font-medium mb-1">{cfg.label} Phase</p>
           {progress && <p className="text-xs text-muted-foreground">{progress}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+const TemplateProgressBadge = ({ progress }: { progress: { total: number; used: number; company: string } }) => {
+  const pct = Math.round((progress.used / progress.total) * 100);
+  const isComplete = progress.used >= progress.total;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`flex items-center gap-2 mb-4 px-2.5 py-1.5 rounded-lg border cursor-help ${
+            isComplete
+              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+              : "text-blue-400 bg-blue-500/10 border-blue-500/20"
+          }`}>
+            <Building2 className="h-3 w-3 shrink-0" />
+            <span className="text-[11px] font-medium">
+              {isComplete ? `${progress.company} ✓` : `${progress.company}: ${progress.used}/${progress.total}`}
+            </span>
+            {!isComplete && (
+              <div className="w-12 h-1.5 rounded-full bg-blue-500/20 overflow-hidden">
+                <div className="h-full rounded-full bg-blue-400 transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-xs">
+          <p className="text-xs font-medium mb-1">{progress.company} Template</p>
+          <p className="text-xs text-muted-foreground">
+            {isComplete
+              ? "All template questions covered! AI is now generating similar questions."
+              : `${progress.used} of ${progress.total} template questions covered (${pct}%)`}
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

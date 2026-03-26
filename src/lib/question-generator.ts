@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { Question, UserProfile, QuestionWithReason, RecommendationReason } from "@/types";
+import type { Question, UserProfile, QuestionWithReason, RecommendationReason, TemplatePoolEntry } from "@/types";
 import { buildPerformanceSummary } from "@/lib/user-profile";
 import { findPrerequisiteGaps } from "@/lib/prerequisite-graph";
 import type { Recommendation } from "@/lib/recommendation";
@@ -16,6 +16,7 @@ interface GenerationContext {
   projectDescription: string;
   projectPurpose: string;
   userPrompt: string;
+  templateEntry?: TemplatePoolEntry; // When present, generate a problem inspired by this template question
 }
 
 /**
@@ -82,7 +83,7 @@ async function searchCuratedPool(ctx: GenerationContext): Promise<Question | nul
 }
 
 async function generateWithAI(ctx: GenerationContext): Promise<Question> {
-  const { profile, recommendation, existingTitles, projectDescription, projectPurpose, userPrompt } = ctx;
+  const { profile, recommendation, existingTitles, projectDescription, projectPurpose, userPrompt, templateEntry } = ctx;
 
   const performanceSummary = buildPerformanceSummary(profile);
 
@@ -145,6 +146,8 @@ ${prereqDirective}
 EXPERIENCE GUIDANCE: ${experienceGuidance[profile.experienceLevel] || experienceGuidance.intermediate}
 
 ${recommendation.isCalibration ? "CALIBRATION MODE: This is a calibration question for a returning user. Keep it straightforward to assess their current level." : ""}
+
+${templateEntry ? `TEMPLATE REFERENCE: Generate a problem inspired by "${templateEntry.title}" at ${templateEntry.difficulty} difficulty level. The problem should test the same core concepts and algorithms as the classic "${templateEntry.title}" problem, but create an ORIGINAL variation with a unique scenario or narrative twist. Do NOT copy the exact well-known problem — instead, design a creative variation that exercises the same algorithmic thinking. The difficulty MUST be ${templateEntry.difficulty}.` : ""}
 
 The user's request: "${userPrompt}"
 

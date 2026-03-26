@@ -171,3 +171,29 @@ export interface PrerequisiteGap {
   currentMastery: number;     // User's current mastery
   prerequisiteOf: string;     // The topic this is a prerequisite for
 }
+
+// ── TEMPLATES (company interview prep) ──
+
+export interface TemplateInfo {
+  id: string;                 // e.g. "microsoft"
+  company: string;            // e.g. "Microsoft"
+  title: string;              // e.g. "Microsoft Interview Prep"
+  description: string;
+  purpose: string;            // e.g. "Prepare for Microsoft"
+  questionCount: number;
+  difficulties: { easy: number; medium: number; hard: number };
+}
+
+export interface TemplateQuestion {
+  number: number;             // original LeetCode number
+  title: string;              // e.g. "Two Sum"
+  difficulty: "Easy" | "Medium" | "Hard";
+}
+
+export interface TemplatePoolEntry {
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  status: "pending" | "used";
+  linkedQuestionId?: string;  // ID of the generated question linked to this entry
+  order: number;              // original order in the template
+}

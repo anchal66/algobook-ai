@@ -1,4 +1,4 @@
-import type { UserProfile, RecommendationReason } from "@/types";
+import type { UserProfile, RecommendationReason, TemplatePoolEntry } from "@/types";
 import {
   getWeakTopics,
   getRecommendedDifficulty,
@@ -279,3 +279,144 @@ const INTERVIEW_PATTERNS = [
   "dynamic programming", "backtracking", "stack", "heap", "graph",
   "trie", "greedy", "hash map", "linked list", "tree",
 ];
+
+// ── TEMPLATE-AWARE RECOMMENDATION ──
+
+export interface TemplateRecommendation extends Recommendation {
+  selectedEntry: TemplatePoolEntry;
+}
+
+/**
+ * Keywords mapping: title substrings → likely DSA topics.
+ * Used to infer topic from template question titles for smart ordering.
+ */
+const TITLE_TOPIC_HINTS: [RegExp, string][] = [
+  [/\btree\b|bst\b|binary tree\b|trie\b|preorder|inorder|postorder/i, "tree"],
+  [/\bgraph\b|island|network|connect/i, "graph"],
+  [/\bbfs\b|level order|shortest path/i, "bfs"],
+  [/\bdfs\b|flood fill|backtrack/i, "dfs"],
+  [/\bdynamic prog|dp\b|subsequence|knapsack|coin change|house robber|climbing stair/i, "dynamic programming"],
+  [/\blinked list\b|listnode|node/i, "linked list"],
+  [/\bstack\b|parenthes|valid paren|calculator/i, "stack"],
+  [/\bqueue\b|sliding window|window/i, "sliding window"],
+  [/\bheap\b|priority queue|k(th)?\s*(largest|smallest)|median/i, "heap"],
+  [/\bbinary search\b|rotated.*sorted|search.*sorted|first bad/i, "binary search"],
+  [/\bsort\b|merge.*sort|quick.*sort|sort color/i, "sorting"],
+  [/\btwo (sum|pointer)|three sum|3sum|two pointer/i, "two pointers"],
+  [/\bhash|anagram|group.*anagram|duplicate|two sum/i, "hash map"],
+  [/\barray\b|subarray|matrix|rotate|spiral/i, "array"],
+  [/\bstring\b|palindrome|substring|reverse.*string/i, "string"],
+  [/\brecursion|recursive|permutation|combination|subset/i, "recursion"],
+  [/\bgreedy\b|interval|jump game|gas station/i, "greedy"],
+  [/\bbit\b|xor|single number|number of 1 bit/i, "bit manipulation"],
+  [/\bmath\b|sqrt|power|factorial|prime/i, "math"],
+];
+
+function inferTopicsFromTitle(title: string): string[] {
+  const topics: string[] = [];
+  for (const [pattern, topic] of TITLE_TOPIC_HINTS) {
+    if (pattern.test(title)) {
+      topics.push(topic);
+    }
+  }
+  return topics.length > 0 ? topics : ["general"];
+}
+
+/**
+ * Recommend from a template pool — uses user intelligence but constrained to pending entries.
+ *
+ * Scoring per pending entry:
+ *   +30  if difficulty matches recommended difficulty
+ *   +25  if inferred topic aligns with a weak topic
+ *   +20  if inferred topic is due for spaced review
+ *   -15  if inferred topic was in the last 3 questions (anti-repetition)
+ *   +10  bonus for lower order (slight preference for earlier entries — breadth first)
+ */
+export function recommendFromTemplate(
+  profile: UserProfile,
+  pendingPool: (TemplatePoolEntry & { docId: string })[],
+  existingQuestions: ExistingQuestion[],
+  userPrompt?: string,
+): TemplateRecommendation | null {
+  if (pendingPool.length === 0) return null;
+
+  // If user typed a specific prompt, fuzzy-match against pool titles
+  if (userPrompt && userPrompt !== "__auto_next__") {
+    const lower = userPrompt.toLowerCase();
+    const match = pendingPool.find((e) => e.title.toLowerCase().includes(lower));
+    if (match) {
+      return {
+        difficulty: match.difficulty,
+        suggestedTopics: inferTopicsFromTitle(match.title),
+        avoidTopics: [],
+        reason: {
+          short: `Template: ${match.title}`,
+          detail: `Matched your request "${userPrompt}" to template entry "${match.title}".`,
+        },
+        isCalibration: false,
+        selectedEntry: match,
+      };
+    }
+    // No match — still pick smartly but note the user requested something
+  }
+
+  const weak = getWeakTopics(profile);
+  const weakSet = new Set(weak.map((t) => t.toLowerCase()));
+  const dueForReview = getDueTopics(profile);
+  const dueSet = new Set(dueForReview.map((t) => t.toLowerCase()));
+  const baseDifficulty = getRecommendedDifficulty(profile);
+  const recentTags = getRecentTags(existingQuestions, 3);
+  const recentSet = new Set(recentTags);
+  const maxOrder = Math.max(...pendingPool.map((e) => e.order), 1);
+
+  // Score each pending entry
+  const scored = pendingPool.map((entry) => {
+    let score = 0;
+    const topics = inferTopicsFromTitle(entry.title);
+
+    // Difficulty alignment
+    if (entry.difficulty === baseDifficulty) score += 30;
+
+    // Weak topic alignment
+    if (topics.some((t) => weakSet.has(t))) score += 25;
+
+    // Spaced repetition alignment
+    if (topics.some((t) => dueSet.has(t))) score += 20;
+
+    // Anti-repetition penalty
+    if (topics.some((t) => recentSet.has(t))) score -= 15;
+
+    // Slight preference for earlier entries (breadth first)
+    score += Math.round((1 - entry.order / maxOrder) * 10);
+
+    // Small random jitter to avoid predictability
+    score += Math.random() * 5;
+
+    return { entry, score, topics };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  const entry = best.entry;
+  const topics = best.topics;
+
+  const reason: RecommendationReason = {
+    short: `Template: ${entry.title}`,
+    detail: `Smart-picked "${entry.title}" (${entry.difficulty}) from the template. ${
+      best.topics.some((t) => weakSet.has(t))
+        ? `Aligns with your weak topic "${best.topics.find((t) => weakSet.has(t))}".`
+        : best.topics.some((t) => dueSet.has(t))
+        ? `Due for spaced review on "${best.topics.find((t) => dueSet.has(t))}".`
+        : "Best fit for your current level."
+    }`,
+  };
+
+  return {
+    difficulty: entry.difficulty,
+    suggestedTopics: topics,
+    avoidTopics: recentTags,
+    reason,
+    isCalibration: false,
+    selectedEntry: entry,
+  };
+}
