@@ -33,16 +33,25 @@ export default function AttendanceModal({ projectId }: { projectId: string }) {
     // Fast local check
     if (localStorage.getItem(localKey)) return;
 
-    // Check Firestore
+    // Check Firestore (with retry for newly created projects)
     const checkAttendance = async () => {
       try {
-        // Load project info for duration
+        // Load project info for duration — retry if doc not yet available
         const projectRef = doc(firestore, "projects", projectId);
-        const projectSnap = await getDoc(projectRef);
-        if (projectSnap.exists()) {
-          const projectData = projectSnap.data();
-          setTotalDuration(projectData.duration || 0);
-          setActiveDays(projectData.activeDays || 0);
+        let projectData: Record<string, unknown> | undefined;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const projectSnap = await getDoc(projectRef);
+          if (projectSnap.exists()) {
+            projectData = projectSnap.data();
+            break;
+          }
+          // Doc not ready yet (new project race condition) — wait and retry
+          await new Promise((r) => setTimeout(r, 400));
+        }
+
+        if (projectData) {
+          setTotalDuration((projectData.duration as number) || 0);
+          setActiveDays((projectData.activeDays as number) || 0);
         }
 
         // Check if already marked today

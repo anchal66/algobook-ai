@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -145,6 +145,16 @@ export default function NewProjectPage() {
 
       const projectsCollection = collection(firestore, "projects");
       const newProjectDoc = await addDoc(projectsCollection, projectData);
+
+      // Wait for the document to be confirmed readable before navigating.
+      // This prevents race conditions where the editor/attendance loads
+      // before the project doc is available in Firestore's cache.
+      const projectRef = doc(firestore, "projects", newProjectDoc.id);
+      for (let i = 0; i < 10; i++) {
+        const snap = await getDoc(projectRef);
+        if (snap.exists()) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
 
       // Seed template pool if a template was selected
       if (selectedTemplate) {

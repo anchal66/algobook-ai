@@ -21,10 +21,15 @@ export default function ProjectHeader({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     const fetchProject = async () => {
-      const docRef = doc(firestore, "projects", projectId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setProject(docSnap.data() as ProjectData);
+      // Retry for newly created projects that may not be readable yet
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const docRef = doc(firestore, "projects", projectId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setProject(docSnap.data() as ProjectData);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 400));
       }
     };
     fetchProject();
