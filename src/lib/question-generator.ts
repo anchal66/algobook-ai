@@ -175,7 +175,16 @@ IMPORTANT RULES:
 - testCases input must be machine-readable stdin (e.g. "3\\n1 2 3" for array [1,2,3])
 - Provide at least 3 test cases including edge cases
 - hints must teach reasoning: pattern recognition, algorithm choice, implementation traps
-- Ensure driverCode correctly parses testCases input format`;
+
+CRITICAL — DRIVER CODE & TEST CASE CONTRACT (most common source of bugs):
+- The driverCode Main class MUST parse EXACTLY the format used in testCases[].input
+- For arrays: testCases input MUST be "N\\nelem1 elem2 ... elemN" (size on first line, space-separated elements on second line). The driverCode MUST read N first via scanner.nextInt(), then read exactly N elements.
+- For strings: one per line
+- For multiple parameters: each on its own line, arrays as "N\\nelem1 elem2..."
+- SELF-CHECK: Before outputting, mentally simulate the driverCode reading testCases[0].input character by character. Every scanner.nextInt()/nextLine()/next() call must have matching data. If there's a mismatch, fix it.
+- driverCode MUST import java.util.* and java.io.* as needed
+- For List<List<Integer>> outputs: print each inner list sorted, and sort outer list lexicographically. Format: "[[],[1],[1,2],[1,2,2],[2],[2,2]]"
+- Ensure driverCode correctly parses testCases input format — a mismatch causes NoSuchElementException at runtime`;
 
   // Strong model for generation
   const completion = await openai.chat.completions.create({
