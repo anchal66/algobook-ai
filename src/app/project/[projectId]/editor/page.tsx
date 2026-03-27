@@ -100,6 +100,10 @@ export default function ProjectPage() {
   // Template progress (for template-based projects)
   const [templateProgress, setTemplateProgress] = useState<{ total: number; used: number; company: string } | null>(null);
 
+  // Question flagging (report broken questions)
+  const [questionFlagged, setQuestionFlagged] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false);
+
   // Elapsed timer for current question
   useEffect(() => {
     if (!question) { setElapsedTime(0); return; }
@@ -136,7 +140,25 @@ export default function ProjectPage() {
     setSolutionExplanation(null);
     setIsSolutionLoading(false);
     setHasSolvedCurrent(false);
+    setQuestionFlagged(false);
   }, [question?.id]);
+
+  const handleFlagQuestion = async (reason: string) => {
+    if (!question?.id || !user || questionFlagged) return;
+    setIsFlagging(true);
+    try {
+      const res = await fetch("/api/question/flag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: question.id, userId: user.uid, reason }),
+      });
+      if (res.ok) setQuestionFlagged(true);
+    } catch (err) {
+      console.error("Error flagging question:", err);
+    } finally {
+      setIsFlagging(false);
+    }
+  };
 
   const formatElapsed = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -818,7 +840,7 @@ export default function ProjectPage() {
                       <ReasonBadge reason={recommendationReason} />
                     )}
                   </div>
-                  <QuestionDisplay question={question} difficultyClass={difficultyClass} />
+                  <QuestionDisplay question={question} difficultyClass={difficultyClass} onReport={handleFlagQuestion} flagged={questionFlagged} isFlagging={isFlagging} />
                   <HintsPanel
                     hints={hints}
                     labels={hintLabels}
@@ -1245,6 +1267,9 @@ export default function ProjectPage() {
                             result={executionResult}
                             inputUsed={lastRunInput}
                             expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
+                            onReport={handleFlagQuestion}
+                            flagged={questionFlagged}
+                            isFlagging={isFlagging}
                           />}
                         {!isExecuting && !executionResult && !executionError &&
                           <p className="text-sm text-muted-foreground">Click <strong>Run</strong> to test your code, or <strong>Submit</strong> to check all test cases.</p>
@@ -1524,9 +1549,25 @@ const QuestionListSidebar = ({ questions, onQuestionSelect, difficultyClass }: {
   </Sheet>
 );
 
-const QuestionDisplay = ({ question, difficultyClass }: { question: Question, difficultyClass: (d: string) => string }) => (
+const QuestionDisplay = ({ question, difficultyClass, onReport, flagged, isFlagging }: { question: Question, difficultyClass: (d: string) => string, onReport?: (reason: string) => void, flagged?: boolean, isFlagging?: boolean }) => (
   <article className="prose prose-invert max-w-none prose-headings:tracking-tight prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50">
-    <h1 className="text-2xl">{question.title}</h1>
+    <div className="flex items-start justify-between gap-2 not-prose">
+      <h1 className="text-2xl font-bold m-0">{question.title}</h1>
+      {onReport && (
+        <button
+          onClick={() => onReport("broken-question")}
+          disabled={flagged || isFlagging}
+          className={`shrink-0 mt-1 text-[10px] px-2 py-1 rounded-md border transition-colors ${
+            flagged
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-400 cursor-default"
+              : "border-border/50 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 text-muted-foreground"
+          }`}
+          title="Report this question if it has issues (broken driver code, wrong test cases, etc.)"
+        >
+          {flagged ? "Reported" : isFlagging ? "..." : "Report Issue"}
+        </button>
+      )}
+    </div>
     <div className="flex flex-wrap gap-2 my-4 not-prose">
       <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold ${difficultyClass(question.difficulty)}`}>
         {question.difficulty}
@@ -1636,7 +1677,7 @@ const WelcomeMessage = () => (
   </div>
 );
 
-const OutputDisplay = ({ result, inputUsed, expectedOutput }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string }) => {
+const OutputDisplay = ({ result, inputUsed, expectedOutput, onReport, flagged, isFlagging }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string, onReport?: (reason: string) => void, flagged?: boolean, isFlagging?: boolean }) => {
   const isAccepted = result.status.id === 3;
   const output = result.stdout?.trim();
   const isCorrect = isAccepted && output === expectedOutput?.trim();
@@ -1654,6 +1695,18 @@ const OutputDisplay = ({ result, inputUsed, expectedOutput }: { result: Executio
       <div className="text-red-400">
         <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Runtime Error</h3>
         <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{result.stderr}</pre>
+        {onReport && !flagged && (
+          <button
+            onClick={() => onReport("runtime-error")}
+            disabled={isFlagging}
+            className="mt-3 text-[11px] px-3 py-1.5 rounded-md border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-300 transition-colors"
+          >
+            {isFlagging ? "Reporting..." : "Not my bug? Report broken question"}
+          </button>
+        )}
+        {flagged && (
+          <p className="mt-3 text-[11px] text-amber-400">Reported — this question won&apos;t be reused. Generate a new one.</p>
+        )}
       </div>
     );
   }

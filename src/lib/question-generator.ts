@@ -64,7 +64,9 @@ async function searchCuratedPool(ctx: GenerationContext): Promise<Question | nul
       .limit(20)
       .get();
 
-    const candidates = snapshot.docs.filter((d) => !existingIds.has(d.id));
+    const candidates = snapshot.docs.filter(
+      (d) => !existingIds.has(d.id) && !d.data().flagged
+    );
 
     if (candidates.length === 0) return null;
 
