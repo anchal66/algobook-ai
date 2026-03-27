@@ -7,7 +7,7 @@ import { firestore } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +38,7 @@ import {
   Clock,
   Target,
   Building2,
+  Trash2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import type { UserProfile } from "@/types";
@@ -96,6 +97,8 @@ export default function DashboardPage() {
   const [activityProject, setActivityProject] = useState<{ id: string; title: string } | null>(null);
   const [projectProgress, setProjectProgress] = useState<Record<string, ProjectProgress>>({});
   const [rankData, setRankData] = useState<{ rank: number; percentile: number } | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -232,6 +235,27 @@ export default function DashboardPage() {
     );
     setFilteredProjects(results);
   }, [searchTerm, projects]);
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user) return;
+    setDeletingProjectId(projectId);
+    try {
+      const res = await fetch(`/api/project/delete?projectId=${encodeURIComponent(projectId)}&userId=${encodeURIComponent(user.uid)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        setFilteredProjects((prev) => prev.filter((p) => p.id !== projectId));
+        const { [projectId]: _, ...rest } = projectProgress;
+        setProjectProgress(rest);
+      }
+    } catch (err) {
+      console.error("Error deleting project:", err);
+    } finally {
+      setDeletingProjectId(null);
+      setConfirmDeleteId(null);
+    }
+  };
 
   if (loading || authLoading) {
     return (
@@ -495,6 +519,13 @@ export default function DashboardPage() {
                             >
                               <BookOpen className="h-4 w-4" /> View Activity
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2 text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                              onClick={() => setConfirmDeleteId(project.id)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete Project
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -646,6 +677,65 @@ export default function DashboardPage() {
         projectId={activityProject?.id || ""}
         projectTitle={activityProject?.title || ""}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {confirmDeleteId && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !deletingProjectId && setConfirmDeleteId(null)}
+          >
+            <motion.div
+              className="relative w-full max-w-sm mx-4 rounded-2xl border border-red-500/20 bg-card p-6 shadow-2xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="rounded-xl bg-red-500/10 p-2.5">
+                  <Trash2 className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Delete Project</h3>
+                  <p className="text-xs text-muted-foreground">This cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">
+                Are you sure you want to delete <strong className="text-foreground">{projects.find((p) => p.id === confirmDeleteId)?.title}</strong>?
+              </p>
+              <p className="text-xs text-muted-foreground mb-6">
+                All questions, submissions, attendance records, and progress will be permanently deleted.
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setConfirmDeleteId(null)}
+                  disabled={!!deletingProjectId}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1 gap-2"
+                  onClick={() => handleDeleteProject(confirmDeleteId)}
+                  disabled={!!deletingProjectId}
+                >
+                  {deletingProjectId === confirmDeleteId ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Deleting...</>
+                  ) : (
+                    <><Trash2 className="h-4 w-4" /> Delete</>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
