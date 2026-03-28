@@ -41,6 +41,7 @@ export function recommend(
   profile: UserProfile,
   existingQuestions: ExistingQuestion[],
   userPrompt?: string,
+  topicFilter?: string[],
 ): Recommendation {
   const state = computePracticeState(profile);
   const daysSince = getDaysSinceActive(profile);
@@ -181,6 +182,17 @@ export function recommend(
     }
   }
 
+  // ── TOPIC FILTER (user-selected topics) ──
+  if (topicFilter && topicFilter.length > 0) {
+    const filterSet = new Set(topicFilter.map((t) => t.toLowerCase()));
+    const filtered = suggestedTopics.filter((t) => filterSet.has(t.toLowerCase()));
+    suggestedTopics = filtered.length > 0 ? filtered : [...topicFilter];
+    reason = {
+      ...reason,
+      detail: reason.detail + ` (Constrained to your selected topics: ${topicFilter.join(", ")})`,
+    };
+  }
+
   // ── PER-TOPIC DIFFICULTY ──
   // Override global difficulty with topic-specific difficulty for the primary topic
   if (suggestedTopics.length > 0) {
@@ -215,7 +227,8 @@ export function recommend(
 
   // If user typed last 3 questions on the same topic, force variety
   if (recentTags.length >= 2 && suggestedTopics.every((t) => recentTags.includes(t))) {
-    const fresh = CORE_TOPICS.filter((t) => !recentTags.includes(t));
+    const pool = topicFilter && topicFilter.length > 0 ? topicFilter : CORE_TOPICS;
+    const fresh = pool.filter((t) => !recentTags.includes(t));
     if (fresh.length > 0) {
       suggestedTopics = pickRandom(fresh, 2);
       reason = {
@@ -337,13 +350,29 @@ export function recommendFromTemplate(
   pendingPool: (TemplatePoolEntry & { docId: string })[],
   existingQuestions: ExistingQuestion[],
   userPrompt?: string,
+  topicFilter?: string[],
 ): TemplateRecommendation | null {
   if (pendingPool.length === 0) return null;
+
+  // Filter pool by selected topics if provided
+  const filterSet = topicFilter && topicFilter.length > 0
+    ? new Set(topicFilter.map((t) => t.toLowerCase()))
+    : null;
+
+  const filteredPool = filterSet
+    ? pendingPool.filter((entry) => {
+        const topics = inferTopicsFromTitle(entry.title);
+        return topics.some((t) => filterSet.has(t.toLowerCase()));
+      })
+    : pendingPool;
+
+  // If filter eliminates all entries, fall back to full pool
+  const pool = filteredPool.length > 0 ? filteredPool : pendingPool;
 
   // If user typed a specific prompt, fuzzy-match against pool titles
   if (userPrompt && userPrompt !== "__auto_next__") {
     const lower = userPrompt.toLowerCase();
-    const match = pendingPool.find((e) => e.title.toLowerCase().includes(lower));
+    const match = pool.find((e) => e.title.toLowerCase().includes(lower));
     if (match) {
       return {
         difficulty: match.difficulty,
@@ -367,10 +396,10 @@ export function recommendFromTemplate(
   const baseDifficulty = getRecommendedDifficulty(profile);
   const recentTags = getRecentTags(existingQuestions, 3);
   const recentSet = new Set(recentTags);
-  const maxOrder = Math.max(...pendingPool.map((e) => e.order), 1);
+  const maxOrder = Math.max(...pool.map((e) => e.order), 1);
 
   // Score each pending entry
-  const scored = pendingPool.map((entry) => {
+  const scored = pool.map((entry) => {
     let score = 0;
     const topics = inferTopicsFromTitle(entry.title);
 

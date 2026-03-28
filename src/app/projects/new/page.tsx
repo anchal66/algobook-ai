@@ -43,6 +43,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { ExperienceLevel, GoalType, TemplateInfo } from "@/types";
+import TopicSelector from "@/components/TopicSelector";
 
 const EXPERIENCE_OPTIONS: {
   value: ExperienceLevel;
@@ -78,6 +79,7 @@ export default function NewProjectPage() {
   const [purpose, setPurpose] = useState("");
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("intermediate");
   const [goalType, setGoalType] = useState<GoalType>("daily-practice");
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -137,6 +139,7 @@ export default function NewProjectPage() {
         purpose,
         experienceLevel,
         goalType,
+        selectedTopics: selectedTopics.length > 0 ? selectedTopics : null,
         createdAt: serverTimestamp(),
       };
       if (selectedTemplate) {
@@ -390,6 +393,17 @@ export default function NewProjectPage() {
                     onChange={(e) => setPurpose(e.target.value)}
                     className="h-11"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Focus Topics (optional)</Label>
+                  <TopicSelector
+                    selected={selectedTopics}
+                    onChange={setSelectedTopics}
+                    placeholder="All topics — click to filter"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Leave empty for AI-recommended topics, or select specific topics to focus your practice.
+                  </p>
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     ]);
 
     const projectData = projectSnap.exists ? projectSnap.data()! : {};
+    const selectedTopics: string[] = Array.isArray(projectData.selectedTopics) ? projectData.selectedTopics : [];
 
     // Sync practice state
     const practiceState = computePracticeState(profile);
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
       }));
 
       if (pendingPool.length > 0) {
-        const templateRec = recommendFromTemplate(profile, pendingPool, existingQuestions, userPrompt);
+        const templateRec = recommendFromTemplate(profile, pendingPool, existingQuestions, userPrompt, selectedTopics);
         if (templateRec) {
           recommendation = templateRec;
           templateEntry = templateRec.selectedEntry as (TemplatePoolEntry & { docId: string });
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
 
     // Fall back to normal recommendation if no template or pool exhausted
     if (!recommendation) {
-      recommendation = recommend(profile, existingQuestions, userPrompt);
+      recommendation = recommend(profile, existingQuestions, userPrompt, selectedTopics);
 
       // If template exhausted, annotate the reason
       if (isTemplateExhausted) {

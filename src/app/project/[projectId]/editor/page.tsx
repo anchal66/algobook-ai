@@ -22,7 +22,8 @@ import {
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, Timestamp, where, increment } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, updateDoc, Timestamp, where, increment } from "firebase/firestore";
+import TopicSelector from "@/components/TopicSelector";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -103,6 +104,9 @@ export default function ProjectPage() {
   // Question flagging (report broken questions)
   const [questionFlagged, setQuestionFlagged] = useState(false);
   const [isFlagging, setIsFlagging] = useState(false);
+
+  // Topic filter (loaded from project doc)
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
 
   // Elapsed timer for current question
   useEffect(() => {
@@ -249,7 +253,12 @@ export default function ProjectPage() {
     const fetchTemplateProgress = async () => {
       try {
         const projSnap = await getDoc(doc(firestore, "projects", projectId));
-        const templateId = projSnap.data()?.templateId as string | undefined;
+        const projData = projSnap.data();
+        // Load selected topics from project doc
+        if (projData?.selectedTopics && Array.isArray(projData.selectedTopics)) {
+          setSelectedTopics(projData.selectedTopics);
+        }
+        const templateId = projData?.templateId as string | undefined;
         if (!templateId) return;
 
         const poolSnap = await getDocs(collection(firestore, "projects", projectId, "templatePool"));
@@ -581,6 +590,18 @@ export default function ProjectPage() {
     submitPrompt("__auto_next__");
   };
 
+  const handleTopicChange = async (topics: string[]) => {
+    setSelectedTopics(topics);
+    if (!projectId) return;
+    try {
+      await updateDoc(doc(firestore, "projects", projectId), {
+        selectedTopics: topics.length > 0 ? topics : null,
+      });
+    } catch (e) {
+      console.error("Failed to save topic filter:", e);
+    }
+  };
+
   const fetchHint = async (level: number) => {
     if (!question?.id || level < 1 || level > 3) return;
     if (level > revealedHintLevel + 1) return;
@@ -884,6 +905,7 @@ export default function ProjectPage() {
                   Next <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
+              <TopicSelector selected={selectedTopics} onChange={handleTopicChange} compact />
               <form onSubmit={handlePromptSubmit} className="flex gap-1.5">
                 <Input
                   placeholder={hasSubscription ? "Ask AI for a new question..." : "Upgrade to Pro to generate questions"}
