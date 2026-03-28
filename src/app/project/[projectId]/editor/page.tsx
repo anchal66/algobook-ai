@@ -17,7 +17,7 @@ import {
   Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
   Maximize2, Minimize2, TriangleAlert, Brain, Flame, BookOpen, Dumbbell,
   RefreshCw, Target, Shield, FileText, Trophy,
-  Building2, PanelLeftClose, PanelLeft,
+  Building2, PanelLeftClose, PanelLeft, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
@@ -83,6 +83,8 @@ export default function ProjectPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [questionPanelVisible, setQuestionPanelVisible] = useState(true);
   const leftPanelRef = usePanelRef();
+  const bottomPanelRef = usePanelRef();
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
   const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions' | 'solution'>('testcase');
   const [selectedCaseIndex, setSelectedCaseIndex] = useState(0);
   const [editableInputs, setEditableInputs] = useState<Record<number, string>>({});
@@ -775,8 +777,12 @@ export default function ProjectPage() {
       setLastRunInput(inputToUse);
     }
 
-    // Switch to test-result on run
+    // Switch to test-result on run and auto-expand if collapsed
     setActiveBottomTab('test-result');
+    if (!bottomPanelOpen) {
+      bottomPanelRef.current?.expand();
+      setBottomPanelOpen(true);
+    }
 
     let allTestsPassed = true;
     let finalResult: ExecutionResult | null = null;
@@ -1194,7 +1200,7 @@ export default function ProjectPage() {
               <ResizableHandle className="h-[3px] bg-border/40 hover:bg-primary/40 transition-colors data-[resize-handle-active]:bg-primary" />
 
               {/* Bottom Panel — LeetCode-style Testcase / Test Result */}
-              <ResizablePanel defaultSize={35} minSize={15}>
+              <ResizablePanel defaultSize={35} minSize={10} collapsible collapsedSize={0} panelRef={bottomPanelRef} onResize={(size) => setBottomPanelOpen(size.asPercentage > 0)}>
                 <div className="flex flex-col h-full">
                   {/* Tab Header */}
                   <div className="flex items-center border-b border-border/50 flex-shrink-0 bg-card/30 px-1">
@@ -1253,6 +1259,21 @@ export default function ProjectPage() {
                         </span>
                       </button>
                     )}
+                    <div className="ml-auto">
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => { bottomPanelRef.current?.collapse(); setBottomPanelOpen(false); }}
+                              className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors"
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Minimize Console</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
 
                   {/* Tab Content */}
@@ -1487,6 +1508,16 @@ export default function ProjectPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {!bottomPanelOpen && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { bottomPanelRef.current?.expand(); setBottomPanelOpen(true); }}
+                    className="gap-1.5 text-xs h-8 px-3 text-muted-foreground"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" /> Console
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
