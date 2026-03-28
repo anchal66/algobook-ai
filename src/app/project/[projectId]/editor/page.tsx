@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Panel as ResizablePanel, Group as ResizablePanelGroup, Separator as ResizableHandle } from "react-resizable-panels";
+import { Panel as ResizablePanel, Group as ResizablePanelGroup, Separator as ResizableHandle, usePanelRef } from "react-resizable-panels";
 import { Editor } from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,7 +17,7 @@ import {
   Lightbulb, Info, Lock, Crown, RotateCcw, Minus, Plus, Timer, Keyboard,
   Maximize2, Minimize2, TriangleAlert, Brain, Flame, BookOpen, Dumbbell,
   RefreshCw, Target, Shield, FileText, Trophy,
-  Building2,
+  Building2, PanelLeftClose, PanelLeft,
 } from "lucide-react";
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
@@ -81,6 +81,8 @@ export default function ProjectPage() {
   const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [questionPanelVisible, setQuestionPanelVisible] = useState(true);
+  const leftPanelRef = usePanelRef();
   const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions' | 'solution'>('testcase');
   const [selectedCaseIndex, setSelectedCaseIndex] = useState(0);
   const [editableInputs, setEditableInputs] = useState<Record<number, string>>({});
@@ -364,6 +366,8 @@ export default function ProjectPage() {
     });
     editor.addCommand(monaco.KeyCode.Escape, () => {
       setIsFullscreen(false);
+      leftPanelRef.current?.expand();
+      setQuestionPanelVisible(true);
     });
 
     // Java completion provider
@@ -471,7 +475,26 @@ export default function ProjectPage() {
     }
   };
 
-  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => {
+      const next = !prev;
+      // When exiting fullscreen, always restore the question panel
+      if (!next && !questionPanelVisible) {
+        leftPanelRef.current?.expand();
+        setQuestionPanelVisible(true);
+      }
+      return next;
+    });
+  };
+
+  const toggleQuestionPanel = () => {
+    if (questionPanelVisible) {
+      leftPanelRef.current?.collapse();
+    } else {
+      leftPanelRef.current?.expand();
+    }
+    setQuestionPanelVisible(prev => !prev);
+  };
 
   // Parse test case inputs into labeled variables
   const parseTestCaseInputs = (input: string): { name: string; value: string }[] => {
@@ -832,10 +855,10 @@ export default function ProjectPage() {
     'bg-red-500/15 text-red-400 border-red-500/20';
 
   return (
-    <main className="h-full w-full overflow-hidden bg-background text-foreground">
+    <main className={`h-full w-full overflow-hidden bg-background text-foreground ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       <ResizablePanelGroup orientation="horizontal">
         {/* Left Panel — Problem */}
-        <ResizablePanel defaultSize={40} minSize={25}>
+        <ResizablePanel defaultSize={40} minSize={25} collapsible collapsedSize={0} panelRef={leftPanelRef} onResize={(size) => setQuestionPanelVisible(size.asPercentage > 0)}>
           <div className="flex flex-col h-full">
             <div className="flex-shrink-0 flex items-center gap-2.5 px-3 py-2 border-b border-border/50">
               <QuestionListSidebar questions={projectQuestions} onQuestionSelect={(id) => loadQuestion(id, projectQuestions)} difficultyClass={difficultyClass} />
@@ -936,7 +959,7 @@ export default function ProjectPage() {
 
         {/* Right Panel — Editor + Console */}
         <ResizablePanel defaultSize={60} minSize={30}>
-          <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+          <div className="flex flex-col h-full">
             <ResizablePanelGroup orientation="vertical" className="flex-grow">
               <ResizablePanel defaultSize={65} minSize={25}>
                 <div className="flex flex-col h-full">
@@ -1020,6 +1043,18 @@ export default function ProjectPage() {
                           <TooltipContent><p>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</p></TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                      {isFullscreen && (
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button onClick={toggleQuestionPanel} className="p-1.5 rounded hover:bg-[#45475a] text-[#a6adc8] transition-colors">
+                                {questionPanelVisible ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeft className="h-3.5 w-3.5" />}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>{questionPanelVisible ? 'Hide Question' : 'Show Question'}</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1413,6 +1448,18 @@ export default function ProjectPage() {
                     <TooltipContent><p>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                {isFullscreen && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button onClick={toggleQuestionPanel} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors" aria-label="Toggle Question">
+                          {questionPanelVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>{questionPanelVisible ? 'Hide Question' : 'Show Question'}</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button
