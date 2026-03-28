@@ -22,7 +22,7 @@ import {
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, updateDoc, Timestamp, where, increment } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, Timestamp, where, increment } from "firebase/firestore";
 import TopicSelector from "@/components/TopicSelector";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
@@ -103,9 +103,10 @@ export default function ProjectPage() {
   // Template progress (for template-based projects)
   const [templateProgress, setTemplateProgress] = useState<{ total: number; used: number; company: string } | null>(null);
 
-  // Question flagging (report broken questions)
-  const [questionFlagged, setQuestionFlagged] = useState(false);
-  const [isFlagging, setIsFlagging] = useState(false);
+  // Report issue modal
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportDisclaimer, setReportDisclaimer] = useState<string | null>(null);
+  const [isReporting, setIsReporting] = useState(false);
 
   // Topic filter (loaded from project doc)
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -146,23 +147,49 @@ export default function ProjectPage() {
     setSolutionExplanation(null);
     setIsSolutionLoading(false);
     setHasSolvedCurrent(false);
-    setQuestionFlagged(false);
+    setReportModalOpen(false);
+    setReportDisclaimer(null);
   }, [question?.id]);
 
-  const handleFlagQuestion = async (reason: string) => {
-    if (!question?.id || !user || questionFlagged) return;
-    setIsFlagging(true);
+  const handleReportSubmit = async (reason: string, details?: string) => {
+    if (!question?.id || !user || !projectId) return;
+    setIsReporting(true);
     try {
       const res = await fetch("/api/question/flag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id, userId: user.uid, reason }),
+        body: JSON.stringify({ questionId: question.id, userId: user.uid, projectId, reason, details }),
       });
-      if (res.ok) setQuestionFlagged(true);
+      if (res.ok) {
+        // Remove the question from local state
+        const removedId = question.id;
+        const updated = projectQuestions.filter((pq) => pq.id !== removedId);
+        setProjectQuestions(updated);
+        setQuestion(null);
+        setCode("");
+        setExecutionResult(null);
+        setExecutionError(null);
+        setReportModalOpen(false);
+
+        // Adjust index
+        if (updated.length > 0) {
+          const newIndex = Math.min(currentQuestionIndex, updated.length - 1);
+          setCurrentQuestionIndex(newIndex);
+          loadQuestion(updated[newIndex].id, updated);
+        } else {
+          setCurrentQuestionIndex(0);
+        }
+
+        // Show disclaimer
+        setReportDisclaimer(
+          "Thanks for reporting! The question has been removed. AI can occasionally generate imperfect questions — your feedback helps us improve."
+        );
+        setTimeout(() => setReportDisclaimer(null), 8000);
+      }
     } catch (err) {
-      console.error("Error flagging question:", err);
+      console.error("Error reporting question:", err);
     } finally {
-      setIsFlagging(false);
+      setIsReporting(false);
     }
   };
 
@@ -884,7 +911,7 @@ export default function ProjectPage() {
                       <ReasonBadge reason={recommendationReason} />
                     )}
                   </div>
-                  <QuestionDisplay question={question} difficultyClass={difficultyClass} onReport={handleFlagQuestion} flagged={questionFlagged} isFlagging={isFlagging} />
+                  <QuestionDisplay question={question} difficultyClass={difficultyClass} onReport={() => setReportModalOpen(true)} />
                   <HintsPanel
                     hints={hints}
                     labels={hintLabels}
@@ -1324,9 +1351,7 @@ export default function ProjectPage() {
                             result={executionResult}
                             inputUsed={lastRunInput}
                             expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
-                            onReport={handleFlagQuestion}
-                            flagged={questionFlagged}
-                            isFlagging={isFlagging}
+                            onReport={() => setReportModalOpen(true)}
                           />}
                         {!isExecuting && !executionResult && !executionError &&
                           <p className="text-sm text-muted-foreground">Click <strong>Run</strong> to test your code, or <strong>Submit</strong> to check all test cases.</p>
@@ -1488,6 +1513,31 @@ export default function ProjectPage() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {/* Report Issue Modal */}
+      {reportModalOpen && question && (
+        <ReportIssueModal
+          questionTitle={question.title}
+          isSubmitting={isReporting}
+          onSubmit={handleReportSubmit}
+          onClose={() => setReportModalOpen(false)}
+        />
+      )}
+
+      {/* Disclaimer toast after report */}
+      {reportDisclaimer && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-card border border-border shadow-xl">
+            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-foreground">{reportDisclaimer}</p>
+            </div>
+            <button onClick={() => setReportDisclaimer(null)} className="text-muted-foreground hover:text-foreground shrink-0">
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -1618,22 +1668,17 @@ const QuestionListSidebar = ({ questions, onQuestionSelect, difficultyClass }: {
   </Sheet>
 );
 
-const QuestionDisplay = ({ question, difficultyClass, onReport, flagged, isFlagging }: { question: Question, difficultyClass: (d: string) => string, onReport?: (reason: string) => void, flagged?: boolean, isFlagging?: boolean }) => (
+const QuestionDisplay = ({ question, difficultyClass, onReport }: { question: Question, difficultyClass: (d: string) => string, onReport?: () => void }) => (
   <article className="prose prose-invert max-w-none prose-headings:tracking-tight prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50">
     <div className="flex items-start justify-between gap-2 not-prose">
       <h1 className="text-2xl font-bold m-0">{question.title}</h1>
       {onReport && (
         <button
-          onClick={() => onReport("broken-question")}
-          disabled={flagged || isFlagging}
-          className={`shrink-0 mt-1 text-[10px] px-2 py-1 rounded-md border transition-colors ${
-            flagged
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-400 cursor-default"
-              : "border-border/50 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 text-muted-foreground"
-          }`}
-          title="Report this question if it has issues (broken driver code, wrong test cases, etc.)"
+          onClick={onReport}
+          className="shrink-0 mt-1 text-[10px] px-2 py-1 rounded-md border border-border/50 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-colors"
+          title="Report this question if it has issues"
         >
-          {flagged ? "Reported" : isFlagging ? "..." : "Report Issue"}
+          <TriangleAlert className="h-3 w-3 inline mr-1" />Report Issue
         </button>
       )}
     </div>
@@ -1746,7 +1791,7 @@ const WelcomeMessage = () => (
   </div>
 );
 
-const OutputDisplay = ({ result, inputUsed, expectedOutput, onReport, flagged, isFlagging }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string, onReport?: (reason: string) => void, flagged?: boolean, isFlagging?: boolean }) => {
+const OutputDisplay = ({ result, inputUsed, expectedOutput, onReport }: { result: ExecutionResult, inputUsed: string | null, expectedOutput?: string, onReport?: () => void }) => {
   const isAccepted = result.status.id === 3;
   const output = result.stdout?.trim();
   const isCorrect = isAccepted && output === expectedOutput?.trim();
@@ -1764,17 +1809,13 @@ const OutputDisplay = ({ result, inputUsed, expectedOutput, onReport, flagged, i
       <div className="text-red-400">
         <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm"><AlertTriangle className="h-4 w-4" /> Runtime Error</h3>
         <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{result.stderr}</pre>
-        {onReport && !flagged && (
+        {onReport && (
           <button
-            onClick={() => onReport("runtime-error")}
-            disabled={isFlagging}
+            onClick={onReport}
             className="mt-3 text-[11px] px-3 py-1.5 rounded-md border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-300 transition-colors"
           >
-            {isFlagging ? "Reporting..." : "Not my bug? Report broken question"}
+            Not my bug? Report broken question
           </button>
-        )}
-        {flagged && (
-          <p className="mt-3 text-[11px] text-amber-400">Reported — this question won&apos;t be reused. Generate a new one.</p>
         )}
       </div>
     );
@@ -1817,4 +1858,133 @@ const OutputDisplay = ({ result, inputUsed, expectedOutput, onReport, flagged, i
     );
   }
   return <div className="text-amber-400"><h3 className="font-semibold text-sm">{result.status.description}</h3><p className="text-xs text-muted-foreground mt-1">Execution did not complete successfully.</p></div>;
+};
+
+// ─── REPORT ISSUE MODAL ───
+
+const REPORT_REASONS = [
+  {
+    id: "not-relevant",
+    label: "Not related to my topic",
+    description: "This question doesn't match the topics I'm practicing",
+  },
+  {
+    id: "incomplete-or-broken",
+    label: "Incomplete or broken question",
+    description: "The question statement, examples, or constraints are missing or incorrect",
+  },
+  {
+    id: "runtime-error",
+    label: "Runtime error despite correct code",
+    description: "The driver code or test cases cause errors even when my solution is correct",
+  },
+  {
+    id: "wrong-test-cases",
+    label: "Wrong test cases",
+    description: "The expected outputs don't match the problem statement",
+  },
+  {
+    id: "other",
+    label: "Other issue",
+    description: "Something else is wrong with this question",
+  },
+] as const;
+
+const ReportIssueModal = ({
+  questionTitle,
+  isSubmitting,
+  onSubmit,
+  onClose,
+}: {
+  questionTitle: string;
+  isSubmitting: boolean;
+  onSubmit: (reason: string, details?: string) => void;
+  onClose: () => void;
+}) => {
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [details, setDetails] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <TriangleAlert className="h-4.5 w-4.5 text-amber-400" />
+            <h2 className="text-base font-semibold">Report Issue</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors">
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <p className="text-sm text-muted-foreground">
+            What&apos;s wrong with <span className="font-medium text-foreground">&ldquo;{questionTitle}&rdquo;</span>?
+          </p>
+
+          <div className="space-y-2">
+            {REPORT_REASONS.map((reason) => (
+              <label
+                key={reason.id}
+                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  selectedReason === reason.id
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-border/50 hover:border-border hover:bg-accent/30"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="report-reason"
+                  value={reason.id}
+                  checked={selectedReason === reason.id}
+                  onChange={() => setSelectedReason(reason.id)}
+                  className="mt-0.5 accent-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium">{reason.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{reason.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {selectedReason === "other" && (
+            <textarea
+              placeholder="Describe the issue..."
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              rows={3}
+              className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground"
+            />
+          )}
+
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/15">
+            <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-300/80">
+              Reporting will remove this question from your project. AI-generated content may occasionally have imperfections — your feedback helps us improve.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 bg-card/80">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={!selectedReason || isSubmitting}
+            onClick={() => selectedReason && onSubmit(selectedReason, details || undefined)}
+            className="gap-1.5"
+          >
+            {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TriangleAlert className="h-3.5 w-3.5" />}
+            {isSubmitting ? "Reporting..." : "Report & Remove"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 };
