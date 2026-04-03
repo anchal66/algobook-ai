@@ -40,6 +40,13 @@ interface ExecutionResult {
   memory: number;
 }
 
+interface TestCaseResult {
+  input: string;
+  expectedOutput: string;
+  result: ExecutionResult;
+  isCustom?: boolean;
+}
+
 export default function ProjectPage() {
   const { user } = useAuth();
   const { active: hasSubscription, loading: subLoading, redirectToCheckout } = useSubscription();
@@ -51,13 +58,12 @@ export default function ProjectPage() {
   const [code, setCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
+  const [executionResults, setExecutionResults] = useState<TestCaseResult[]>([]);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [projectQuestions, setProjectQuestions] = useState<ProjectQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   const [submissionHistory, setSubmissionHistory] = useState<Submission[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [lastRunInput, setLastRunInput] = useState<string | null>(null);
 
   // Hints state
   const [hints, setHints] = useState<string[]>([]);
@@ -88,6 +94,8 @@ export default function ProjectPage() {
   const [activeBottomTab, setActiveBottomTab] = useState<'testcase' | 'test-result' | 'submissions' | 'solution'>('testcase');
   const [selectedCaseIndex, setSelectedCaseIndex] = useState(0);
   const [editableInputs, setEditableInputs] = useState<Record<number, string>>({});
+  const [customTestCase, setCustomTestCase] = useState<string | null>(null);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
 
   // Session tracking (client-side fatigue detection)
   const sessionRef = useRef<SessionState>(createSession());
@@ -169,7 +177,7 @@ export default function ProjectPage() {
         setProjectQuestions(updated);
         setQuestion(null);
         setCode("");
-        setExecutionResult(null);
+        setExecutionResults([]);
         setExecutionError(null);
         setReportModalOpen(false);
 
@@ -227,7 +235,7 @@ export default function ProjectPage() {
   const loadQuestion = useCallback(async (questionId: string, questionsList: ProjectQuestion[]) => {
     setIsLoading(true);
     setQuestion(null);
-    setExecutionResult(null);
+    setExecutionResults([]);
     setExecutionError(null);
     setEditableInputs({});
     setSelectedCaseIndex(0);
@@ -534,16 +542,6 @@ export default function ProjectPage() {
     }));
   };
 
-  // Get the input for running — either edited or original test case
-  const getRunInput = (): string => {
-    if (editableInputs[selectedCaseIndex] !== undefined) {
-      return editableInputs[selectedCaseIndex];
-    }
-    const cases = question?.testCases.filter(tc => tc.isSample) || [];
-    const tc = cases[selectedCaseIndex] || question?.testCases[selectedCaseIndex];
-    return tc?.input || '';
-  };
-
   const handleNextQuestion = () => {
     if (isLoading) return;
     if (projectQuestions.length === 0) return;
@@ -576,7 +574,7 @@ export default function ProjectPage() {
     if (!promptToSubmit.trim() || !user) return;
     setIsLoading(true);
     setQuestion(null);
-    setExecutionResult(null);
+    setExecutionResults([]);
     setExecutionError(null);
     setRecommendationReason(null);
     setHints([]);
@@ -748,11 +746,12 @@ export default function ProjectPage() {
     }
 
     setIsExecuting(true);
-    setExecutionResult(null);
+    setExecutionResults([]);
     setExecutionError(null);
-    setLastRunInput(null);
+    setSelectedResultIndex(0);
 
-    let testCasesToRun: TestCase[] = [];
+    // Build the list of cases to run
+    let testCasesToRun: (TestCase & { isCustom?: boolean })[] = [];
 
     if (isSubmission) {
       if (question.testCases.length === 0) {
@@ -760,18 +759,25 @@ export default function ProjectPage() {
         setIsExecuting(false);
         return;
       }
-      testCasesToRun = question.testCases;
-    } else {
-      // Count Run clicks (non-submission) for struggle tracking
-      runCountRef.current += 1;
-      const inputToUse = getRunInput();
-      testCasesToRun = [{ input: inputToUse, expectedOutput: "N/A (Custom Input)", isSample: true }];
-      // Try matching to expected output if it's a known test case
-      const matchedCase = question.testCases.find(tc => tc.input === inputToUse);
-      if (matchedCase) {
-        testCasesToRun = [matchedCase];
+      testCasesToRun = [...question.testCases];
+      // Include custom test case in submission too
+      if (customTestCase !== null && customTestCase.trim()) {
+        testCasesToRun.push({ input: customTestCase, expectedOutput: "N/A (Custom Input)", isSample: false, isCustom: true });
       }
-      setLastRunInput(inputToUse);
+    } else {
+      // Run: execute ALL sample cases + custom case
+      runCountRef.current += 1;
+      const sampleCases = question.testCases.filter(tc => tc.isSample);
+      const cases = sampleCases.length > 0 ? sampleCases : question.testCases.slice(0, 3);
+      // Apply any edits the user made
+      testCasesToRun = cases.map((tc, i) => ({
+        ...tc,
+        input: editableInputs[i] !== undefined ? editableInputs[i] : tc.input,
+      }));
+      // Add custom test case if exists
+      if (customTestCase !== null && customTestCase.trim()) {
+        testCasesToRun.push({ input: customTestCase, expectedOutput: "N/A (Custom Input)", isSample: false, isCustom: true });
+      }
     }
 
     // Switch to test-result on run and auto-expand if collapsed
@@ -782,7 +788,7 @@ export default function ProjectPage() {
     }
 
     let allTestsPassed = true;
-    let finalResult: ExecutionResult | null = null;
+    const results: TestCaseResult[] = [];
 
     for (const testCase of testCasesToRun) {
       try {
@@ -806,11 +812,14 @@ export default function ProjectPage() {
           throw new Error(errorData.error || "API request failed");
         }
         const result: ExecutionResult = await response.json();
-        finalResult = result;
-        setLastRunInput(testCase.input);
+        results.push({
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          result,
+          isCustom: testCase.isCustom,
+        });
         if (result.status.id !== 3 || (testCase.expectedOutput !== "N/A (Custom Input)" && result.stdout?.trim() !== testCase.expectedOutput.trim())) {
           allTestsPassed = false;
-          if (isSubmission) break;
         }
       } catch (error: any) {
         console.error("Failed to execute code:", error);
@@ -820,7 +829,12 @@ export default function ProjectPage() {
       }
     }
 
-    setExecutionResult(finalResult);
+    setExecutionResults(results);
+    // Auto-select the first failing case, or first case
+    const firstFailIdx = results.findIndex(r =>
+      r.result.status.id !== 3 || (r.expectedOutput !== "N/A (Custom Input)" && r.result.stdout?.trim() !== r.expectedOutput.trim())
+    );
+    setSelectedResultIndex(firstFailIdx >= 0 ? firstFailIdx : 0);
 
     if (isSubmission && user) {
       const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
@@ -1223,8 +1237,9 @@ export default function ProjectPage() {
                       }`}
                     >
                       <span className="flex items-center gap-1.5">
-                        {executionResult ? (
-                          executionResult.status.id === 3 ? <Play className="h-3 w-3 text-emerald-500" /> : <TriangleAlert className="h-3 w-3 text-red-400" />
+                        {executionResults.length > 0 ? (
+                          executionResults.every(r => r.result.status.id === 3 && (r.expectedOutput === "N/A (Custom Input)" || r.result.stdout?.trim() === r.expectedOutput.trim()))
+                            ? <Play className="h-3 w-3 text-emerald-500" /> : <TriangleAlert className="h-3 w-3 text-red-400" />
                         ) : (
                           <Play className="h-3 w-3" />
                         )}
@@ -1280,69 +1295,100 @@ export default function ProjectPage() {
                       <div className="p-4">
                         {question && question.testCases.length > 0 ? (
                           <>
-                            {/* Case tabs */}
+                            {/* Case tabs + custom add button */}
                             <div className="flex items-center gap-1.5 mb-4">
-                              {question.testCases.filter(tc => tc.isSample).length > 0
-                                ? question.testCases.filter(tc => tc.isSample).map((_, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => setSelectedCaseIndex(i)}
-                                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                                        selectedCaseIndex === i
-                                          ? 'bg-[#313244] text-foreground'
-                                          : 'text-muted-foreground hover:bg-[#313244]/50'
-                                      }`}
-                                    >
-                                      Case {i + 1}
-                                    </button>
-                                  ))
-                                : question.testCases.slice(0, 3).map((_, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => setSelectedCaseIndex(i)}
-                                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                                        selectedCaseIndex === i
-                                          ? 'bg-[#313244] text-foreground'
-                                          : 'text-muted-foreground hover:bg-[#313244]/50'
-                                      }`}
-                                    >
-                                      Case {i + 1}
-                                    </button>
-                                  ))
-                              }
+                              {(() => {
+                                const sampleCases = question.testCases.filter(tc => tc.isSample);
+                                const cases = sampleCases.length > 0 ? sampleCases : question.testCases.slice(0, 3);
+                                return cases.map((_, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setSelectedCaseIndex(i)}
+                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                      selectedCaseIndex === i && selectedCaseIndex !== -1
+                                        ? 'bg-[#313244] text-foreground'
+                                        : 'text-muted-foreground hover:bg-[#313244]/50'
+                                    }`}
+                                  >
+                                    Case {i + 1}
+                                  </button>
+                                ));
+                              })()}
+                              {customTestCase !== null && (
+                                <button
+                                  onClick={() => setSelectedCaseIndex(-1)}
+                                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                    selectedCaseIndex === -1
+                                      ? 'bg-[#313244] text-foreground'
+                                      : 'text-muted-foreground hover:bg-[#313244]/50'
+                                  }`}
+                                >
+                                  Custom
+                                </button>
+                              )}
+                              {customTestCase === null && (
+                                <button
+                                  onClick={() => { setCustomTestCase(''); setSelectedCaseIndex(-1); }}
+                                  className="px-2 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:bg-[#313244]/50 transition-colors"
+                                  title="Add custom test case"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
 
                             {/* Input fields for selected case */}
-                            {(() => {
-                              const sampleCases = question.testCases.filter(tc => tc.isSample);
-                              const cases = sampleCases.length > 0 ? sampleCases : question.testCases.slice(0, 3);
-                              const tc = cases[selectedCaseIndex];
-                              if (!tc) return null;
-                              const parsed = parseTestCaseInputs(tc.input);
-                              return (
-                                <div className="space-y-3">
-                                  {parsed.map((p, i) => (
-                                    <div key={i}>
-                                      <label className="text-xs text-muted-foreground font-medium mb-1.5 block">
-                                        {p.name} =
-                                      </label>
-                                      <div
-                                        className="bg-[#313244] rounded-lg px-3 py-2.5 font-mono text-sm text-[#cdd6f4] cursor-text border border-transparent focus-within:border-[#45475a] transition-colors"
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        onInput={(e) => {
-                                          const newVal = (e.target as HTMLDivElement).innerText;
-                                          const lines = (editableInputs[selectedCaseIndex] || tc.input).split('\\n');
-                                          lines[i] = newVal;
-                                          setEditableInputs(prev => ({ ...prev, [selectedCaseIndex]: lines.join('\\n') }));
-                                        }}
-                                        dangerouslySetInnerHTML={{ __html: p.value }}
-                                      />
-                                    </div>
-                                  ))}
+                            {selectedCaseIndex === -1 && customTestCase !== null ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs text-muted-foreground font-medium">Custom Input</label>
+                                  <button
+                                    onClick={() => { setCustomTestCase(null); setSelectedCaseIndex(0); }}
+                                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    Remove
+                                  </button>
                                 </div>
-                              );
-                            })()}
+                                <textarea
+                                  value={customTestCase}
+                                  onChange={(e) => setCustomTestCase(e.target.value)}
+                                  placeholder="Enter input (one value per line)..."
+                                  rows={4}
+                                  className="w-full bg-[#313244] rounded-lg px-3 py-2.5 font-mono text-sm text-[#cdd6f4] border border-transparent focus:border-[#45475a] transition-colors resize-none focus:outline-none"
+                                />
+                              </div>
+                            ) : (
+                              (() => {
+                                const sampleCases = question.testCases.filter(tc => tc.isSample);
+                                const cases = sampleCases.length > 0 ? sampleCases : question.testCases.slice(0, 3);
+                                const tc = cases[selectedCaseIndex];
+                                if (!tc) return null;
+                                const parsed = parseTestCaseInputs(tc.input);
+                                return (
+                                  <div className="space-y-3">
+                                    {parsed.map((p, i) => (
+                                      <div key={i}>
+                                        <label className="text-xs text-muted-foreground font-medium mb-1.5 block">
+                                          {p.name} =
+                                        </label>
+                                        <div
+                                          className="bg-[#313244] rounded-lg px-3 py-2.5 font-mono text-sm text-[#cdd6f4] cursor-text border border-transparent focus-within:border-[#45475a] transition-colors"
+                                          contentEditable
+                                          suppressContentEditableWarning
+                                          onInput={(e) => {
+                                            const newVal = (e.target as HTMLDivElement).innerText;
+                                            const lines = (editableInputs[selectedCaseIndex] || tc.input).split('\\n');
+                                            lines[i] = newVal;
+                                            setEditableInputs(prev => ({ ...prev, [selectedCaseIndex]: lines.join('\\n') }));
+                                          }}
+                                          dangerouslySetInnerHTML={{ __html: p.value }}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()
+                            )}
                           </>
                         ) : (
                           <p className="text-sm text-muted-foreground">No test cases available. Generate a question first.</p>
@@ -1364,14 +1410,44 @@ export default function ProjectPage() {
                             <pre className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg text-xs whitespace-pre-wrap">{executionError}</pre>
                           </div>
                         )}
-                        {executionResult && !executionError &&
-                          <OutputDisplay
-                            result={executionResult}
-                            inputUsed={lastRunInput}
-                            expectedOutput={question?.testCases.find(tc => tc.input === lastRunInput)?.expectedOutput}
-                            onReport={() => setReportModalOpen(true)}
-                          />}
-                        {!isExecuting && !executionResult && !executionError &&
+                        {executionResults.length > 0 && !executionError && (
+                          <>
+                            {/* Per-case result tabs */}
+                            <div className="flex items-center gap-1.5 mb-4">
+                              {executionResults.map((tcr, i) => {
+                                const passed = tcr.result.status.id === 3 &&
+                                  (tcr.expectedOutput === "N/A (Custom Input)" || tcr.result.stdout?.trim() === tcr.expectedOutput.trim());
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => setSelectedResultIndex(i)}
+                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                      selectedResultIndex === i
+                                        ? 'bg-[#313244] text-foreground'
+                                        : 'text-muted-foreground hover:bg-[#313244]/50'
+                                    }`}
+                                  >
+                                    {passed
+                                      ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                      : <XCircle className="h-3 w-3 text-red-400" />
+                                    }
+                                    {tcr.isCustom ? 'Custom' : `Case ${i + 1}`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {/* Selected case result */}
+                            {executionResults[selectedResultIndex] && (
+                              <OutputDisplay
+                                result={executionResults[selectedResultIndex].result}
+                                inputUsed={executionResults[selectedResultIndex].input}
+                                expectedOutput={executionResults[selectedResultIndex].expectedOutput}
+                                onReport={() => setReportModalOpen(true)}
+                              />
+                            )}
+                          </>
+                        )}
+                        {!isExecuting && executionResults.length === 0 && !executionError &&
                           <p className="text-sm text-muted-foreground">Click <strong>Run</strong> to test your code, or <strong>Submit</strong> to check all test cases.</p>
                         }
                       </div>
