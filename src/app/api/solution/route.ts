@@ -62,13 +62,22 @@ RULES:
 - Alternative approaches should be genuinely different algorithms, not minor variations
 - Keep each field concise but informative`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_tokens: 800,
-      temperature: 0.3,
-    });
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-5.4-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_tokens: 800,
+        temperature: 0.3,
+      });
+    } catch (aiError: any) {
+      console.error("OpenAI API error:", aiError?.message || aiError);
+      return NextResponse.json(
+        { error: "AI service temporarily unavailable. Please try again." },
+        { status: 502 },
+      );
+    }
 
     const content = completion.choices[0].message.content;
     if (!content) {
@@ -86,8 +95,8 @@ RULES:
       improvements: Array.isArray(explanation.improvements) ? explanation.improvements : [],
       alternativeApproaches: Array.isArray(explanation.alternativeApproaches) ? explanation.alternativeApproaches : [],
     });
-  } catch (error) {
-    console.error("Solution API error:", error);
+  } catch (error: any) {
+    console.error("Solution API error:", error?.message || error);
     return NextResponse.json({ error: "Failed to generate solution analysis" }, { status: 500 });
   }
 }

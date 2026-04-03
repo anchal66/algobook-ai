@@ -534,17 +534,14 @@ export default function ProjectPage() {
     }));
   };
 
-  // Get the input for running — either edited or original
+  // Get the input for running — either edited or original test case
   const getRunInput = (): string => {
-    if (activeBottomTab === 'testcase') {
-      if (editableInputs[selectedCaseIndex] !== undefined) {
-        return editableInputs[selectedCaseIndex];
-      }
-      const cases = question?.testCases.filter(tc => tc.isSample) || [];
-      const tc = cases[selectedCaseIndex] || question?.testCases[selectedCaseIndex];
-      return tc?.input || '';
+    if (editableInputs[selectedCaseIndex] !== undefined) {
+      return editableInputs[selectedCaseIndex];
     }
-    return '';
+    const cases = question?.testCases.filter(tc => tc.isSample) || [];
+    const tc = cases[selectedCaseIndex] || question?.testCases[selectedCaseIndex];
+    return tc?.input || '';
   };
 
   const handleNextQuestion = () => {
