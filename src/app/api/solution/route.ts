@@ -45,7 +45,7 @@ STUDENT'S CODE:
 ${userCode}
 \`\`\`
 
-Analyze the student's solution and respond with a JSON object:
+Analyze the student's solution and respond with a JSON object (no markdown, no code fences, just raw JSON):
 {
   "analysis": "2-3 sentence description of what the student's code does and their approach",
   "timeComplexity": "O(?) with brief explanation",
@@ -67,8 +67,7 @@ RULES:
       completion = await openai.chat.completions.create({
         model: "gpt-5.4-mini",
         messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 800,
+        max_tokens: 1200,
         temperature: 0.3,
       });
     } catch (aiError: any) {
@@ -79,12 +78,14 @@ RULES:
       );
     }
 
-    const content = completion.choices[0].message.content;
+    const content = completion.choices[0].message.content?.trim();
     if (!content) {
       throw new Error("AI failed to generate solution analysis.");
     }
 
-    const explanation = JSON.parse(content);
+    // Extract JSON from response (handle potential markdown fences)
+    const jsonStr = content.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const explanation = JSON.parse(jsonStr);
 
     // Ensure all required fields exist
     return NextResponse.json({
