@@ -5,7 +5,7 @@
  */
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, nextProblemStream } from "@/lib/workspace/api";
+import { ApiError, getProject, nextProblemStream } from "@/lib/workspace/api";
 import { track } from "@/lib/analytics";
 import { useWorkspace } from "@/store/workspace";
 import { useSettings } from "@/store/settings";
@@ -68,6 +68,29 @@ export function useNextProblem(): NextProblemApi {
       if (!controller?.signal.aborted && useWorkspace.getState().projectId === pid) router.replace(`/project/${pid}/solve/${result.problem.id}`);
     } catch (e) {
       if ((e as Error)?.name === "AbortError") { useWorkspace.getState().setGeneration({ active: false }); return; }
+      if (e instanceof ApiError && e.code === "CONFLICT") {
+        // Another request (a second tab, a remount) already holds this project's generation lease: wait for its
+        // problem to be linked instead of failing, then open it.
+        const known = new Set(useWorkspace.getState().items.map((i) => i.problemId));
+        useWorkspace.getState().pushStage({ stage: "verifying", at: Date.now(), info: { waiting: true } });
+        const deadline = Date.now() + 5 * 60_000;
+        while (Date.now() < deadline && !controller?.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            const res = await getProject(pid);
+            const fresh = res.items.find((i) => !known.has(i.problemId));
+            if (fresh) {
+              invalidateProjectCache();
+              useWorkspace.getState().setContext({ items: res.items });
+              useWorkspace.getState().setGeneration({ active: false });
+              if (!controller?.signal.aborted) router.replace(`/project/${pid}/solve/${fresh.problemId}`);
+              return;
+            }
+          } catch { /* keep waiting */ }
+        }
+        useWorkspace.getState().setGeneration({ active: false, error: controller?.signal.aborted ? null : "The problem is taking longer than expected. Open the problem list — it appears there as soon as it is ready." });
+        return;
+      }
       const msg = e instanceof ApiError
         ? e.code === "QUOTA_EXCEEDED" ? "You have used today's AI generations. Pick a problem from the list or come back tomorrow."
           : e.code === "PAYMENT_REQUIRED" ? "AI generation needs a Pro plan."
