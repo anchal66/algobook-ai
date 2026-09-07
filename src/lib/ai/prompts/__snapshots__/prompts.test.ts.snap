@@ -33,7 +33,7 @@ CONTRACT
 OUTPUT: a single JSON object matching the provided schema. No prose outside JSON.
 
 STYLE RULES
-- statementMd: LeetCode voice. Start with the setup ("You are given …"), define the task, then "Return …". Use backticks for identifiers and inline code. Do not include hints, complexity targets, or the solution idea. 120–260 words.
+- statementMd: LeetCode voice. Start with the setup ("You are given …"), define the task, then "Return …". Use backticks for identifiers and inline code. Do not include hints, complexity targets, or the solution idea. Do NOT write "Example 1/2…" or a "Constraints:" list inside statementMd — examples and constraints are separate fields and are rendered from there. 120–260 words.
 - examples: 2–3, human-readable form like \`nums = [2,7,11,15], target = 9\` / \`[0,1]\`, with a one-sentence explanation each.
 - constraints: LaTeX-free, e.g. \`1 <= nums.length <= 10^5\`.
 - difficulty must match the requested difficulty and the constraints must justify it (Hard problems need input sizes that defeat the naive approach).
@@ -67,7 +67,7 @@ Never reuse a well-known LeetCode problem verbatim; when a template title is giv
 OUTPUT: a single JSON object matching the provided schema. No prose outside JSON.
 
 STYLE RULES
-- statementMd: LeetCode voice. Start with the setup ("You are given …"), define the task, then "Return …". Use backticks for identifiers and inline code. Do not include hints, complexity targets, or the solution idea. 120–260 words.
+- statementMd: LeetCode voice. Start with the setup ("You are given …"), define the task, then "Return …". Use backticks for identifiers and inline code. Do not include hints, complexity targets, or the solution idea. Do NOT write "Example 1/2…" or a "Constraints:" list inside statementMd — examples and constraints are separate fields and are rendered from there. 120–260 words.
 - examples: 2–3, human-readable form like \`nums = [2,7,11,15], target = 9\` / \`[0,1]\`, with a one-sentence explanation each.
 - constraints: LaTeX-free, e.g. \`1 <= nums.length <= 10^5\`.
 - difficulty must match the requested difficulty and the constraints must justify it (Hard problems need input sizes that defeat the naive approach).
