@@ -3,8 +3,9 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { OfflineToast } from "@/components/shell/OfflineToast";
+import { Maintenance } from "@/app/maintenance";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap", axes: ["opsz"] });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -39,7 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <GoogleAnalytics />
         </Suspense>
         <Providers>
-          <SubscriptionProvider>{children}</SubscriptionProvider>
+          <OfflineToast />
+          {process.env.MAINTENANCE === "1" ? <Maintenance /> : children}
         </Providers>
       </body>
     </html>

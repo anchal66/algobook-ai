@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { fmtClock, fmtDate, fmtDuration } from "@/lib/app/format";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/lib/app/useNow";
 
 const VERDICT: Record<string, { label: string; variant: "ok" | "brand" | "warn" | "err" }> = {
   "strong-hire": { label: "Strong hire", variant: "ok" }, hire: { label: "Hire", variant: "brand" }, "lean-hire": { label: "Lean hire", variant: "warn" }, "no-hire": { label: "No hire", variant: "err" },
@@ -31,11 +32,12 @@ export default function InterviewPage() {
   const [duration, setDuration] = useState<30 | 45 | 60>(45);
   const [difficulty, setDifficulty] = useState<"mixed" | "medium" | "hard">("mixed");
   const [busy, setBusy] = useState(false);
+  const now = useNow();
   const allowed = me ? me.quotas.limits.interview !== 0 : true;
   const left = me ? (me.quotas.limits.interview < 0 ? Infinity : Math.max(0, me.quotas.limits.interview - (me.quotas.used.interview ?? 0))) : 0;
 
   const interviews = useMemo(() => list.data?.interviews ?? [], [list.data]);
-  const active = interviews.find((i) => i.status === "active" && new Date(i.endsAt).getTime() > Date.now());
+  const active = interviews.find((i) => i.status === "active" && new Date(i.endsAt).getTime() > now);
 
   const start = async () => {
     setBusy(true);
@@ -127,15 +129,16 @@ function ActiveBanner({ interview, onFinish, busy }: { interview: InterviewDTO; 
 
 function HistoryRow({ i, onFinish, busy }: { i: InterviewDTO; onFinish: () => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
+  const now = useNow();
   const fb = i.feedback;
   const v = fb ? VERDICT[fb.verdict] : null;
-  const expiredUnfinished = i.status === "active" && new Date(i.endsAt).getTime() <= Date.now();
+  const expiredUnfinished = i.status === "active" && new Date(i.endsAt).getTime() <= now;
   return (
     <li className="py-3">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 text-left" aria-expanded={open}>
         <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-[10px] text-md font-semibold tabular", fb ? "bg-brand-soft text-brand" : "bg-surface-2 text-text-3")}>{fb ? fb.score.toFixed(1) : "—"}</div>
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-text-1">{fmtDate(i.startedAt)} · {i.durationMin} min · <span className="capitalize">{i.difficulty}</span>{v && <Badge variant={v.variant} size="sm">{v.label}</Badge>}{expiredUnfinished && <Badge variant="warn" size="sm">Time's up — finish for debrief</Badge>}</p>
+          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-text-1">{fmtDate(i.startedAt)} · {i.durationMin} min · <span className="capitalize">{i.difficulty}</span>{v && <Badge variant={v.variant} size="sm">{v.label}</Badge>}{expiredUnfinished && <Badge variant="warn" size="sm">Time&rsquo;s up — finish for debrief</Badge>}</p>
           <p className="truncate text-xs text-text-3">{i.problems.map((p) => p.title).join(" · ")}</p>
         </div>
         <ChevronDown className={cn("size-4 text-text-3 transition-transform", open && "rotate-180")} />

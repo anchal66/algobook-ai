@@ -149,7 +149,7 @@ export interface TemplateDTO { id: string; company: string; title: string; descr
 export const listTemplates = () => apiFetch<{ templates: TemplateDTO[] }>("/api/templates");
 export const getSubscriptionStatus = () => apiFetch<{ active: boolean; tier: "free" | "pro"; status: string; plan: { name: string; slug: string } | null; endDate: string | null }>("/api/subscription/status");
 export const startCheckout = (planSlug: "pro-monthly" | "pro-yearly") => apiFetch<{ checkoutUrl: string }>("/api/subscription/checkout", { method: "POST", body: { planSlug } });
-export const listInvoices = () => apiFetch<{ invoices: { id: string; planSlug: string; amountInPaise: number; currency: string; status: string; createdAt: string; startDate: string | null; endDate: string | null }[] }>("/api/subscription/invoices");
+export const listInvoices = () => apiFetch<{ invoices: { id: string; planSlug: string; planName: string; amountInPaise: number; currency: string; status: string; createdAt: string; startDate: string; endDate: string; gatewayTransactionId: string }[] }>("/api/subscription/invoices");
 
 // ── Admin ───────────────────────────────────────────────────────────────────
 export interface UsageBucket { calls: number; failed: number; costUsd: number; inputTokens: number; cachedTokens: number; outputTokens: number; reasoningTokens: number; latencyMs: number; avgLatencyMs: number }

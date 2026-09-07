@@ -21,9 +21,11 @@ export default function ProjectsPage() {
   const projects = useQuery(user ? "/api/projects" : null, listProjects);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"active" | "done" | "all">("active");
+  const dailyId = me?.user.dailyProjectId ?? null;
+  const list = projects.data?.projects;
 
   const rows = useMemo(() => {
-    const all = (projects.data?.projects ?? []).filter((p) => !isSystemProject(p) && p.id !== me?.user.dailyProjectId);
+    const all = (list ?? []).filter((p) => !isSystemProject(p) && p.id !== dailyId);
     const s = q.trim().toLowerCase();
     return all.filter((p) => {
       const done = p.progress.items > 0 && p.progress.solved >= p.progress.items;
@@ -31,7 +33,7 @@ export default function ProjectsPage() {
       if (filter === "done" && !done) return false;
       return !s || p.title.toLowerCase().includes(s) || p.purpose.toLowerCase().includes(s) || (p.templateId ?? "").includes(s);
     });
-  }, [projects.data, q, filter, me?.user.dailyProjectId]);
+  }, [list, q, filter, dailyId]);
 
   return (
     <>

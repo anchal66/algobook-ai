@@ -15,10 +15,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { AnimatedNumber, Reveal } from "@/components/design/motion";
 import { fmtClock, fmtDate, secondsToUtcMidnight, titleCase } from "@/lib/app/format";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/lib/app/useNow";
 
 export default function DailyPage() {
   const { user } = useAuth();
   const daily = useQuery(user ? "/api/daily?days=30" : null, () => getDaily(30), { staleMs: 60_000 });
+  const now = useNow();
   const [left, setLeft] = useState(secondsToUtcMidnight());
   useEffect(() => { const t = setInterval(() => setLeft(secondsToUtcMidnight()), 1000); return () => clearInterval(t); }, []);
 
@@ -28,12 +30,12 @@ export default function DailyPage() {
     const byDate = new Map(history.map((h) => [h.date, h.solved]));
     let n = 0;
     for (let i = 0; i < 60; i++) {
-      const d = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10);
+      const d = new Date(now - i * 86_400_000).toISOString().slice(0, 10);
       const solved = byDate.get(d);
       if (solved) n++; else if (i === 0) continue; else break;
     }
     return n;
-  }, [history]);
+  }, [history, now]);
 
   const c = daily.data?.challenge;
   const href = c && daily.data?.projectId ? `/project/${daily.data.projectId}/solve/${c.problemId}` : c ? `/problems/${c.slug}` : "#";

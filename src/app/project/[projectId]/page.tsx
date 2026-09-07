@@ -17,6 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { ActivityTab, PlanTab, ProblemsTab, SettingsTab } from "@/components/project/tabs";
 import { COMPANY_LABEL } from "@/components/dashboard/ProjectCard";
 import { titleCase } from "@/lib/app/format";
+import { useNow } from "@/lib/app/useNow";
 
 const TABS = ["plan", "problems", "activity", "settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -26,6 +27,7 @@ function Overview({ projectId }: { projectId: string }) {
   const router = useRouter();
   const sp = useSearchParams();
   const tab: Tab = (TABS as readonly string[]).includes(sp.get("tab") ?? "") ? (sp.get("tab") as Tab) : "plan";
+  const now = useNow();
   const q = useQuery(user ? `/api/projects/${projectId}` : null, () => getProject(projectId), { staleMs: 30_000 });
   const project = q.data?.project;
   const items = q.data?.items ?? [];
@@ -37,7 +39,7 @@ function Overview({ projectId }: { projectId: string }) {
 
   const pr = project.progress;
   const pct = pr.items ? Math.round((pr.solved / pr.items) * 100) : 0;
-  const elapsed = Math.max(0, Math.floor((Date.now() - new Date(project.createdAt).getTime()) / 86_400_000));
+  const elapsed = Math.max(0, Math.floor((now - new Date(project.createdAt).getTime()) / 86_400_000));
   const dayPct = Math.min(100, Math.round((elapsed / Math.max(1, project.durationDays)) * 100));
   const company = project.templateId ? COMPANY_LABEL[project.templateId] ?? titleCase(project.templateId) : null;
 

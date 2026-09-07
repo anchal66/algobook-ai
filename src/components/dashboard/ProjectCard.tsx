@@ -15,6 +15,7 @@ import { deleteProject, type ProjectDTO } from "@/lib/app/api";
 import { invalidate } from "@/lib/app/query";
 import { timeAgo, titleCase } from "@/lib/app/format";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/lib/app/useNow";
 
 export const COMPANY_LABEL: Record<string, string> = { amazon: "Amazon", apple: "Apple", google: "Google", meta: "Meta", microsoft: "Microsoft", uber: "Uber" };
 
@@ -26,9 +27,10 @@ export function ProjectCard({ project, className }: { project: ProjectDTO; class
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const now = useNow();
   const pr = project.progress;
   const pct = pr.items ? Math.round((pr.solved / pr.items) * 100) : 0;
-  const elapsedDays = Math.max(0, Math.floor((Date.now() - new Date(project.createdAt).getTime()) / 86_400_000));
+  const elapsedDays = Math.max(0, Math.floor((now - new Date(project.createdAt).getTime()) / 86_400_000));
   const daysLeft = Math.max(0, project.durationDays - elapsedDays);
   const company = project.templateId ? COMPANY_LABEL[project.templateId] ?? titleCase(project.templateId) : null;
 
