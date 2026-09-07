@@ -4,7 +4,8 @@ import { Footer } from "@/components/marketing/Footer";
 
 export function MarketingShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="relative min-h-dvh bg-background">
+      <a href="#main" className="skip-link">Skip to content</a>
       <MarketingNav />
       <main id="main" className="pt-16">{children}</main>
       <Footer />

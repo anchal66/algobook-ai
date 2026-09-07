@@ -25,7 +25,8 @@
     "qa:screenshots": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-screenshots.ts",
     "db:migrate:stats": "NODE_OPTIONS=--conditions=react-server tsx scripts/migrate-stats.ts",
     "load:leaderboard": "NODE_OPTIONS=--conditions=react-server tsx scripts/load-test-leaderboard.ts",
-    "qa:user": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-user.ts"
+    "qa:user": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-user.ts",
+    "qa:lighthouse": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-lighthouse.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -92,6 +93,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "jsdom": "^28.1.0",
+    "lighthouse": "^12.8.2",
     "puppeteer-core": "^25.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",

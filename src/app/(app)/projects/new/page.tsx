@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, invalidate } from "@/lib/app/query";
-import { createProject, getInsights, listTemplates, type TemplateDTO } from "@/lib/app/api";
+import { createProject, listTemplates, type TemplateDTO } from "@/lib/app/api";
 import { PageHeader } from "@/components/shell/AppShell";
 import { Button } from "@/components/ui/button";
 import { StepDetails, StepGoal, StepReview, StepTemplate, templateDuration, type WizardState } from "@/components/wizard/steps";
@@ -43,8 +43,7 @@ export default function NewProjectPage() {
       const { project } = await createProject({ title: s.title.trim(), description: s.description.trim(), purpose: s.purpose.trim(), durationDays: s.durationDays, experienceLevel: s.experienceLevel, goalType: s.goalType, selectedTopics: s.selectedTopics, templateId: s.templateId });
       track("project_create", { template: s.templateId, durationDays: s.durationDays });
       invalidate("/api/projects");
-      // Kick off the AI plan; the overview's Plan tab shows it as soon as it lands.
-      void getInsights(project.id).catch(() => undefined);
+      // The overview's Plan tab requests the AI plan on mount (one call, cached server-side for 10 min).
       toast.success("Project created — building your plan…");
       router.push(`/project/${project.id}?tab=plan`);
     } catch (e) {

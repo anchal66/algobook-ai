@@ -29,7 +29,6 @@ export function MarketingNav() {
 
   return (
     <header className={cn("fixed inset-x-0 top-0 z-40 transition-[background-color,border-color,backdrop-filter] duration-200", scrolled || open ? "border-b border-line/70 bg-background/75 backdrop-blur-xl" : "border-b border-transparent")}>
-      <a href="#main" className="skip-link">Skip to content</a>
       <nav aria-label="Marketing" className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5 sm:px-8">
         <Link href="/" aria-label="AlgoBook home" className="shrink-0"><Logo size={28} /></Link>
         <ul className="hidden items-center gap-1 md:flex">

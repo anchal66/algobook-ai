@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | STARTED |
+| **Status** | IN PROGRESS |
 | Branch | `module/05-design-pages` |
 | Depends on | 01–04 (APIs), 03 (workspace look must be consistent with the shell) |
 | Unblocks | Launch |
@@ -77,32 +77,32 @@ About, Contact (form → `mailto`/simple API that stores in `contactMessages`), 
 - **Copy**: no "GPT-4" anywhere; model names not exposed to users ("AlgoBook AI").
 
 ## 4. Tasks
-- [ ] U-01 Tokens + `globals.css` + Tailwind theme + light/dark verification page `/dev/tokens` (admin).
-- [ ] U-02 Fonts, logo mark, favicon set, OG image route.
-- [ ] U-03 Restyled primitives (Button, Card, Chip, Tabs, Dialog, Sheet, Select, Switch, Tooltip, Skeleton, Progress, Avatar, EmptyState, Toast).
-- [ ] U-04 DataTable (sortable, sticky, virtualized) + pagination pattern.
-- [ ] U-05 Motion kit components + reduced-motion guard + page transitions.
-- [ ] U-06 `HeroScene` (R3F) with WebP fallback and device gating; bundle budget check.
-- [ ] U-07 Charts: StatRing, SkillRadar, RatingLine, ActivityHeatmap (port + polish), DifficultyBars, BeatsHistogram.
-- [ ] U-08 App shell: nav rail, top bar (⌘K, streak, XP, plan, avatar menu), responsive drawer nav.
-- [ ] U-09 Command palette (`cmdk`) with problem/project/page search and actions.
-- [ ] U-10 Landing page (all 8 sections) incl. live demo embed and comparison table; SEO/structured data.
-- [ ] U-11 Login page.
-- [ ] U-12 Dashboard (all cards, empty states, onboarding checklist) + `GET /api/problems/recommended` (3 picks via Module 04 `recommend()`).
-- [ ] U-13 Explore page (filters, table, random pick) on `GET /api/problems`.
-- [ ] U-14 New project wizard.
-- [ ] U-15 Project overview (Plan/Problems/Activity/Settings tabs); delete v1 insights/history pages.
-- [ ] U-16 Profile + public profile + edit; per-user OG image.
-- [ ] U-17 Leaderboard page (global/weekly/cohort).
-- [ ] U-18 Daily page; Interview page (start/history) — interview page only if Module 04 P-18 shipped.
-- [ ] U-19 Settings page (all sections; delete account route `DELETE /api/me` in this module).
-- [ ] U-20 Admin console (usage, pool coverage, flagged queue, triggers).
-- [ ] U-21 Marketing/legal pages restyle + contact form.
-- [ ] U-22 System pages (404/error/loading/offline/maintenance).
-- [ ] U-23 GA4 events; manifest/PWA-lite.
-- [ ] U-24 Accessibility pass (axe DevTools clean on every page) and keyboard navigation pass.
+- [x] U-01 Tokens + `globals.css` + Tailwind theme + light/dark verification page `/dev/tokens` (admin).
+- [x] U-02 Fonts, logo mark, favicon set, OG image route.
+- [x] U-03 Restyled primitives (Button, Card, Chip, Tabs, Dialog, Sheet, Select, Switch, Tooltip, Skeleton, Progress, Avatar, EmptyState, Toast).
+- [x] U-04 DataTable (sortable, sticky, virtualized) + pagination pattern.
+- [x] U-05 Motion kit components + reduced-motion guard + page transitions.
+- [x] U-06 `HeroScene` (R3F) with WebP fallback and device gating; bundle budget check.
+- [x] U-07 Charts: StatRing, SkillRadar, RatingLine, ActivityHeatmap (port + polish), DifficultyBars, BeatsHistogram.
+- [x] U-08 App shell: nav rail, top bar (⌘K, streak, XP, plan, avatar menu), responsive drawer nav.
+- [x] U-09 Command palette (`cmdk`) with problem/project/page search and actions.
+- [x] U-10 Landing page (all 8 sections) incl. live demo embed and comparison table; SEO/structured data.
+- [x] U-11 Login page.
+- [x] U-12 Dashboard (all cards, empty states, onboarding checklist) + `GET /api/problems/recommended` (3 picks via Module 04 `recommend()`).
+- [x] U-13 Explore page (filters, table, random pick) on `GET /api/problems`.
+- [x] U-14 New project wizard.
+- [x] U-15 Project overview (Plan/Problems/Activity/Settings tabs); delete v1 insights/history pages.
+- [x] U-16 Profile + public profile + edit; per-user OG image.
+- [x] U-17 Leaderboard page (global/weekly/cohort).
+- [x] U-18 Daily page; Interview page (start/history) — interview page only if Module 04 P-18 shipped.
+- [x] U-19 Settings page (all sections; delete account route `DELETE /api/me` in this module).
+- [x] U-20 Admin console (usage, pool coverage, flagged queue, triggers).
+- [x] U-21 Marketing/legal pages restyle + contact form.
+- [x] U-22 System pages (404/error/loading/offline/maintenance).
+- [x] U-23 GA4 events; manifest/PWA-lite.
+- [x] U-24 Accessibility pass (axe DevTools clean on every page) and keyboard navigation pass.
 - [ ] U-25 Performance pass (Lighthouse numbers recorded in status log; fix regressions).
-- [ ] U-26 Remove every v1 page/component that is no longer referenced (`dashboard/page.tsx`, `ActivitySheet`, `TopicSelector` if replaced, etc.); `grep` for dead imports; `npm run build` clean.
+- [x] U-26 Remove every v1 page/component that is no longer referenced (`dashboard/page.tsx`, `ActivitySheet`, `TopicSelector` if replaced, etc.); `grep` for dead imports; `npm run build` clean.
 - [ ] U-27 **Final regression**: run every module's browser checklist (01–05) end to end on a fresh account and a pro account, both themes, desktop + mobile; screenshots to `docs/modules/qa/05/`.
 - [ ] U-28 Update README (features, screenshots), `STATUS.md` all COMPLETE, tag `v2.0.0`.
 - [ ] U-29 **Ship it.** All tasks ticked, Lighthouse and axe targets met, `npm run build` green, the full regression (U-27) passed on a fresh account and a Pro account in both themes on desktop and mobile → commit, merge `module/05-design-pages` into `main`, rebuild, `git push origin main`, push the `v2.0.0` tag, and record the commit SHA (Master Plan §10 step 7).

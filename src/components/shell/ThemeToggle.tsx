@@ -2,13 +2,20 @@
 import { useTheme } from "next-themes";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useSettings, type ThemePref } from "@/store/settings";
+import { auth } from "@/lib/firebase";
+import { patchSettings } from "@/lib/workspace/api";
 import { cn } from "@/lib/utils";
 
 /** Cycles dark → light → system; keeps the workspace's editor theme setting in sync so both surfaces agree. */
 export function useThemePref() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const setEditor = useSettings((s) => s.setEditor);
-  const set = (t: ThemePref) => { setTheme(t); setEditor({ theme: t }); };
+  const set = (t: ThemePref) => {
+    setTheme(t);
+    setEditor({ theme: t });
+    // Flush immediately (the store syncs after a 1.5 s debounce) so opening the workspace right away keeps the choice.
+    if (auth.currentUser) void patchSettings({ editor: { theme: t === "dark" ? "algobook-dark" : t === "light" ? "algobook-light" : "system" } }).catch(() => undefined);
+  };
   return { theme: (theme ?? "dark") as ThemePref, resolvedTheme, set };
 }
 
