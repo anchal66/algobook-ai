@@ -246,7 +246,7 @@ Estimated cost per **new verified problem** ≈ $0.006–$0.02 on Luna (vs ~$0.1
 | # | Module file | Depends on | Status |
 |---|---|---|---|
 | 01 | `01-MODULE-FOUNDATION.md` — auth, schema v2 + wipe, repositories, Judge service, run/submit APIs, rules, quotas | — | NOT STARTED |
-| 02 | `02-MODULE-AI-ENGINE.md` — model policy, structured outputs, verified generation pipeline, hints/editorial/review/chat/completion, pre-generation, cost telemetry | 01 | NOT STARTED |
+| 02 | `02-MODULE-AI-ENGINE.md` — model policy, structured outputs, verified generation pipeline, hints/editorial/review/chat/completion, pre-generation, cost telemetry | 01 | COMPLETE (2026-09-08) |
 | 03 | `03-MODULE-EDITOR-WORKSPACE.md` — LeetCode-parity problem page (+ AI extras) | 01, 02 | NOT STARTED |
 | 04 | `04-MODULE-PRACTICE-INTELLIGENCE.md` — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard snapshots, achievements, daily challenge, mock interview, templates | 01, 02 | NOT STARTED |
 | 05 | `05-MODULE-DESIGN-SYSTEM-PAGES.md` — design system, motion/3D, landing, dashboard, explore, project wizard, profile, leaderboard, settings, admin, final QA | 01–04 (pages consume their APIs) | NOT STARTED |

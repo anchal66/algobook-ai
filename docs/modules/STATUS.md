@@ -19,7 +19,7 @@ Update this table **and** the header of the module file whenever a status change
 | Module | Total tasks | Done | Deferred | Pushed to `main` (SHA) |
 |---|---|---|---|---|
 | 01 | 27 | 26 | 0 | `1afb319` (only F-07, the D-02 wipe, is outstanding — the classifier refuses it) |
-| 02 | 23 | 23 | 0 | (recorded below after the push) |
+| 02 | 23 | 23 | 0 | `fbf0b60` (merge of `module/02-ai-engine`, pushed 2026-09-08) |
 | 03 | 35 | 0 | 0 | — |
 | 04 | 25 | 0 | 0 | — |
 | 05 | 29 | 0 | 0 | — |
@@ -37,4 +37,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-07 | 01 | Firestore rules v2 released and all 13 indexes issued; rules verified from a client token. Only the D-02 wipe remains | Claude |
 | 2026-09-07 | 01 | Rules v2 confirmed live (ruleset created 17:44 UTC, matches `firebase/firestore.rules`); indexes CREATING; wipe not yet run | Claude |
 | 2026-09-07 | 02 | NOT STARTED → STARTED on `module/02-ai-engine`; context read; OpenAI Responses API + zod v4 structured outputs probed OK on `gpt-5.6-luna` | Claude |
-| 2026-09-08 | 02 | IN PROGRESS → COMPLETE; merged into `main` and pushed (SHA in the roll-up table) | Claude |
+| 2026-09-08 | 02 | IN PROGRESS → COMPLETE; merged into `main` and pushed as `fbf0b60` | Claude |
