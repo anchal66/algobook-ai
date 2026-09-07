@@ -18,7 +18,10 @@
     "db:find-uid": "NODE_OPTIONS=--conditions=react-server tsx scripts/find-uid.ts",
     "dev:token": "NODE_OPTIONS=--conditions=react-server tsx scripts/dev-token.ts",
     "api:smoke": "NODE_OPTIONS=--conditions=react-server tsx scripts/api-smoke.ts",
-    "db:status": "NODE_OPTIONS=--conditions=react-server tsx scripts/db-status.ts"
+    "db:status": "NODE_OPTIONS=--conditions=react-server tsx scripts/db-status.ts",
+    "ai:eval": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai-eval.ts",
+    "db:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/check-firestore-status.ts",
+    "judge0:quota": "NODE_OPTIONS=--conditions=react-server tsx scripts/judge0-quota.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

@@ -12,6 +12,11 @@ const serverSchema = z.object({
   JUDGE0_BASE_URL: z.url().default("https://judge0-ce.p.rapidapi.com"),
   JUDGE0_HOST_HEADER: z.string().default("judge0-ce.p.rapidapi.com"),
   JUDGE0_AUTH_TOKEN: z.string().optional().or(z.literal("")),
+  /** "local" runs code with the host toolchain (dev/eval only; never in production). */
+  JUDGE_BACKEND: z.enum(["judge0", "local"]).default("judge0"),
+  /** Pre-generation (Module 02): minimum verified problems per topic×difficulty cell, and the cap per batch run. */
+  PREGEN_POOL_MIN: z.coerce.number().int().min(0).default(6),
+  PREGEN_MAX_PER_RUN: z.coerce.number().int().min(1).max(500).default(60),
   FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional().or(z.literal("")),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional().or(z.literal("")),
   CQ_PAYMENT_GATEWAY_URL: z.url(),
@@ -56,7 +61,10 @@ function load() {
   if (!s.FIREBASE_SERVICE_ACCOUNT_KEY && !s.FIREBASE_SERVICE_ACCOUNT_PATH) {
     throw new Error("[env] Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_KEY.");
   }
-  if (s.JUDGE0_HOST_HEADER && !s.RAPIDAPI_KEY) {
+  if (s.JUDGE_BACKEND === "local" && s.NODE_ENV === "production") {
+    throw new Error("[env] JUDGE_BACKEND=local is not allowed in production (no sandbox).");
+  }
+  if (s.JUDGE_BACKEND === "judge0" && s.JUDGE0_HOST_HEADER && !s.RAPIDAPI_KEY) {
     throw new Error("[env] RAPIDAPI_KEY is required when JUDGE0_HOST_HEADER is set (RapidAPI mode).");
   }
   if (!s.JUDGE0_HOST_HEADER && !s.JUDGE0_AUTH_TOKEN) {

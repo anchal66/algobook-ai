@@ -9,7 +9,7 @@ Update this table **and** the header of the module file whenever a status change
 | # | Module | Status | Branch | Started | Completed | Owner / assistant | Notes |
 |---|---|---|---|---|---|---|---|
 | 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | IN PROGRESS (merged) | `module/01-foundation` | 2026-09-07 | — | Claude (Opus 5) + Avinash | Merged into `main` and pushed. Rules v2 + indexes deployed 2026-09-07. api-smoke 32/33 (the last failure was Judge0's free-tier rate limit, not code). Not COMPLETE until the D-02 wipe runs — the classifier refuses that command. |
-| 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | STARTED | `module/02-ai-engine` | 2026-09-07 | — | Claude (Fable 5.1) | Depends only on Module 01 code (all merged); the pending wipe does not block it. |
+| 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | IN PROGRESS | `module/02-ai-engine` | 2026-09-07 | — | Claude (Fable 5.1) | Code being written; local judge backend added for eval (Judge0 free tier = 50 batches/day). |
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | NOT STARTED | `module/03-workspace` | — | — | — | Blocked by 01, 02. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | NOT STARTED | `module/04-intelligence` | — | — | — | Blocked by 01, 02. Can run in parallel with 03. |
 | 05 | Design System & Pages — tokens, motion/3D, landing, dashboard, explore, wizard, profile, leaderboard, settings, admin, final QA | NOT STARTED | `module/05-design-pages` | — | — | — | Blocked by 01–04. |

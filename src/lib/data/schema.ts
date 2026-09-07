@@ -221,6 +221,8 @@ export const ProblemSchema = z.object({
   verifiedAt: timestamp.nullable().default(null),
   model: z.string().nullable().default(null),
   languageJobs: langRecord(LanguageJobSchema).default({}),
+  /** Last time the reuse path served this problem (tie-break: least recently served). */
+  lastServedAt: timestamp.nullable().default(null),
 });
 
 /** problems/{id}/private/tests */
@@ -425,6 +427,8 @@ export const PregenJobSchema = z.object({
   inputFileId: z.string(),
   outputFileId: z.string().nullable().default(null),
   requested: z.number().int(),
+  /** Output lines already processed by the collector (it works in bounded chunks). */
+  cursor: z.number().int().default(0),
   /** custom_id → what was asked for (topic/difficulty or template entry). */
   requests: z.record(z.string(), z.object({
     kind: z.enum(["pool", "template"]),
@@ -500,6 +504,7 @@ export type TestCase = z.infer<typeof TestCaseSchema>;
 export type Checker = z.infer<typeof CheckerSchema>;
 export type Limits = z.infer<typeof LimitsSchema>;
 export type ProblemStats = z.infer<typeof ProblemStatsSchema>;
+export type TemplateRef = z.infer<typeof TemplateRefSchema>;
 export type Problem = z.infer<typeof ProblemSchema>;
 export type ProblemPrivateTests = z.infer<typeof ProblemPrivateTestsSchema>;
 export type ProblemPrivateDrivers = z.infer<typeof ProblemPrivateDriversSchema>;

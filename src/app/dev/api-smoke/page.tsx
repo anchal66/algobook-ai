@@ -9,7 +9,42 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiError } from "@/lib/api-client";
+import { auth } from "@/lib/firebase";
 import type { CaseResult, Language } from "@/types";
+
+/** Reads a text/event-stream response and dispatches `{event, data}` pairs. */
+async function readSse(res: Response, onEvent: (event: string, data: unknown) => void): Promise<void> {
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* ignore */ }
+    const err = (body as { error?: { code?: string; message?: string } } | null)?.error;
+    throw new ApiError(res.status, (err?.code ?? "INTERNAL") as never, err?.message ?? `Request failed (${res.status})`);
+  }
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+      let event = "message", data = "";
+      for (const line of chunk.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7).trim();
+        else if (line.startsWith("data: ")) data += line.slice(6);
+      }
+      if (data) { try { onEvent(event, JSON.parse(data)); } catch { onEvent(event, data); } }
+    }
+  }
+}
+
+async function sseFetch(path: string, body: unknown, onEvent: (event: string, data: unknown) => void): Promise<void> {
+  const token = await auth.currentUser!.getIdToken();
+  const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  await readSse(res, onEvent);
+}
 
 type Lang = Language;
 const LANGS: Lang[] = ["java", "python", "cpp", "javascript"];
@@ -65,6 +100,15 @@ export default function ApiSmokePage() {
   const [raw, setRaw] = useState<string>("");
   const [projectProbe, setProjectProbe] = useState("");
   const [probeOut, setProbeOut] = useState("");
+  // ── Module 02 ──
+  const [genProject, setGenProject] = useState("");
+  const [genPrompt, setGenPrompt] = useState("medium sliding window");
+  const [stages, setStages] = useState<string[]>([]);
+  const [genOut, setGenOut] = useState<{ source: string; attempts: number; latencyMs: number; costUsd?: number; title?: string } | null>(null);
+  const [aiOut, setAiOut] = useState<string>("");
+  const [chatInput, setChatInput] = useState("why does my loop fail?");
+  const [chatLog, setChatLog] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [langStatus, setLangStatus] = useState<Record<string, string>>({});
 
   const loadMe = useCallback(async () => {
     try { setMe(await apiFetch<Me>("/api/me")); setError(null); } catch (e) { setError(errText(e)); }
@@ -108,6 +152,112 @@ export default function ApiSmokePage() {
     catch (e) { setProbeOut(errText(e)); } finally { setBusy(null); }
   };
 
+  // ── Module 02 actions ──
+  const ensureProject = async (): Promise<string> => {
+    if (genProject) return genProject;
+    const res = await apiFetch<{ project: { id: string } }>("/api/projects", { method: "POST", body: { title: "AI smoke project", description: "Module 02 smoke", selectedTopics: [] } });
+    setGenProject(res.project.id);
+    return res.project.id;
+  };
+
+  const generateNext = async () => {
+    setBusy("generate"); setError(null); setStages([]); setGenOut(null);
+    try {
+      const pid = await ensureProject();
+      const t0 = Date.now();
+      await sseFetch(`/api/projects/${pid}/next?stream=1`, { userPrompt: genPrompt || undefined, language: lang }, (event, data) => {
+        const d = data as Record<string, unknown>;
+        if (event === "stage") setStages((s) => [...s, `${((Date.now() - t0) / 1000).toFixed(1)}s ${d.stage}${d.round !== undefined ? ` r${d.round}` : ""}${d.model ? ` ${d.model}` : ""}${d.source ? ` (${d.source})` : ""}`]);
+        else if (event === "done") {
+          const r = d as { source: string; attempts: number; latencyMs: number; costUsd?: number; problem: { id: string; title: string } };
+          setGenOut({ source: r.source, attempts: r.attempts, latencyMs: r.latencyMs, costUsd: r.costUsd, title: r.problem.title });
+          setProblemId(r.problem.id); setRaw(JSON.stringify(d, null, 2));
+        } else if (event === "error") { const e = d as { message: string; code: string }; setError(`${e.code}: ${e.message}`); }
+      });
+      loadMe();
+    } catch (e) { setError(errText(e)); } finally { setBusy(null); }
+  };
+
+  const ensureLang = async (l: Lang) => {
+    if (!problem) return;
+    setLangStatus((s) => ({ ...s, [l]: "Preparing…" }));
+    try {
+      const res = await apiFetch<{ status: string; starter: string | null }>(`/api/problems/${problem.problem.id}/languages`, { method: "POST", body: { language: l, wait: true } });
+      setLangStatus((s) => ({ ...s, [l]: res.status }));
+      if (res.status === "ready") await loadProblem();
+    } catch (e) { setLangStatus((s) => ({ ...s, [l]: errText(e).slice(0, 80) })); }
+  };
+
+  const hint = async (level: 1 | 2 | 3) => {
+    if (!problem) return;
+    setBusy("hint"); setAiOut("");
+    try {
+      const res = await apiFetch<{ label: string; text: string; source: string; costUsd?: number }>(`/api/problems/${problem.problem.id}/hints`, { method: "POST", body: { level, code: level === 3 ? code : undefined, language: lang } });
+      setAiOut(`Hint ${level} · ${res.label} (${res.source}${res.costUsd !== undefined ? `, $${res.costUsd.toFixed(4)}` : ""})\n\n${res.text}`); loadMe();
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
+  const editorial = async () => {
+    if (!problem) return;
+    setBusy("editorial"); setAiOut("");
+    const t0 = Date.now();
+    try {
+      const res = await apiFetch<{ editorial: { overview: string; approaches: { title: string; time: string; space: string; code: Record<string, string> }[]; pitfalls: string[] }; cached: boolean }>(`/api/problems/${problem.problem.id}/editorial`);
+      setAiOut(`Editorial (${res.cached ? "cached" : "generated"}, ${Date.now() - t0} ms)\n\n${res.editorial.overview}\n\n${res.editorial.approaches.map((a, i) => `${i + 1}. ${a.title} — ${a.time} / ${a.space}\n${a.code.java?.slice(0, 400) ?? ""}`).join("\n\n")}\n\nPitfalls: ${res.editorial.pitfalls.join(" | ")}`); loadMe();
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
+  const explain = async () => {
+    if (!problem) return;
+    const output = submitResult?.compileOutput || submitResult?.failedCase?.stderr || runResult?.find((c) => c.compileOutput || c.stderr)?.compileOutput || "";
+    if (!output) { setAiOut("Submit or run something that fails first (compile error / runtime error)."); return; }
+    setBusy("explain"); setAiOut("");
+    try {
+      const res = await apiFetch<{ explanation: string }>(`/api/problems/${problem.problem.id}/explain-error`, { method: "POST", body: { language: lang, code, output } });
+      setAiOut(`Explain error:\n\n${res.explanation}`); loadMe();
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
+  const review = async () => {
+    if (!problem || !submitResult) return;
+    setBusy("review"); setAiOut("");
+    try {
+      const res = await apiFetch<{ review: Record<string, unknown>; cached: boolean }>(`/api/problems/${problem.problem.id}/review`, { method: "POST", body: { submissionId: submitResult.id } });
+      setAiOut(`Review (${res.cached ? "cached" : "generated"}):\n${JSON.stringify(res.review, null, 2)}`); loadMe();
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
+  const chat = async () => {
+    if (!problem || !chatInput.trim()) return;
+    const turns = [...chatLog, { role: "user" as const, content: chatInput }];
+    setChatLog([...turns, { role: "assistant", content: "" }]); setChatInput(""); setBusy("chat");
+    try {
+      await sseFetch(`/api/problems/${problem.problem.id}/chat`, { messages: turns.slice(-8), code, language: lang }, (event, data) => {
+        if (event === "delta") setChatLog((l) => { const c = [...l]; c[c.length - 1] = { role: "assistant", content: c[c.length - 1].content + (data as { text: string }).text }; return c; });
+        else if (event === "error") setChatLog((l) => [...l, { role: "assistant", content: `⚠ ${(data as { message: string }).message}` }]);
+      });
+      loadMe();
+    } catch (e) { setChatLog((l) => [...l, { role: "assistant", content: `⚠ ${errText(e)}` }]); } finally { setBusy(null); }
+  };
+
+  const complete = async () => {
+    setBusy("complete"); setAiOut("");
+    const t0 = Date.now();
+    try {
+      const res = await apiFetch<{ text: string }>("/api/ai/complete", { method: "POST", body: { language: lang, prefix: code, suffix: "", problemId: problem?.problem.id } });
+      setAiOut(`Completion (${Date.now() - t0} ms):\n${JSON.stringify(res.text)}`); loadMe();
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
+  const insights = async () => {
+    setBusy("insights"); setAiOut("");
+    try {
+      const pid = await ensureProject();
+      const res = await apiFetch<{ insights: Record<string, unknown>; cached: boolean }>(`/api/projects/${pid}/insights`, { method: "POST", body: {} });
+      setAiOut(`Insights (${res.cached ? "cached" : "generated"}):\n${JSON.stringify(res.insights, null, 2)}`);
+    } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
+  };
+
   if (loading) return <div className="p-8 font-mono text-sm">Loading auth…</div>;
   if (!user) return <div className="p-8 font-mono text-sm">Sign in first (<Link className="underline" href="/login">/login</Link>).</div>;
   if (me && !me.isAdmin) return <div className="p-8 font-mono text-sm">Admin only. Add your uid ({me.user.uid}) to ADMIN_UIDS.</div>;
@@ -117,7 +267,7 @@ export default function ApiSmokePage() {
   return (
     <div className="mx-auto max-w-6xl p-6 font-mono text-sm space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <h1 className="text-lg font-bold">/dev/api-smoke — Module 01</h1>
+        <h1 className="text-lg font-bold">/dev/api-smoke — Modules 01 + 02</h1>
         {me && (
           <div className="text-xs text-muted-foreground">
             uid <b>{me.user.uid}</b> · @{me.user.username} · plan <b>{me.plan.tier}</b> ({me.plan.status}) · quotas {me.quotas.date}: run {me.quotas.used.run ?? 0}/{me.quotas.limits.run}, submit {me.quotas.used.submit ?? 0}/{me.quotas.limits.submit}
@@ -195,6 +345,57 @@ export default function ApiSmokePage() {
           </div>
         </section>
       )}
+
+      <section className="space-y-3 border-t border-border pt-4">
+        <div className="font-bold">Module 02 — AI engine</div>
+        <div className="grid gap-2 md:grid-cols-[1fr_2fr_auto] items-end">
+          <label className="grid gap-1">Project id (blank = create one)
+            <input className="rounded border border-border bg-background px-2 py-1" value={genProject} onChange={(e) => setGenProject(e.target.value)} />
+          </label>
+          <label className="grid gap-1">Prompt (topic preference)
+            <input className="rounded border border-border bg-background px-2 py-1" value={genPrompt} onChange={(e) => setGenPrompt(e.target.value)} />
+          </label>
+          <button className="rounded bg-indigo-600 px-3 py-1.5 text-white disabled:opacity-50" disabled={busy !== null} onClick={generateNext}>{busy === "generate" ? "Generating…" : "Generate next (stream)"}</button>
+        </div>
+        {(stages.length > 0 || genOut) && (
+          <div className="rounded border border-border p-2 text-xs space-y-1">
+            <div className="flex flex-wrap gap-2">{stages.map((s, i) => <span key={i} className="rounded bg-muted px-2 py-0.5">{s}</span>)}</div>
+            {genOut && <div><b>{genOut.title}</b> · source <b className={genOut.source === "reused" ? "text-emerald-400" : "text-indigo-300"}>{genOut.source}</b> · attempts {genOut.attempts} · {genOut.latencyMs} ms{genOut.costUsd !== undefined ? ` · $${genOut.costUsd.toFixed(4)}` : ""}</div>}
+          </div>
+        )}
+        {problem && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Languages:</span>
+            {LANGS.map((l) => {
+              const ready = problem.languages.find((x) => x.key === l)?.ready;
+              return <button key={l} className={`rounded border px-2 py-1 ${ready ? "border-emerald-500/50 text-emerald-300" : "border-border hover:bg-muted"}`} onClick={() => ensureLang(l)}>{l}: {ready ? "ready" : langStatus[l] ?? "ensure"}</button>;
+            })}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={() => hint(1)}>Hint 1</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={() => hint(2)}>Hint 2</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={() => hint(3)}>Hint 3 (uses code)</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={editorial}>Editorial</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={explain}>Explain error</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!submitResult || busy !== null} onClick={review}>Review last submission</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={busy !== null} onClick={complete}>Complete (ghost text)</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={busy !== null} onClick={insights}>Project insights</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => probe("/api/admin/ai-usage")}>GET /api/admin/ai-usage</button>
+        </div>
+        {aiOut && <pre className="max-h-80 overflow-auto rounded border border-border p-2 text-xs whitespace-pre-wrap">{aiOut}</pre>}
+        <div className="grid gap-2 md:grid-cols-[1fr_auto] items-end">
+          <label className="grid gap-1">Tutor chat
+            <input className="rounded border border-border bg-background px-2 py-1" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") chat(); }} />
+          </label>
+          <button className="rounded border border-border px-3 py-1.5 hover:bg-muted disabled:opacity-50" disabled={!problem || busy !== null} onClick={chat}>{busy === "chat" ? "Streaming…" : "Send"}</button>
+        </div>
+        {chatLog.length > 0 && (
+          <div className="max-h-72 overflow-auto rounded border border-border p-2 text-xs space-y-2">
+            {chatLog.map((m, i) => <div key={i} className={m.role === "user" ? "text-indigo-300" : ""}><b>{m.role}:</b> <span className="whitespace-pre-wrap">{m.content}</span></div>)}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-2 border-t border-border pt-4">
         <div className="font-bold">Probes</div>

@@ -26,16 +26,16 @@ export interface PurposePolicy {
 }
 
 export const MODEL_POLICY: Record<AiPurpose, PurposePolicy> = {
-  generate: { model: "gpt-5.6-luna", reasoning: "high", verbosity: "low", maxOutputTokens: 6000 },
-  repair: { model: "gpt-5.6-luna", reasoning: "xhigh", verbosity: "low", maxOutputTokens: 6000 },
-  driver: { model: "gpt-5.6-luna", reasoning: "medium", verbosity: "low", maxOutputTokens: 2500 },
-  hint3: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 600 },
-  explain: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 500 },
-  review: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 900 },
-  editorial: { model: "gpt-5.6-luna", reasoning: "medium", verbosity: "medium", maxOutputTokens: 4000 },
-  chat: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 700 },
+  generate: { model: "gpt-5.6-luna", reasoning: "high", verbosity: "low", maxOutputTokens: 16000 }, // reasoning tokens count against this budget (measured: 4–8k on `high`)
+  repair: { model: "gpt-5.6-luna", reasoning: "xhigh", verbosity: "low", maxOutputTokens: 20000 },
+  driver: { model: "gpt-5.6-luna", reasoning: "medium", verbosity: "low", maxOutputTokens: 8000 },
+  hint3: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 1200 },
+  explain: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 1200 },
+  review: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 2500 },
+  editorial: { model: "gpt-5.6-luna", reasoning: "medium", verbosity: "medium", maxOutputTokens: 10000 },
+  chat: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 1500 },
   complete: { model: "gpt-5.6-luna", reasoning: "none", verbosity: "low", maxOutputTokens: 96 },
-  insights: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 700 },
+  insights: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 2500 },
   embed: { model: "text-embedding-3-small", maxOutputTokens: 0 },
 };
 

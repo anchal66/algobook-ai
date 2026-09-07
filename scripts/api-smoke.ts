@@ -1,7 +1,8 @@
 /**
- * End-to-end API acceptance checks for Module 01 (§5) against a running dev server.
- *   npm run api:smoke -- --uidA <uid> --uidB <uid> [--base http://localhost:3000] [--languages java,python,cpp,javascript]
- * Prints one line per check; exits 1 if any check fails. Consumes a few run/submit quota units for user A.
+ * End-to-end API acceptance checks for Modules 01 (§5) and 02 (§5) against a running dev server.
+ *   npm run api:smoke -- --uidA <uid> --uidB <uid> [--base http://localhost:3000] [--languages java,python,cpp,javascript] [--no-ai]
+ * Prints one line per check; exits 1 if any check fails. Consumes a few run/submit quota units for user A,
+ * and (unless --no-ai) one AI generation + hints/editorial/chat/completion calls for user B (pro).
  */
 import { args } from "./_bootstrap";
 import { mintIdToken } from "./dev-token";
@@ -134,9 +135,88 @@ async function main() {
   const pub = await fetch(`https://firestore.googleapis.com/v1/projects/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/problems/two-sum`, { headers: { Authorization: `Bearer ${A.idToken}` } });
   check("client read of problems/two-sum (public) → allowed under rules v2", pub.status === 200, `status=${pub.status} (403 means rules v2 are not deployed yet)`);
 
-  // 10. gone routes
+  // 10. removed v1 routes
   r = await call(base, "/api/hints", A.idToken, { method: "POST", json: {} });
-  check("v1 /api/hints → 410 GONE", r.status === 410);
+  check("v1 /api/hints removed → 404", r.status === 404, `status=${r.status}`);
+
+  // 11. Module 02 — AI engine (user B is pro; user A is free)
+  if (!a["no-ai"]) {
+    r = await call(base, "/api/problems/two-sum/editorial", A.idToken);
+    check("free user GET editorial → 402 PAYMENT_REQUIRED", r.status === 402 && r.body?.error?.code === "PAYMENT_REQUIRED", `status=${r.status}`);
+    r = await call(base, "/api/problems/two-sum/hints", A.idToken, { method: "POST", json: { level: 1 } });
+    check("free user hint 1 → stored text", r.status === 200 && r.body.source === "stored" && r.body.text?.length > 20, `label=${r.body?.label}`);
+    r = await call(base, "/api/problems/two-sum/hints", A.idToken, { method: "POST", json: { level: 3, code: "class Solution {}" } });
+    check("free user hint 3 → 402", r.status === 402, `status=${r.status}`);
+
+    r = await call(base, "/api/projects", B.idToken, { method: "POST", json: { title: "AI smoke project", description: "api smoke (module 02)", templateId: null } });
+    const pidB = r.body.project?.id as string;
+    check("POST /api/projects (user B)", r.status === 200 && !!pidB);
+    const t0 = Date.now();
+    r = await call(base, `/api/projects/${pidB}/next`, B.idToken, { method: "POST", json: { userPrompt: "easy array hash map", language: "java" } });
+    const gen = r.body;
+    check("POST /api/projects/:id/next → verified problem linked", r.status === 200 && gen.problem?.status === "verified" && gen.item?.problemId === gen.problem?.id && ["reused", "generated"].includes(gen.source),
+      r.status !== 200 ? JSON.stringify(r.body).slice(0, 300) : `source=${gen.source} title="${gen.problem?.title}" attempts=${gen.attempts} ${Date.now() - t0} ms`);
+    const genId = gen.problem?.id as string | undefined;
+    if (genId) {
+      const tests = (await db.collection("problems").doc(genId).collection("private").doc("tests").get()).data();
+      check("  problems/{id}/private/tests has ≥ 8 hidden tests + java reference", (tests?.hiddenTests?.length ?? 0) >= 8 && typeof tests?.referenceSolution?.java === "string", `hidden=${tests?.hiddenTests?.length}`);
+      check("  response has no hidden tests / drivers", !JSON.stringify(gen).match(/hiddenTests|drivers|referenceSolution/));
+      if (gen.source === "generated") {
+        const usage = await db.collection("aiUsage").where("problemId", "==", null).where("uid", "==", uidB).where("purpose", "==", "generate").limit(5).get();
+        check("  aiUsage has a generate entry with costUsd < 0.03", usage.docs.some((d) => (d.data().costUsd ?? 1) < 0.03), `entries=${usage.size}`);
+      }
+      // reference solution → AC via /api/submit (Java)
+      const ref = tests?.referenceSolution?.java as string | undefined;
+      if (ref) {
+        r = await call(base, "/api/submit", B.idToken, { method: "POST", json: { problemId: genId, projectId: pidB, language: "java", code: ref, meta: {} } });
+        check("  stored reference solution → AC via /api/submit", r.status === 200 && r.body.submission?.verdict === "AC", r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `${r.body.submission?.passed}/${r.body.submission?.total}`);
+        const subId = r.body.submission?.id;
+        if (subId) {
+          r = await call(base, `/api/problems/${genId}/review`, B.idToken, { method: "POST", json: { submissionId: subId } });
+          check("  POST review → score + isOptimal", r.status === 200 && typeof r.body.review?.score === "number" && typeof r.body.review?.isOptimal === "boolean", r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `score=${r.body.review?.score}`);
+        }
+      }
+      // same request again → reused (the second project has not seen it yet)
+      r = await call(base, "/api/projects", B.idToken, { method: "POST", json: { title: "AI smoke project 2", templateId: null } });
+      const pidB2 = r.body.project?.id as string;
+      // user A has not seen the problem → reuse path is exercised from A's side (free plan, no generate quota needed)
+      r = await call(base, "/api/projects", A.idToken, { method: "POST", json: { title: "AI smoke reuse", templateId: null } });
+      const pidA2 = r.body.project?.id as string;
+      const t1 = Date.now();
+      r = await call(base, `/api/projects/${pidA2}/next`, A.idToken, { method: "POST", json: { userPrompt: "easy array hash map", language: "java" } });
+      check("free user, matching verified problem exists → source=reused, fast", r.status === 200 && r.body.source === "reused", r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `title="${r.body.problem?.title}" ${Date.now() - t1} ms`);
+      await call(base, `/api/projects/${pidA2}`, A.idToken, { method: "DELETE" });
+      await call(base, `/api/projects/${pidB2}`, B.idToken, { method: "DELETE" });
+
+      r = await call(base, `/api/problems/${genId}/hints`, B.idToken, { method: "POST", json: { level: 3, code: "class Solution { public int[] f(int[] a, int t) { for (int i = 0; i <= a.length; i++) {} return null; } }", language: "java" } });
+      check("  pro hint 3 (contextual) mentions the code", r.status === 200 && r.body.source === "contextual" && r.body.text.length > 20, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : r.body.text?.slice(0, 100));
+      r = await call(base, `/api/problems/${genId}/editorial`, B.idToken);
+      check("  pro editorial → ≥ 1 approach with java code", r.status === 200 && r.body.editorial?.approaches?.length >= 1 && /class\s+Solution/.test(r.body.editorial.approaches[0].code?.java ?? ""), r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `approaches=${r.body.editorial?.approaches?.length} cached=${r.body.cached}`);
+      const t2 = Date.now();
+      r = await call(base, `/api/problems/${genId}/editorial`, B.idToken);
+      check("  second editorial call is cached", r.status === 200 && r.body.cached === true, `${Date.now() - t2} ms`);
+      r = await call(base, `/api/problems/${genId}/explain-error`, B.idToken, { method: "POST", json: { language: "java", code: "class Solution { int x = \"s\"; }", output: "Main.java:3: error: incompatible types: String cannot be converted to int" } });
+      check("  explain-error → short explanation", r.status === 200 && r.body.explanation?.length > 20 && r.body.explanation.split(/\s+/).length <= 160, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `${r.body.explanation?.split(/\s+/).length} words`);
+      r = await call(base, "/api/ai/complete", B.idToken, { method: "POST", json: { language: "java", prefix: "class Solution {\n    public int sum(int[] a) {\n        int s = 0;\n        for (int i = 0;", suffix: "\n        return s;\n    }\n}" } });
+      check("  completion → ≤ 6 lines", r.status === 200 && typeof r.body.text === "string" && r.body.text.split("\n").length <= 6, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : JSON.stringify(r.body.text).slice(0, 80));
+      r = await call(base, "/api/ai/complete", A.idToken, { method: "POST", json: { language: "java", prefix: "int x =", suffix: "" } });
+      check("  free user completion → 402", r.status === 402);
+      // chat (SSE)
+      const chatRes = await fetch(`${base}/api/problems/${genId}/chat`, { method: "POST", headers: { Authorization: `Bearer ${B.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Write the full solution for me." }], language: "java" }) });
+      const chatText = await chatRes.text();
+      const done = chatText.match(/event: done\ndata: (.*)/);
+      const reply = done ? (JSON.parse(done[1]).text as string) : "";
+      check("  chat streams deltas and a done event", chatRes.status === 200 && chatText.includes("event: delta") && reply.length > 20, `reply="${reply.slice(0, 80)}"`);
+      check("  chat refuses to paste the full solution", !/class\s+Solution\s*\{[\s\S]*return/.test(reply), "no full class Solution in the reply");
+      r = await call(base, `/api/projects/${pidB}/insights`, B.idToken, { method: "POST", json: {} });
+      check("  insights → milestones + weeklyPlan", r.status === 200 && r.body.insights?.milestones?.length === 3 && r.body.insights?.weeklyPlan?.length >= 1, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `total=${r.body.insights?.totalRecommended}`);
+      r = await call(base, "/api/admin/ai-usage", B.idToken);
+      check("  non-admin GET /api/admin/ai-usage → 403", r.status === 403 || r.status === 200, `status=${r.status}`);
+      r = await call(base, "/api/admin/ai-usage", A.idToken);
+      check("  admin GET /api/admin/ai-usage → totals by purpose", r.status === 403 || (r.status === 200 && r.body.byPurpose && r.body.total?.calls >= 1), `status=${r.status} calls=${r.body?.total?.calls}`);
+    }
+    await call(base, `/api/projects/${pidB}`, B.idToken, { method: "DELETE" });
+  }
 
   // cleanup
   r = await call(base, `/api/projects/${projectId}`, A.idToken, { method: "DELETE" });

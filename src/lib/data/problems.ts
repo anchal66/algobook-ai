@@ -3,8 +3,8 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { FALLBACK_SCAN_LIMIT, isMissingIndexError, onMissingIndex } from "@/lib/data/_firestore";
 import {
-  ProblemSchema, ProblemPrivateTestsSchema, ProblemPrivateDriversSchema,
-  type Difficulty, type Language, type Problem, type ProblemPrivateDrivers, type ProblemPrivateTests, type ProblemStatus, type WithId,
+  ProblemSchema, ProblemPrivateTestsSchema, ProblemPrivateDriversSchema, ProblemHintsSchema, ProblemEditorialSchema, LanguageJobSchema,
+  type Difficulty, type Language, type LanguageJob, type Problem, type ProblemEditorial, type ProblemHints, type ProblemPrivateDrivers, type ProblemPrivateTests, type ProblemStatus, type WithId,
 } from "@/lib/data/schema";
 
 const COL = "problems";
@@ -45,7 +45,7 @@ export async function getDrivers(id: string): Promise<ProblemPrivateDrivers | nu
 }
 
 export interface ProblemDraft {
-  problem: Omit<Problem, "createdAt" | "verifiedAt" | "stats" | "flagged"> & Partial<Pick<Problem, "stats" | "flagged">>;
+  problem: Omit<Problem, "createdAt" | "verifiedAt" | "stats" | "flagged" | "languageJobs" | "lastServedAt"> & Partial<Pick<Problem, "stats" | "flagged" | "languageJobs" | "lastServedAt">>;
   tests: ProblemPrivateTests;
   drivers: ProblemPrivateDrivers;
   /** Optional fixed id (e.g. the slug for seeded problems). */
@@ -191,4 +191,103 @@ export async function incrementFlag(id: string, reason: string): Promise<{ count
     });
     return { count, retired };
   });
+}
+
+// ── Module 02 additions ──────────────────────────────────────────────────────
+
+export async function getHints(id: string): Promise<ProblemHints | null> {
+  const snap = await adminDb.collection(COL).doc(id).collection("content").doc("hints").get();
+  return snap.exists ? ProblemHintsSchema.parse(snap.data()) : null;
+}
+
+export async function setHints(id: string, hints: ProblemHints["hints"]): Promise<void> {
+  const batch = adminDb.batch();
+  batch.set(adminDb.collection(COL).doc(id).collection("content").doc("hints"), ProblemHintsSchema.parse({ hints }));
+  batch.update(adminDb.collection(COL).doc(id), { hintsPreview: hints.length });
+  await batch.commit();
+}
+
+export async function getEditorial(id: string): Promise<ProblemEditorial | null> {
+  const snap = await adminDb.collection(COL).doc(id).collection("content").doc("editorial").get();
+  return snap.exists ? ProblemEditorialSchema.parse(snap.data()) : null;
+}
+
+export async function setEditorial(id: string, editorial: Omit<ProblemEditorial, "createdAt">): Promise<ProblemEditorial> {
+  const doc = ProblemEditorialSchema.parse({ ...editorial, createdAt: Timestamp.now() });
+  await adminDb.collection(COL).doc(id).collection("content").doc("editorial").set(doc);
+  return doc;
+}
+
+/** `stats.referenceRuntimeMs[lang]` — max reference runtime over all tests (TLE sanity). */
+export async function setReferenceRuntime(id: string, language: Language, runtimeMs: number): Promise<void> {
+  await adminDb.collection(COL).doc(id).update({ [`stats.referenceRuntimeMs.${language}`]: runtimeMs });
+}
+
+/** Returns the raw language-job map (in-flight driver generation, Module 02 §3.3 step 7). */
+export async function getLanguageJobs(id: string): Promise<Partial<Record<Language, LanguageJob>>> {
+  const snap = await adminDb.collection(COL).doc(id).get();
+  const raw = (snap.data()?.languageJobs ?? {}) as Record<string, unknown>;
+  const out: Partial<Record<Language, LanguageJob>> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const parsed = LanguageJobSchema.safeParse(v);
+    if (parsed.success) out[k as Language] = parsed.data;
+  }
+  return out;
+}
+
+/**
+ * Claims the driver-generation job for `language` in a transaction. Returns "claimed" when this
+ * caller must do the work, "ready" when the language already exists, or "running" when another
+ * request holds a fresh (< staleMs) claim.
+ */
+export async function claimLanguageJob(id: string, language: Language, staleMs = 5 * 60_000): Promise<"claimed" | "ready" | "running"> {
+  const ref = adminDb.collection(COL).doc(id);
+  return adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Problem not found");
+    const data = snap.data()!;
+    if ((data.languages as string[] | undefined)?.includes(language)) return "ready";
+    const job = LanguageJobSchema.safeParse((data.languageJobs ?? {})[language]);
+    if (job.success && job.data.status === "running" && job.data.startedAt && Date.now() - job.data.startedAt.toMillis() < staleMs) return "running";
+    const now = Timestamp.now();
+    tx.update(ref, { [`languageJobs.${language}`]: { status: "running", startedAt: now, updatedAt: now, error: null } });
+    return "claimed";
+  });
+}
+
+export async function finishLanguageJob(id: string, language: Language, status: "done" | "failed", error?: string): Promise<void> {
+  await adminDb.collection(COL).doc(id).update({
+    [`languageJobs.${language}.status`]: status,
+    [`languageJobs.${language}.updatedAt`]: Timestamp.now(),
+    [`languageJobs.${language}.error`]: error ?? null,
+  });
+}
+
+/** Picks a slug that is not taken yet (`two-sum`, `two-sum-2`, …). */
+export async function uniqueSlug(base: string): Promise<string> {
+  const clean = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "problem";
+  for (let i = 0; i < 20; i++) {
+    const candidate = i === 0 ? clean : `${clean}-${i + 1}`;
+    const snap = await adminDb.collection(COL).where("slug", "==", candidate).limit(1).get();
+    if (snap.empty) return candidate;
+  }
+  return `${clean}-${Date.now().toString(36)}`;
+}
+
+/** Verified problems produced from a company template entry (Module 02 A-17 → Module 04 recommendFromTemplate). */
+export async function findByTemplateTitle(title: string, opts: { excludeIds?: string[]; limit?: number } = {}): Promise<ProblemPublic[]> {
+  const exclude = new Set(opts.excludeIds ?? []);
+  const snap = await adminDb.collection(COL).where("status", "==", "verified").where("templateRef.title", "==", title).limit((opts.limit ?? 5) + exclude.size).get();
+  return snap.docs.filter((d) => !exclude.has(d.id)).slice(0, opts.limit ?? 5).map((d) => stripPrivate(d.id, d.data()));
+}
+
+/** Number of verified, non-retired problems in a topic×difficulty cell (pre-generation deficits). */
+export async function countVerified(topic: string, difficulty: Difficulty): Promise<number> {
+  const agg = await adminDb.collection(COL).where("status", "==", "verified").where("difficulty", "==", difficulty).where("tags", "array-contains", topic).count().get();
+  return agg.data().count;
+}
+
+/** Recently served pointer used for "least recently served" tie-breaks in reuse. */
+export async function touchServed(id: string): Promise<void> {
+  await adminDb.collection(COL).doc(id).update({ lastServedAt: Timestamp.now() }).catch(() => undefined);
 }

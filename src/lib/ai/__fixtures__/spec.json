@@ -1,0 +1,40 @@
+{
+  "title": "Pair Sum Indices",
+  "slug": "pair-sum-indices",
+  "difficulty": "Easy",
+  "tags": ["array", "hash map"],
+  "statementMd": "You are given an integer array `nums` and an integer `target`. Return the indices of the two distinct elements whose sum equals `target`, smaller index first. Exactly one answer exists.",
+  "functionName": "pairSum",
+  "returnType": "int[]",
+  "params": [{ "name": "nums", "type": "int[]" }, { "name": "target", "type": "int" }],
+  "examples": [
+    { "input": "nums = [2,7,11,15], target = 9", "output": "[0,1]", "explanation": "nums[0] + nums[1] == 9." },
+    { "input": "nums = [3,3], target = 6", "output": "[0,1]", "explanation": null }
+  ],
+  "constraints": ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9", "Exactly one valid answer exists."],
+  "followUp": null,
+  "checker": { "type": "exact", "eps": null },
+  "sampleTests": [
+    { "input": "4\n2 7 11 15\n9\n", "expectedOutput": "[0,1]" },
+    { "input": "2\n3 3\n6\n", "expectedOutput": "[0,1]" }
+  ],
+  "hiddenTests": [
+    { "input": "3\n3 2 4\n6\n", "expectedOutput": "[1,2]" },
+    { "input": "5\n-1 -2 -3 -4 -5\n-8\n", "expectedOutput": "[2,4]" },
+    { "input": "4\n0 4 3 0\n0\n", "expectedOutput": "[0,3]" },
+    { "input": "4\n1000000000 -1000000000 5 7\n12\n", "expectedOutput": "[2,3]" },
+    { "input": "3\n5 75 25\n100\n", "expectedOutput": "[1,2]" },
+    { "input": "2\n1 2\n3\n", "expectedOutput": "[0,1]" },
+    { "input": "6\n1 5 9 13 18 21\n30\n", "expectedOutput": "[2,5]" },
+    { "input": "5\n10 20 30 40 50\n90\n", "expectedOutput": "[3,4]" }
+  ],
+  "starter": { "java": "class Solution {\n    public int[] pairSum(int[] nums, int target) {\n        // your code here\n    }\n}" },
+  "driver": { "java": "import java.util.*;\nimport java.io.*;\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        int n = Integer.parseInt(br.readLine().trim());\n        String line = br.readLine();\n        int[] nums = new int[n];\n        StringTokenizer st = new StringTokenizer(line == null ? \"\" : line);\n        for (int i = 0; i < n; i++) nums[i] = Integer.parseInt(st.nextToken());\n        int target = Integer.parseInt(br.readLine().trim());\n        int[] res = new Solution().pairSum(nums, target);\n        StringBuilder sb = new StringBuilder(\"[\");\n        for (int i = 0; i < res.length; i++) { if (i > 0) sb.append(\",\"); sb.append(res[i]); }\n        System.out.println(sb.append(\"]\"));\n    }\n}" },
+  "reference": { "java": "import java.util.*;\nclass Solution {\n    public int[] pairSum(int[] nums, int target) {\n        Map<Integer, Integer> seen = new HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            Integer j = seen.get(target - nums[i]);\n            if (j != null) return new int[]{j, i};\n            seen.put(nums[i], i);\n        }\n        return new int[0];\n    }\n}" },
+  "hints": [
+    { "label": "Pattern Recognition", "text": "This is a pair-finding problem on an unsorted array." },
+    { "label": "Algorithm Choice", "text": "A hash map from value to index gives O(1) complement lookups." },
+    { "label": "Implementation Trap", "text": "Insert after checking so an element cannot pair with itself." }
+  ],
+  "timeLimitSec": 2
+}

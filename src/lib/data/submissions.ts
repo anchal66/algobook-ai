@@ -1,7 +1,8 @@
 import "server-only";
 import { adminDb } from "@/lib/firebase-admin";
 import { FALLBACK_SCAN_LIMIT, isMissingIndexError, onMissingIndex } from "@/lib/data/_firestore";
-import { SubmissionSchema, type Submission, type WithId } from "@/lib/data/schema";
+import { Timestamp } from "firebase-admin/firestore";
+import { SubmissionSchema, StoredReviewSchema, type Review, type StoredReview, type Submission, type WithId } from "@/lib/data/schema";
 
 const COL = "submissions";
 
@@ -81,4 +82,17 @@ export async function countForProblem(uid: string, problemId: string): Promise<n
 export async function hasAccepted(uid: string, problemId: string): Promise<boolean> {
   const snap = await adminDb.collection(COL).where("uid", "==", uid).where("problemId", "==", problemId).where("verdict", "==", "AC").limit(1).get();
   return !snap.empty;
+}
+
+/** Distinct problem ids the user has an accepted submission for (capped scan; equality-only query, no composite index). */
+export async function acceptedProblemIds(uid: string, cap = 1000): Promise<string[]> {
+  const snap = await adminDb.collection(COL).where("uid", "==", uid).where("verdict", "==", "AC").select("problemId").limit(cap).get();
+  return [...new Set(snap.docs.map((d) => d.data().problemId as string))];
+}
+
+/** Stores the post-AC AI review on the submission (Module 02 A-11). */
+export async function setReview(id: string, review: Review, model: string): Promise<StoredReview> {
+  const doc = StoredReviewSchema.parse({ ...review, model, createdAt: Timestamp.now() });
+  await adminDb.collection(COL).doc(id).update({ review: doc });
+  return doc;
 }

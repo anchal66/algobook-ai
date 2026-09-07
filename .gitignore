@@ -47,3 +47,6 @@ next-env.d.ts
 # Firestore wipe backups (never commit)
 /backups/
 firebase-debug.log
+
+# AI evaluation output (Module 02)
+/eval-out/
