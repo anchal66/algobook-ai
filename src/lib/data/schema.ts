@@ -177,6 +177,15 @@ export const ProblemStatsSchema = z.object({
   avgRuntimeMs: langRecord(z.number()).default({}),
   runtimeSamples: langRecord(z.array(z.number())).default({}),
   memorySamples: langRecord(z.array(z.number())).default({}),
+  /** Max runtime of the reference solution over all tests (Module 02): TLE sanity = max(limit, 3× this). */
+  referenceRuntimeMs: langRecord(z.number()).default({}),
+});
+/** problems/{id}.languageJobs[lang] — in-flight driver generation (Module 02 §3.3 step 7). */
+export const LanguageJobSchema = z.object({
+  status: z.enum(["queued", "running", "done", "failed"]),
+  startedAt: timestamp.nullable().default(null),
+  updatedAt: timestamp.nullable().default(null),
+  error: z.string().nullable().default(null),
 });
 export const TemplateRefSchema = z.object({ company: z.string(), number: z.number().int(), title: z.string() });
 
@@ -211,6 +220,7 @@ export const ProblemSchema = z.object({
   createdAt: timestamp,
   verifiedAt: timestamp.nullable().default(null),
   model: z.string().nullable().default(null),
+  languageJobs: langRecord(LanguageJobSchema).default({}),
 });
 
 /** problems/{id}/private/tests */
@@ -224,13 +234,28 @@ export const ProblemPrivateDriversSchema = z.object({ drivers: langRecord(z.stri
 export const ProblemHintsSchema = z.object({ hints: z.array(z.object({ label: z.string(), text: z.string() })).length(3) });
 /** problems/{id}/content/editorial */
 export const ProblemEditorialSchema = z.object({
+  overview: z.string().default(""),
   approaches: z.array(z.object({
     title: z.string(), intuition: z.string(), algorithm: z.string(),
     code: langRecord(z.string()).default({}), time: z.string(), space: z.string(),
   })),
+  pitfalls: z.array(z.string()).default([]),
   model: z.string(),
   createdAt: timestamp,
 });
+
+/** AI code review stored on the accepted submission (Module 02 §3.2 ReviewSchema = v1 SolutionExplanation + score/isOptimal). */
+export const ReviewSchema = z.object({
+  analysis: z.string(),
+  timeComplexity: z.string(),
+  spaceComplexity: z.string(),
+  optimalApproach: z.string(),
+  improvements: z.array(z.string()).max(6),
+  alternativeApproaches: z.array(z.string()).max(4),
+  score: z.number().min(0).max(10),
+  isOptimal: z.boolean(),
+});
+export const StoredReviewSchema = ReviewSchema.extend({ model: z.string(), createdAt: timestamp });
 
 // ── projects ─────────────────────────────────────────────────────────────────
 
@@ -319,6 +344,8 @@ export const SubmissionSchema = z.object({
   runCount: z.number().int().default(0),
   isFirstTry: z.boolean().default(false),
   createdAt: timestamp,
+  /** Post-AC AI review (Module 02 A-11), at most one per submission. */
+  review: StoredReviewSchema.nullable().default(null),
 });
 
 // ── drafts / notes / activity ────────────────────────────────────────────────
@@ -390,6 +417,34 @@ export const AiUsageSchema = z.object({
   createdAt: timestamp,
 });
 
+/** jobs/{id} — background jobs (Module 02 pre-generation via the OpenAI Batch API). */
+export const PregenJobSchema = z.object({
+  type: z.literal("pregen"),
+  status: z.enum(["submitted", "collecting", "done", "failed", "cancelled"]),
+  batchId: z.string(),
+  inputFileId: z.string(),
+  outputFileId: z.string().nullable().default(null),
+  requested: z.number().int(),
+  /** custom_id → what was asked for (topic/difficulty or template entry). */
+  requests: z.record(z.string(), z.object({
+    kind: z.enum(["pool", "template"]),
+    difficulty: DifficultySchema,
+    topics: z.array(z.string()),
+    company: z.string().nullable().default(null),
+    templateRef: TemplateRefSchema.nullable().default(null),
+  })),
+  results: z.object({
+    processed: z.number().int().default(0),
+    verified: z.number().int().default(0),
+    repaired: z.number().int().default(0),
+    failed: z.number().int().default(0),
+    costUsd: z.number().default(0),
+  }).default({ processed: 0, verified: 0, repaired: 0, failed: 0, costUsd: 0 }),
+  error: z.string().nullable().default(null),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
 export const TemplateSchema = z.object({
   company: z.string(),
   title: z.string(),
@@ -450,6 +505,10 @@ export type ProblemPrivateTests = z.infer<typeof ProblemPrivateTestsSchema>;
 export type ProblemPrivateDrivers = z.infer<typeof ProblemPrivateDriversSchema>;
 export type ProblemHints = z.infer<typeof ProblemHintsSchema>;
 export type ProblemEditorial = z.infer<typeof ProblemEditorialSchema>;
+export type LanguageJob = z.infer<typeof LanguageJobSchema>;
+export type Review = z.infer<typeof ReviewSchema>;
+export type StoredReview = z.infer<typeof StoredReviewSchema>;
+export type PregenJob = z.infer<typeof PregenJobSchema>;
 
 export type ProjectProgress = z.infer<typeof ProjectProgressSchema>;
 export type Project = z.infer<typeof ProjectSchema>;

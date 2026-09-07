@@ -30,6 +30,11 @@ Required services:
    Until they are deployed, list endpoints fall back to in-memory ordering and log `firestore.missing_index`.
 2. **Judge0** — a RapidAPI key for `judge0-ce.p.rapidapi.com`, or a self-hosted
    instance (see `docs/modules/reference/JUDGE0-SELF-HOST.md`).
+   **The RapidAPI free tier allows 50 batched submissions per day**, and Run and Submit
+   use exactly one batch each, so the whole deployment supports ~50 code executions
+   per day. `/api/run` and `/api/submit` return `502 UPSTREAM "Judge0 rate limit
+   reached"` once it is spent (`x-ratelimit-batched-submissions-remaining: 0`, resets
+   on a rolling ~24 h window). Self-hosting removes the cap and is a config change.
 3. **OpenAI** — `OPENAI_API_KEY` (Module 02).
 4. **ADMIN_UIDS** — comma-separated Firebase UIDs allowed to use admin routes and
    `/dev/api-smoke`. Find yours: `npm run db:find-uid -- --email you@example.com`.
@@ -42,6 +47,7 @@ Required services:
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint` | ESLint 10 flat config (`eslint-config-next`) |
 | `npm test` | vitest unit tests (checkers, quotas, stdin encoding, assembler, template parser) |
+| `npm run db:status` | Prints collection counts and whether the seeded fixtures are present |
 | `npm run db:deploy` | Publishes `firebase/firestore.rules` + `firestore.indexes.json` with the service account (same as `firebase deploy --only firestore:rules,firestore:indexes`, no CLI login needed) |
 | `npm run db:seed:templates` | Seeds `templates/{company}` from `templates/*.md` |
 | `npm run db:seed:sample` | Seeds the verified "Two Sum" problem (Java, Python, C++, JavaScript) after running each reference solution on Judge0 |
