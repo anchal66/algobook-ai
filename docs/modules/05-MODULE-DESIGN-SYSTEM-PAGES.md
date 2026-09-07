@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | NOT STARTED |
+| **Status** | STARTED |
 | Branch | `module/05-design-pages` |
 | Depends on | 01–04 (APIs), 03 (workspace look must be consistent with the shell) |
 | Unblocks | Launch |
@@ -130,3 +130,4 @@ About, Contact (form → `mailto`/simple API that stores in `contactMessages`), 
 
 ## 7. Status log
 - 2026-09-07 — Module specified. NOT STARTED.
+- 2026-09-08 — NOT STARTED → STARTED on `module/05-design-pages` (Claude Fable 5.1), branched from `main` 3882407 with Modules 01–04 merged. Context read: Master Plan §2/§6/§8/§10, DECISIONS (D-06/D-08/D-09/D-12/D-13 defaults apply), Module 03/04 status logs and their open items (attendance UI remnants, bookmarks/👍 server field, `/api/submit` response fields).
