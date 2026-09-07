@@ -1,0 +1,55 @@
+Evaluating 4 generations (E1/M2/H1) with JUDGE_BACKEND=local
+  [1/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1553,"cachedTokens":0,"outputTokens":2924,"reasoningTokens":1753,"costUsd":0.003819,"latencyMs":35141,"ok":true}
+  [1/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":105,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":834,"ok":true}
+  [1/4] verifying r0
+{"evt":"judge.local_toolchain_verified"}
+  ✓ First Unique Consonant (Easy/string) firstPass=true adopted=0 repairs=0 cost=$0.0038 36557 ms tests=3+10
+  [2/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1548,"cachedTokens":1414,"outputTokens":16000,"reasoningTokens":1888,"costUsd":0.019255,"latencyMs":115631,"ok":false,"error":"incomplete: max_output_tokens"}
+  ✗ Medium/stack: Model output was cut off (max_output_tokens); raise maxOutputTokens or reduce verbosity []
+  [3/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1548,"cachedTokens":1414,"outputTokens":4319,"reasoningTokens":985,"costUsd":0.005238,"latencyMs":35225,"ok":true}
+  [3/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":102,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":1141,"ok":true}
+  [3/4] verifying r0
+  ✓ Shortest Route with One Wall Break (Medium/bfs) firstPass=true adopted=0 repairs=0 cost=$0.0052 36794 ms tests=3+9
+  [4/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1560,"cachedTokens":1414,"outputTokens":4440,"reasoningTokens":2574,"costUsd":0.005385,"latencyMs":46128,"ok":true}
+  [4/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":102,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":592,"ok":true}
+{"evt":"generate.static_failed","round":0,"title":"Fuel Plan with Price Drops","errors":["sampleTests[0] input does not match the params encoding: param \"positions\" (int[]): first line must be the element count N, got \"[0,5,10]\"","sampleTests[1] input does not match the params encoding: param \"positions\" (int[]): first line must be the element count N, got \"[0,4,7]\"","hiddenTests[0] input does not match the params encoding: param \"positions\" (int[]): first line must be the element count N, got \"[0]\"","hiddenTests[1] input does not match the params encoding: param \"positions\" (int[]): first line must be the element count N, got \"[0,5]\"","hiddenTests[2] input does not match the params encoding: param \"positions\" (int[]): first line must be the element count N, got \"[0,6]\""]}
+  [4/4] repairing r1 gpt-5.6-luna
+{"evt":"ai.call","purpose":"repair","model":"gpt-5.6-luna","inputTokens":3804,"cachedTokens":0,"outputTokens":11209,"reasoningTokens":9320,"costUsd":0.014212,"latencyMs":109627,"ok":true}
+  [4/4] verifying r1
+  ✓ Fuel Plan with Price Drops (Hard/greedy) firstPass=false adopted=0 repairs=1 cost=$0.0196 156699 ms tests=2+10
+
+SUMMARY {
+  "generations": 4,
+  "firstPassRate": "50.0%",
+  "verifiedWithoutRepair": "50.0% (first pass + adopted reference outputs)",
+  "afterRepairRate": "75.0%",
+  "repairSuccessRate": "50.0% (1/2)",
+  "meanCostUsd": "0.0072",
+  "p50Ms": 115637,
+  "p95Ms": 156699,
+  "byDifficulty": {
+    "Easy": {
+      "n": 1,
+      "ok": 1,
+      "firstPass": 1
+    },
+    "Medium": {
+      "n": 2,
+      "ok": 1,
+      "firstPass": 1
+    },
+    "Hard": {
+      "n": 1,
+      "ok": 1,
+      "firstPass": 0
+    }
+  }
+}
+exit=2

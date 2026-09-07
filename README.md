@@ -97,3 +97,11 @@ Work happens one module at a time on `module/0N-*` branches; each module file
 has tasks, acceptance criteria and a browser test checklist. See
 `docs/modules/00-MASTER-PLAN.md §1` and `§10` for the workflow and the
 Definition of Done.
+
+## AI engine (Module 02)
+
+- `POST /api/projects/:id/next` recommends, reuses a verified problem or generates one (`gpt-5.6-luna`, structured outputs), verifies the reference solution on the judge, repairs on failure, and streams stages with `?stream=1`. Python, C++ and JavaScript drivers are generated and verified in the background.
+- Hints, editorial, code review, explain-error, tutor chat (SSE), inline completion, project insights: `src/lib/ai/features.ts` and the routes under `src/app/api/problems/[id]/*`, `src/app/api/ai/complete`.
+- Model ids and prices live only in `src/lib/ai/models.ts` (`AI_MODEL_OVERRIDE_<PURPOSE>` / `AI_REASONING_OVERRIDE_<PURPOSE>` for experiments). Every call is logged to `aiUsage`; `GET /api/admin/ai-usage` aggregates it.
+- Pre-generation of the topic×difficulty pool uses the OpenAI Batch API: `POST /api/admin/pregen` (`submit` / `collect` / `status` / `deficits`) or the hourly `GET /api/cron/pregen` with `Authorization: Bearer $CRON_SECRET`.
+- `npm run ai:eval -- --n 15` measures first-pass verification, repair success, cost and latency without persisting. Set `JUDGE_BACKEND=local` (host javac/python3/g++/node; development only) to avoid the Judge0 RapidAPI daily quota — the `dev-local` entry in `.claude/launch.json` starts the dev server that way.

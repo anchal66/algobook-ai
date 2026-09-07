@@ -1,0 +1,41 @@
+Evaluating 2 generations (E0/M2/H0) with JUDGE_BACKEND=local
+  [1/2] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1588,"cachedTokens":0,"outputTokens":16000,"reasoningTokens":2421,"costUsd":0.019518,"latencyMs":92546,"ok":false,"error":"incomplete: max_output_tokens"}
+  ✗ Medium/stack: Model output was cut off (max_output_tokens); raise maxOutputTokens or reduce verbosity []
+  [2/2] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1588,"cachedTokens":1457,"outputTokens":3637,"reasoningTokens":1069,"costUsd":0.00442,"latencyMs":27616,"ok":true}
+  [2/2] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":107,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":1175,"ok":true}
+  [2/2] verifying r0
+{"evt":"judge.local_toolchain_verified"}
+{"evt":"generate.adopted_reference_outputs","round":0,"title":"Largest Solid X in a Binary Matrix","adopted":1,"of":9}
+  ✓ Largest Solid X in a Binary Matrix (Medium/matrix) firstPass=false adopted=1 repairs=0 cost=$0.0044 29411 ms tests=2+9
+
+SUMMARY {
+  "generations": 2,
+  "firstPassRate": "0.0%",
+  "verifiedWithoutRepair": "50.0% (first pass + adopted reference outputs)",
+  "afterRepairRate": "50.0%",
+  "repairSuccessRate": "50.0% (1/2)",
+  "meanCostUsd": "0.0022",
+  "p50Ms": 92601,
+  "p95Ms": 92601,
+  "byDifficulty": {
+    "Easy": {
+      "n": 0,
+      "ok": 0,
+      "firstPass": 0
+    },
+    "Medium": {
+      "n": 2,
+      "ok": 1,
+      "firstPass": 0
+    },
+    "Hard": {
+      "n": 0,
+      "ok": 0,
+      "firstPass": 0
+    }
+  }
+}
+exit=2

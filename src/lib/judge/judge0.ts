@@ -66,10 +66,16 @@ async function judge0Fetch(path: string, init?: RequestInit): Promise<Response> 
 
 let verified: Promise<void> | null = null;
 
+/** `JUDGE_BACKEND=local` runs programs with the host toolchain (dev/eval only, see local.ts). */
+export function isLocalBackend(): boolean {
+  return env.JUDGE_BACKEND === "local";
+}
+
 /** Verifies the four Judge0 language ids exist on this instance (cached for the process lifetime). Fails loudly. */
 export function verifyLanguages(): Promise<void> {
   if (!verified) {
     verified = (async () => {
+      if (isLocalBackend()) { const { verifyLocalToolchain } = await import("@/lib/judge/local"); await verifyLocalToolchain(); return; }
       const res = await judge0Fetch("/languages");
       const list = (await res.json()) as { id: number; name: string }[];
       const ids = new Set(list.map((l) => l.id));
@@ -142,6 +148,7 @@ export async function pollBatch(tokens: string[]): Promise<RawSubmission[]> {
 /** Submit + poll in one call. */
 export async function runBatch(items: BatchItem[]): Promise<RawSubmission[]> {
   if (!items.length) return [];
+  if (isLocalBackend()) { const { runBatchLocal } = await import("@/lib/judge/local"); return runBatchLocal(items); }
   const tokens = await submitBatch(items);
   return pollBatch(tokens);
 }

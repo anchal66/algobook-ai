@@ -1,0 +1,61 @@
+Evaluating 4 generations (E2/M1/H1) with JUDGE_BACKEND=local
+  [1/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1535,"cachedTokens":1395,"outputTokens":6962,"reasoningTokens":4351,"costUsd":0.00841,"latencyMs":74220,"ok":true}
+  [1/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":94,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":899,"ok":true}
+  [1/4] verifying r0
+{"evt":"judge.local_toolchain_verified"}
+  ✓ Closest Cross-List Pair (Easy/two pointers) firstPass=true adopted=0 repairs=0 cost=$0.0084 75756 ms tests=3+10
+  [2/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1539,"cachedTokens":1395,"outputTokens":8249,"reasoningTokens":2885,"costUsd":0.009956,"latencyMs":74486,"ok":true}
+  [2/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":89,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":661,"ok":true}
+{"evt":"generate.static_failed","round":0,"title":"First Value Meeting the Mark","errors":["hiddenTests[5] duplicates sampleTests[0] (identical input)"]}
+  [2/4] repairing r1 gpt-5.6-luna
+{"evt":"ai.call","purpose":"repair","model":"gpt-5.6-luna","inputTokens":6927,"cachedTokens":1529,"outputTokens":8387,"reasoningTokens":3019,"costUsd":0.011175,"latencyMs":61707,"ok":true}
+  [2/4] verifying r1
+  ✓ First Value Meeting the Mark (Easy/binary search) firstPass=false adopted=0 repairs=1 cost=$0.0211 137261 ms tests=3+10
+  [3/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1536,"cachedTokens":1395,"outputTokens":11738,"reasoningTokens":5904,"costUsd":0.014142,"latencyMs":106944,"ok":true}
+  [3/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":93,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":369,"ok":true}
+  [3/4] verifying r0
+  ✓ Event Priority Rollup (Medium/heap) firstPass=true adopted=0 repairs=0 cost=$0.0141 107689 ms tests=3+10
+  [4/4] generating
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1546,"cachedTokens":1395,"outputTokens":8989,"reasoningTokens":7069,"costUsd":0.010845,"latencyMs":108892,"ok":true}
+  [4/4] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":87,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":609,"ok":true}
+{"evt":"generate.static_failed","round":0,"title":"Unordered Equal-Sum Partition Count","errors":["hiddenTests[3] duplicates sampleTests[1] (identical input)"]}
+  [4/4] repairing r1 gpt-5.6-luna
+{"evt":"ai.call","purpose":"repair","model":"gpt-5.6-luna","inputTokens":3483,"cachedTokens":1529,"outputTokens":4510,"reasoningTokens":2588,"costUsd":0.005833,"latencyMs":38938,"ok":true}
+  [4/4] verifying r1
+  ✓ Unordered Equal-Sum Partition Count (Hard/backtracking) firstPass=false adopted=0 repairs=1 cost=$0.0167 148845 ms tests=3+12
+
+SUMMARY {
+  "generations": 4,
+  "firstPassRate": "50.0%",
+  "verifiedWithoutRepair": "50.0% (first pass + adopted reference outputs)",
+  "afterRepairRate": "100.0%",
+  "repairSuccessRate": "100.0% (2/2)",
+  "meanCostUsd": "0.0151",
+  "p50Ms": 137261,
+  "p95Ms": 148845,
+  "byDifficulty": {
+    "Easy": {
+      "n": 2,
+      "ok": 2,
+      "firstPass": 1
+    },
+    "Medium": {
+      "n": 1,
+      "ok": 1,
+      "firstPass": 1
+    },
+    "Hard": {
+      "n": 1,
+      "ok": 1,
+      "firstPass": 0
+    }
+  }
+}
+exit=0

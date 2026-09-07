@@ -160,3 +160,18 @@ export async function nextPoolEntry(projectId: string): Promise<WithId<TemplateP
   const snap = await adminDb.collection(COL).doc(projectId).collection("templatePool").where("status", "==", "pending").orderBy("order", "asc").limit(1).get();
   return snap.empty ? null : { id: snap.docs[0].id, ...TemplatePoolEntrySchema.parse(snap.docs[0].data()) };
 }
+
+/** Problem ids linked to any of the user's projects (Module 02 reuse exclusion). */
+export async function itemProblemIdsForUser(uid: string, maxProjects = 50): Promise<string[]> {
+  const projectsSnap = await adminDb.collection(COL).where("uid", "==", uid).select().limit(maxProjects).get();
+  const ids = new Set<string>();
+  await Promise.all(projectsSnap.docs.map(async (p) => {
+    const items = await p.ref.collection("items").select().get();
+    items.docs.forEach((d) => ids.add(d.id));
+  }));
+  return [...ids];
+}
+
+export async function setInsights(projectId: string, insights: Record<string, unknown>): Promise<void> {
+  await adminDb.collection(COL).doc(projectId).update({ insights: { ...insights, generatedAt: Timestamp.now() } });
+}

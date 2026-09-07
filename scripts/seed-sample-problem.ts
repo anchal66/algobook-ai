@@ -211,7 +211,7 @@ async function main() {
   const id = await problems.create({
     id: "two-sum",
     problem: {
-      slug: "two-sum", number: 1, title: "Two Sum", difficulty: "Easy", tags: ["array", "hash-table"],
+      slug: "two-sum", number: 1, title: "Two Sum", difficulty: "Easy", tags: ["array", "hash map"],
       companies: ["amazon", "apple", "google", "meta", "microsoft", "uber"],
       statementMd,
       examples: [
