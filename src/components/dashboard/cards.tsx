@@ -13,6 +13,16 @@ import type { ContinueItem, DailyResponse } from "@/lib/app/api";
 import type { MeResponse } from "@/lib/workspace/types";
 import { fmtClock, levelProgress, secondsToUtcMidnight, timeAgo } from "@/lib/app/format";
 import { cn } from "@/lib/utils";
+import { errorText } from "@/lib/app/errors";
+
+export function ErrorLine({ error, onRetry }: { error: Error; onRetry?: () => void }) {
+  return (
+    <div className="text-sm">
+      <p className="text-text-2">{errorText(error)}</p>
+      {onRetry && <Button variant="outline" size="xs" className="mt-2" onClick={onRetry}>Retry</Button>}
+    </div>
+  );
+}
 
 function CardShell({ title, icon, children, className, action }: { title: string; icon: React.ReactNode; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
   return (
@@ -26,10 +36,10 @@ function CardShell({ title, icon, children, className, action }: { title: string
   );
 }
 
-export function ContinueCard({ item, loading }: { item: ContinueItem | null | undefined; loading: boolean }) {
+export function ContinueCard({ item, loading, error, onRetry }: { item: ContinueItem | null | undefined; loading: boolean; error?: Error | null; onRetry?: () => void }) {
   return (
     <CardShell title="Continue" icon={<Play className="size-4" />}>
-      {loading ? <Skeleton className="h-20" /> : item ? (
+      {loading ? <Skeleton className="h-20" /> : error && !item ? <ErrorLine error={error} onRetry={onRetry} /> : item ? (
         <>
           <Link href={item.href} className="line-clamp-2 text-md font-semibold text-text-1 hover:underline underline-offset-4">{item.number ? `${item.number}. ` : ""}{item.title}</Link>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-text-3">
@@ -49,14 +59,14 @@ export function ContinueCard({ item, loading }: { item: ContinueItem | null | un
   );
 }
 
-export function DailyCard({ daily, loading }: { daily: DailyResponse | undefined; loading: boolean }) {
+export function DailyCard({ daily, loading, error, onRetry }: { daily: DailyResponse | undefined; loading: boolean; error?: Error | null; onRetry?: () => void }) {
   const [left, setLeft] = useState(secondsToUtcMidnight());
   useEffect(() => { const t = setInterval(() => setLeft(secondsToUtcMidnight()), 1000); return () => clearInterval(t); }, []);
   const c = daily?.challenge;
   const href = c && daily?.projectId ? `/project/${daily.projectId}/solve/${c.problemId}` : c ? `/problems/${c.slug}` : "/daily";
   return (
     <CardShell title="Daily challenge" icon={<CalendarCheck className="size-4" />} action={<span className="tabular text-xs text-text-3" title="Resets at 00:00 UTC">{fmtClock(left)}</span>}>
-      {loading ? <Skeleton className="h-20" /> : c ? (
+      {loading ? <Skeleton className="h-20" /> : error && !daily ? <ErrorLine error={error} onRetry={onRetry} /> : c ? (
         <>
           <Link href={href} className="line-clamp-2 text-md font-semibold text-text-1 hover:underline underline-offset-4">{c.title}</Link>
           <div className="mt-1.5 flex items-center gap-2 text-xs text-text-3">

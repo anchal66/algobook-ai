@@ -382,7 +382,7 @@
         }
       ],
       "id": "performance",
-      "score": 0.94
+      "score": 0.96
     },
     "accessibility": {
       "title": "Accessibility",
@@ -944,14 +944,14 @@
   },
   "weakAudits": {
     "largest-contentful-paint": {
-      "score": 0.81,
+      "score": 0.83,
       "title": "Largest Contentful Paint",
-      "displayValue": "1.5 s"
+      "displayValue": "1.4 s"
     },
     "largest-contentful-paint-element": {
       "score": 0,
       "title": "Largest Contentful Paint element",
-      "displayValue": "1,470 ms"
+      "displayValue": "1,430 ms"
     },
     "label-content-name-mismatch": {
       "score": 0,
@@ -970,7 +970,7 @@
     "unused-javascript": {
       "score": 0,
       "title": "Reduce unused JavaScript",
-      "displayValue": "Est savings of 214 KiB"
+      "displayValue": "Est savings of 190 KiB"
     },
     "uses-text-compression": {
       "score": 0.5,
@@ -978,7 +978,7 @@
       "displayValue": "Est savings of 5 KiB"
     },
     "legacy-javascript": {
-      "score": 0,
+      "score": 0.5,
       "title": "Avoid serving legacy JavaScript to modern browsers",
       "displayValue": "Est savings of 13 KiB"
     },

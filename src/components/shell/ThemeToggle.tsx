@@ -5,6 +5,7 @@ import { useSettings, type ThemePref } from "@/store/settings";
 import { auth } from "@/lib/firebase";
 import { patchSettings } from "@/lib/workspace/api";
 import { cn } from "@/lib/utils";
+import { Segmented } from "@/components/ui/segmented";
 
 /** Cycles dark → light → system; keeps the workspace's editor theme setting in sync so both surfaces agree. */
 export function useThemePref() {
@@ -38,23 +39,5 @@ export function ThemeToggle({ className, showLabel }: { className?: string; show
 
 export function ThemeSegmented({ className }: { className?: string }) {
   const { theme, set } = useThemePref();
-  const opts: { v: ThemePref; label: string; icon: typeof Sun }[] = [
-    { v: "light", label: "Light", icon: Sun }, { v: "dark", label: "Dark", icon: Moon }, { v: "system", label: "System", icon: Monitor },
-  ];
-  return (
-    <div role="radiogroup" aria-label="Theme" className={cn("inline-flex rounded-[8px] bg-surface-2 p-[3px]", className)}>
-      {opts.map((o) => (
-        <button
-          key={o.v}
-          role="radio"
-          aria-checked={theme === o.v}
-          type="button"
-          onClick={() => set(o.v)}
-          className={cn("flex h-8 items-center gap-1.5 rounded-[6px] px-3 text-sm font-medium transition-colors", theme === o.v ? "bg-card text-text-1 shadow-sm" : "text-text-2 hover:text-text-1")}
-        >
-          <o.icon className="size-4" />{o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented<ThemePref> label="Theme" className={className} value={theme} onChange={set} options={[{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }, { value: "system", label: "System", icon: Monitor }]} />;
 }

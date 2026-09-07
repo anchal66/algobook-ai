@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, Play } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery } from "@/lib/app/query";
-import { getProject } from "@/lib/app/api";
+import { ApiError, getProject } from "@/lib/app/api";
+import { errorText } from "@/lib/app/errors";
 import { AppShell } from "@/components/shell/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,11 @@ function Overview({ projectId }: { projectId: string }) {
   const solveHref = nextItem ? `/project/${projectId}/solve/${nextItem.problemId}` : `/project/${projectId}/solve/next`;
 
   if (q.loading) return <div className="space-y-4"><Skeleton className="h-24" /><Skeleton className="h-96" /></div>;
-  if (q.error || !project) return <EmptyState title="Project not found" description={q.error?.message ?? "It may have been deleted."} action={<Button asChild variant="outline"><Link href="/projects">All projects</Link></Button>} />;
+  if (q.error || !project) {
+    const status = q.error instanceof ApiError ? q.error.status : 0;
+    const notFound = !q.error || status === 404 || status === 403;
+    return <EmptyState title={notFound ? "Project not found" : "Couldn't load this project"} description={notFound ? "It may have been deleted." : errorText(q.error)} action={<>{!notFound && <Button variant="brand" onClick={() => void q.refetch()}>Retry</Button>}<Button asChild variant="outline"><Link href="/projects">All projects</Link></Button></>} />;
+  }
 
   const pr = project.progress;
   const pct = pr.items ? Math.round((pr.solved / pr.items) * 100) : 0;

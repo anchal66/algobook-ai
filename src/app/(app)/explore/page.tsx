@@ -24,22 +24,18 @@ function ExploreInner() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
-  const urlFilters = useMemo(() => fromSearchParams(new URLSearchParams(sp.toString())), [sp]);
-  const [f, setF] = useState<ExploreFilters>(urlFilters);
+  const f = useMemo(() => fromSearchParams(new URLSearchParams(sp.toString())), [sp]);
   const [tableH, setTableH] = useState(640);
 
-  // Keep the URL in sync (replace, so back navigation returns to the previous page with filters intact).
+  // The URL is the single source of truth (Back/Forward and shared links restore the exact filters).
   const onChange = useCallback((patch: Partial<ExploreFilters>) => {
-    setF((prev) => {
-      const next = { ...prev, ...patch };
-      const qs = toSearchParams(next).toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-      return next;
-    });
-  }, [router, pathname]);
+    const next = { ...f, ...patch };
+    const qs = toSearchParams(next).toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [router, pathname, f]);
 
   useEffect(() => {
-    const fit = () => setTableH(Math.max(420, window.innerHeight - 330));
+    const fit = () => setTableH(window.innerWidth < 640 ? Math.max(480, window.innerHeight - 120) : Math.max(420, window.innerHeight - 330));
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
@@ -78,11 +74,11 @@ function ExploreInner() {
         description={<>Every verified problem in the shared bank. {all.length > 0 && <>You&rsquo;ve solved <span className="font-medium text-text-1 tabular">{solvedCount}</span> of {all.length.toLocaleString()}.</>}</>}
       />
       {topics.length > 0 && (
-        <div className="mask-fade-x no-scrollbar -mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1" role="list" aria-label="Topics">
+        <div className="mask-fade-x no-scrollbar -mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Topics">
           {topics.slice(0, 24).map((t) => {
             const on = f.topics.includes(t.tag);
             return (
-              <button key={t.tag} type="button" role="listitem" onClick={() => onChange({ topics: on ? f.topics.filter((x) => x !== t.tag) : [...f.topics, t.tag] })} className={cn("flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors", on ? "border-brand bg-brand-soft text-brand" : "border-line bg-card text-text-2 hover:border-line-strong hover:text-text-1")}>
+              <button key={t.tag} type="button" aria-pressed={on} onClick={() => onChange({ topics: on ? f.topics.filter((x) => x !== t.tag) : [...f.topics, t.tag] })} className={cn("flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors", on ? "border-brand bg-brand-soft text-brand" : "border-line bg-card text-text-2 hover:border-line-strong hover:text-text-1")}>
                 {titleCase(t.tag)}<Badge size="sm" variant={on ? "brand" : "neutral"}>{t.count}</Badge>
               </button>
             );

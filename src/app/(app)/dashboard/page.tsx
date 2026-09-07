@@ -19,6 +19,7 @@ import { ContinueCard, DailyCard, RatingCard, StreakCard } from "@/components/da
 import { Onboarding } from "@/components/dashboard/Onboarding";
 import { NewProjectTile, ProjectCard, isSystemProject } from "@/components/dashboard/ProjectCard";
 import { titleCase } from "@/lib/app/format";
+import { errorText } from "@/lib/app/errors";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   const firstName = (me?.user.displayName || user?.displayName || "there").split(" ")[0];
   const isNew = !!me && !!projects.data && visible.length === 0 && (stats?.totalSolved ?? 0) === 0;
   const onboarding = { hasProject: visible.length > 0, hasSolve: (stats?.totalSolved ?? 0) > 0, hasProfile: !!me?.user.bio };
+  const firstProjectId = visible[0]?.id ?? null;
   const showOnboarding = !!me && !!projects.data && (!onboarding.hasProject || !onboarding.hasSolve || !onboarding.hasProfile) && (stats?.totalSolved ?? 0) < 3;
 
   return (
@@ -57,11 +59,11 @@ export default function DashboardPage() {
         }
       />
 
-      {showOnboarding && <Reveal className="mb-6"><Onboarding state={onboarding} firstName={firstName} /></Reveal>}
+      {showOnboarding && <Reveal className="mb-6"><Onboarding state={onboarding} firstName={firstName} firstProjectId={firstProjectId} /></Reveal>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Reveal delay={0}><ContinueCard item={cont.data?.item} loading={cont.loading} /></Reveal>
-        <Reveal delay={0.05}><DailyCard daily={daily.data} loading={daily.loading} /></Reveal>
+        <Reveal delay={0}><ContinueCard item={cont.data?.item} loading={cont.loading} error={cont.error} onRetry={() => void cont.refetch()} /></Reveal>
+        <Reveal delay={0.05}><DailyCard daily={daily.data} loading={daily.loading} error={daily.error} onRetry={() => void daily.refetch()} /></Reveal>
         <Reveal delay={0.1}><StreakCard me={me} /></Reveal>
         <Reveal delay={0.15}><RatingCard me={me} /></Reveal>
       </div>
@@ -74,7 +76,7 @@ export default function DashboardPage() {
         {projects.loading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>
         ) : projects.error ? (
-          <EmptyState title="Couldn't load projects" description={projects.error.message} action={<Button variant="outline" onClick={() => void projects.refetch()}>Retry</Button>} />
+          <EmptyState title="Couldn't load projects" description={errorText(projects.error)} action={<Button variant="outline" onClick={() => void projects.refetch()}>Retry</Button>} />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visible.slice(0, isNew ? 0 : 5).map((p, i) => <Reveal key={p.id} delay={i * 0.04}><ProjectCard project={p} /></Reveal>)}
@@ -117,7 +119,7 @@ export default function DashboardPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState compact title="No recommendations yet" description={recommended.error?.message ?? "The pool fills as problems are verified."} />
+            <EmptyState compact title={recommended.error ? "Couldn't load recommendations" : "No recommendations yet"} description={recommended.error ? errorText(recommended.error) : "The pool fills as problems are verified."} action={recommended.error ? <Button size="sm" variant="outline" onClick={() => void recommended.refetch()}>Retry</Button> : undefined} />
           )}
         </Card>
       </div>

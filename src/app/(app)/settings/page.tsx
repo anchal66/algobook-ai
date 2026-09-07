@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { AlertTriangle, Check, CreditCard, ExternalLink, Sparkles } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -64,22 +65,22 @@ export default function SettingsPage() {
   const pro = me.plan.tier === "pro";
   const notif = me.user.settings.notifications;
 
-  const saveName = async () => { setSavingName(true); try { await patchMe({ displayName: name.trim() }); await load(user.uid, true); toast.success("Name updated"); } catch (e) { toast.error((e as Error).message); } finally { setSavingName(false); } };
+  const saveName = async () => { setSavingName(true); try { await patchMe({ displayName: name.trim() }); await load(user.uid, true); toast.success("Name updated"); } catch (e) { toast.error(errorText(e)); } finally { setSavingName(false); } };
   const buy = async (plan: "pro-monthly" | "pro-yearly") => {
     setCheckout(plan); track("checkout_start", { plan });
-    try { const { checkoutUrl } = await startCheckout(plan); window.location.assign(checkoutUrl); } catch (e) { toast.error((e as Error).message); setCheckout(null); }
+    try { const { checkoutUrl } = await startCheckout(plan); window.location.assign(checkoutUrl); } catch (e) { toast.error(errorText(e)); setCheckout(null); }
   };
-  const toggleNotif = async (patch: { dailyReminder?: boolean; streakAlerts?: boolean }) => { try { await patchNotifications(patch); await load(user.uid, true); } catch (e) { toast.error((e as Error).message); } };
-  const togglePublic = async (v: boolean) => { try { await patchMe({ publicProfile: v }); await load(user.uid, true); toast.success(v ? "Profile is public" : "Profile is private"); } catch (e) { toast.error((e as Error).message); } };
+  const toggleNotif = async (patch: { dailyReminder?: boolean; streakAlerts?: boolean }) => { try { await patchNotifications(patch); await load(user.uid, true); } catch (e) { toast.error(errorText(e)); } };
+  const togglePublic = async (v: boolean) => { try { await patchMe({ publicProfile: v }); await load(user.uid, true); toast.success(v ? "Profile is public" : "Profile is private"); } catch (e) { toast.error(errorText(e)); } };
   const del = async () => {
     setDeleting(true);
-    try { await deleteMe(); clearQueries(); useMe.getState().reset(); await signOut(auth); toast.success("Account deleted"); router.push("/"); } catch (e) { toast.error((e as Error).message); setDeleting(false); }
+    try { await deleteMe(); clearQueries(); useMe.getState().reset(); await signOut(auth); toast.success("Account deleted"); router.push("/"); } catch (e) { toast.error(errorText(e)); setDeleting(false); }
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
-      <nav aria-label="Settings sections" className="hidden lg:block">
-        <ul className="sticky top-20 space-y-0.5 text-sm">{SECTIONS.map(([id, label]) => <li key={id}><a href={`#${id}`} className={cn("block rounded-[8px] px-3 py-2 text-text-2 hover:bg-surface-2 hover:text-text-1", id === "danger" && "text-err")}>{label}</a></li>)}</ul>
+      <nav aria-label="Settings sections" className="lg:sticky lg:top-20 lg:self-start">
+        <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 pb-1 text-sm lg:mx-0 lg:flex-col lg:space-y-0.5 lg:px-0">{SECTIONS.map(([id, label]) => <li key={id} className="shrink-0"><a href={`#${id}`} className={cn("block whitespace-nowrap rounded-[8px] px-3 py-2 text-text-2 hover:bg-surface-2 hover:text-text-1", id === "danger" && "text-err")}>{label}</a></li>)}</ul>
       </nav>
       <div className="space-y-4">
         <PageHeader title="Settings" className="mb-2" />

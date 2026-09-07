@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 
 export interface OnboardingState { hasProject: boolean; hasSolve: boolean; hasProfile: boolean }
 
-export function Onboarding({ state, firstName }: { state: OnboardingState; firstName: string }) {
+export function Onboarding({ state, firstName, firstProjectId }: { state: OnboardingState; firstName: string; firstProjectId?: string | null }) {
   const steps = [
     { done: state.hasProject, title: "Create your first project", text: "Pick a company template or describe your goal — we plan the problem list.", href: "/projects/new", cta: "New project" },
-    { done: state.hasSolve, title: "Solve your first problem", text: "Run against sample tests, submit, and unlock your rating.", href: state.hasProject ? "/dashboard" : "/explore", cta: state.hasProject ? "Open project" : "Explore" },
+    { done: state.hasSolve, title: "Solve your first problem", text: "Run against sample tests, submit, and unlock your rating.", href: state.hasProject && firstProjectId ? `/project/${firstProjectId}/solve/next` : "/explore", cta: state.hasProject && firstProjectId ? "Solve your first problem" : "Explore" },
     { done: state.hasProfile, title: "Set up your profile", text: "Add a bio and skills so your public profile is share-ready.", href: "/profile/edit", cta: "Edit profile" },
   ];
   const doneCount = steps.filter((s) => s.done).length;

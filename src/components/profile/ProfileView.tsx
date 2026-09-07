@@ -11,6 +11,8 @@ import type { UserStats } from "@/types";
 import { Reveal } from "@/components/design/motion";
 import { fmtNumber, titleCase } from "@/lib/app/format";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { errorText } from "@/lib/app/errors";
 
 export interface ProfileData extends ProfileIdentity {
   stats: UserStats;
@@ -71,7 +73,7 @@ export function ProfileView({ p, isOwner }: { p: ProfileData; isOwner: boolean }
             </Card>
           </Reveal>
         </div>
-        <Reveal><BadgesGrid data={badges.data} /></Reveal>
+        <Reveal>{badges.error && !badges.data ? <Card className="p-5"><p className="text-sm text-text-2">Couldn&rsquo;t load badges: {errorText(badges.error)}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => void badges.refetch()}>Retry</Button></Card> : <BadgesGrid data={badges.data} />}</Reveal>
         <div className="grid gap-4 md:grid-cols-2">
           <Reveal>
             <Card className="p-5">

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Crown, Flame, Info, Trophy } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { useQuery } from "@/lib/app/query";
 import { getLeaderboard, type GlobalEntry, type LeaderboardResponse, type TemplateEntry, type WeekEntry } from "@/lib/app/api";
 import { PageHeader } from "@/components/shell/AppShell";
@@ -43,7 +45,7 @@ export default function LeaderboardPage() {
     try {
       const r = await getLeaderboard({ scope: "global", cursor: nextCursor, limit: 50 });
       if (r.scope === "global") { setPages((p) => [...p, r.entries]); setCursor(r.nextCursor); }
-    } finally { setLoadingMore(false); }
+    } catch (e) { toast.error(errorText(e)); } finally { setLoadingMore(false); }
   };
   const changeScope = (s: Scope) => { setScope(s); setPages([]); setCursor(null); };
 

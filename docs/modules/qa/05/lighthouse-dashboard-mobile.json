@@ -382,7 +382,7 @@
         }
       ],
       "id": "performance",
-      "score": 0.6
+      "score": 0.64
     },
     "accessibility": {
       "title": "Accessibility",
@@ -944,34 +944,29 @@
   },
   "weakAudits": {
     "first-contentful-paint": {
-      "score": 0.09,
+      "score": 0.12,
       "title": "First Contentful Paint",
-      "displayValue": "5.0 s"
+      "displayValue": "4.8 s"
     },
     "largest-contentful-paint": {
-      "score": 0.02,
+      "score": 0.03,
       "title": "Largest Contentful Paint",
-      "displayValue": "8.2 s"
+      "displayValue": "7.7 s"
     },
     "speed-index": {
-      "score": 0.63,
+      "score": 0.67,
       "title": "Speed Index",
-      "displayValue": "5.0 s"
-    },
-    "max-potential-fid": {
-      "score": 0.87,
-      "title": "Max Potential First Input Delay",
-      "displayValue": "140 ms"
+      "displayValue": "4.8 s"
     },
     "interactive": {
-      "score": 0.41,
+      "score": 0.45,
       "title": "Time to Interactive",
-      "displayValue": "8.2 s"
+      "displayValue": "7.8 s"
     },
     "largest-contentful-paint-element": {
       "score": 0,
       "title": "Largest Contentful Paint element",
-      "displayValue": "8,170 ms"
+      "displayValue": "7,720 ms"
     },
     "uses-long-cache-ttl": {
       "score": 0.5,
@@ -986,7 +981,7 @@
     "unused-javascript": {
       "score": 0,
       "title": "Reduce unused JavaScript",
-      "displayValue": "Est savings of 214 KiB"
+      "displayValue": "Est savings of 190 KiB"
     },
     "uses-text-compression": {
       "score": 0,
@@ -1013,9 +1008,8 @@
       "title": "Network dependency tree"
     },
     "render-blocking-insight": {
-      "score": 0,
-      "title": "Render blocking requests",
-      "displayValue": "Est savings of 150 ms"
+      "score": 0.5,
+      "title": "Render blocking requests"
     }
   }
 }

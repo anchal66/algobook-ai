@@ -7,6 +7,8 @@ import { signOut } from "firebase/auth";
 import { ArrowRight, Dices, FolderKanban, LogOut, Moon, Plus, Search, Sun } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { useAuth } from "@/context/AuthContext";
 import { useMe } from "@/store/me";
 import { useQuery, clearQueries } from "@/lib/app/query";
@@ -67,7 +69,7 @@ function PaletteDialog() {
   const go = (href: string) => { close(); router.push(href); };
   const pick = async () => {
     close();
-    try { const r = await randomProblem(); if (r.item) router.push(`/problems/${r.item.slug}`); } catch { /* ignore */ }
+    try { const r = await randomProblem(); if (r.item) router.push(`/problems/${r.item.slug}`); else toast.message("No unsolved problems to pick from right now."); } catch (e) { toast.error(errorText(e)); }
   };
   const logout = async () => { close(); clearQueries(); useMe.getState().reset(); await signOut(auth); router.push("/"); };
 

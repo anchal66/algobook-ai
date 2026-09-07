@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ArrowDownWideNarrow, Award, Binary, BookOpen, Brackets, Building2, CalendarCheck, CornerDownRight, Crown, Flame, GitBranch, GitFork, GraduationCap, Grid3x3, Hash, Languages, Layers, Leaf, Link as LinkIcon, Link2, ListOrdered, Lock, MapPin, Medal, Moon, Mountain, MoveHorizontal, Network, PanelLeftOpen, Pencil, Repeat, Rocket, Search, Share2, ShieldCheck, Sigma, Skull, Sparkles, Star, Table, Target, TextCursorInput, TrendingUp, Trophy, Type, Undo2, Waves, Zap, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -26,6 +27,7 @@ export function IdentityCard({ p, isOwner, rank }: { p: ProfileIdentity; isOwner
     try { await navigator.clipboard.writeText(url); toast.success("Profile link copied"); } catch { toast.message(url); }
   };
   const host = (u: string) => { try { return new URL(u).hostname.replace("www.", ""); } catch { return u; } };
+  const pathOf = (u: string) => { try { const x = new URL(u); return x.hostname.replace("www.", "") + x.pathname.replace(/\/$/, ""); } catch { return u; } };
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -41,7 +43,7 @@ export function IdentityCard({ p, isOwner, rank }: { p: ProfileIdentity; isOwner
         {p.company && <li className="flex items-center gap-2"><Building2 className="size-4 text-text-3" />{p.company}</li>}
         {p.college && <li className="flex items-center gap-2"><GraduationCap className="size-4 text-text-3" />{p.college}</li>}
         {p.location && <li className="flex items-center gap-2"><MapPin className="size-4 text-text-3" />{p.location}</li>}
-        {p.githubUrl && <li className="flex items-center gap-2"><GithubMark className="size-4 text-text-3" /><a href={p.githubUrl} target="_blank" rel="noreferrer" className="truncate hover:text-text-1 hover:underline">{host(p.githubUrl)}{new URL(p.githubUrl).pathname}</a></li>}
+        {p.githubUrl && <li className="flex items-center gap-2"><GithubMark className="size-4 text-text-3" /><a href={p.githubUrl} target="_blank" rel="noreferrer" className="truncate hover:text-text-1 hover:underline">{pathOf(p.githubUrl)}</a></li>}
         {p.linkedinUrl && <li className="flex items-center gap-2"><LinkedinMark className="size-4 text-text-3" /><a href={p.linkedinUrl} target="_blank" rel="noreferrer" className="truncate hover:text-text-1 hover:underline">{host(p.linkedinUrl)}</a></li>}
         <li className="flex items-center gap-2 text-text-3"><Link2 className="size-4" />Joined {fmtDate(p.createdAt, { month: "short", year: "numeric" })}</li>
       </ul>
@@ -137,7 +139,7 @@ export function RecentAccepted({ rows }: { rows: { id: string; title: string; sl
   return (
     <Card className="p-5">
       <h2 className="text-md font-semibold text-text-1">Recent accepted</h2>
-      {!rows ? null : rows.length === 0 ? <p className="mt-2 text-sm text-text-3">No accepted submissions yet.</p> : (
+      {rows === undefined ? <Skeleton className="mt-3 h-16" /> : rows.length === 0 ? <p className="mt-2 text-sm text-text-3">No accepted submissions yet.</p> : (
         <ul className="mt-2 divide-y divide-line">
           {rows.map((r) => <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm"><Link href={`/problems/${r.slug}`} className="truncate font-medium text-text-1 hover:underline">{r.title}</Link><span className="shrink-0 text-xs text-text-3">{titleCase(r.language)} · {fmtDate(r.at, { month: "short", day: "numeric" })}</span></li>)}
         </ul>

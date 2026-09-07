@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { ChevronDown, Lock, Mic2, Play, Sparkles, Timer } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useMe } from "@/store/me";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, DifficultyBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtClock, fmtDate, fmtDuration } from "@/lib/app/format";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,8 @@ export default function InterviewPage() {
   const [duration, setDuration] = useState<30 | 45 | 60>(45);
   const [difficulty, setDifficulty] = useState<"mixed" | "medium" | "hard">("mixed");
   const [busy, setBusy] = useState(false);
+  const [finishing, setFinishing] = useState<string | null>(null);
+  const [confirmFinish, setConfirmFinish] = useState<string | null>(null);
   const now = useNow();
   const allowed = me ? me.quotas.limits.interview !== 0 : true;
   const left = me ? (me.quotas.limits.interview < 0 ? Infinity : Math.max(0, me.quotas.limits.interview - (me.quotas.used.interview ?? 0))) : 0;
@@ -46,18 +50,24 @@ export default function InterviewPage() {
       invalidate("/api/interview");
       track("upgrade_click", { source: "interview_start" });
       router.push(`/project/${r.projectId}/solve/${r.interview.problems[0]?.problemId ?? "next"}`);
-    } catch (e) { toast.error((e as Error).message); setBusy(false); }
+    } catch (e) { toast.error(errorText(e)); setBusy(false); }
   };
 
   const finish = async (id: string) => {
-    setBusy(true);
-    try { await finishInterview(id); toast.success("Interview finished — your debrief is ready."); invalidate("/api/interview"); } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+    setFinishing(id); setConfirmFinish(null);
+    try { await finishInterview(id); toast.success("Interview finished — your debrief is ready."); invalidate("/api/interview"); } catch (e) { toast.error(errorText(e)); } finally { setFinishing(null); }
   };
 
   return (
     <>
       <PageHeader title="Mock interview" description="A timed session with two problems chosen around your rating. No hints, no editorial, no tutor — then an AI interviewer debriefs you." />
-      {active && <ActiveBanner interview={active} onFinish={() => void finish(active.id)} busy={busy} />}
+      {active && <ActiveBanner interview={active} onFinish={() => setConfirmFinish(active.id)} busy={finishing === active.id} />}
+      <Dialog open={!!confirmFinish} onOpenChange={(v) => { if (!v) setConfirmFinish(null); }}>
+        <DialogContent className="rounded-modal border-line bg-card sm:max-w-md">
+          <DialogHeader><DialogTitle>End the interview now?</DialogTitle><DialogDescription>The timer stops, unsolved problems count as unsolved, and the AI debrief is generated from what you have submitted so far. This cannot be undone.</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant="ghost" onClick={() => setConfirmFinish(null)}>Keep going</Button><Button variant="destructive" onClick={() => confirmFinish && void finish(confirmFinish)}>End interview</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
         <Card className="p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-text-1"><Mic2 className="size-5 text-brand" /> Start a session</h2>
@@ -102,7 +112,7 @@ export default function InterviewPage() {
             <EmptyState compact icon={<Timer />} title="No sessions yet" description="Your debriefs — score, verdict, strengths and gaps — collect here." />
           ) : (
             <ul className="mt-4 divide-y divide-line">
-              {interviews.filter((i) => i !== active).map((i) => <HistoryRow key={i.id} i={i} onFinish={() => void finish(i.id)} busy={busy} />)}
+              {interviews.filter((i) => i !== active).map((i) => <HistoryRow key={i.id} i={i} onFinish={() => void finish(i.id)} busy={finishing === i.id} />)}
             </ul>
           )}
         </Card>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { Building2, CalendarDays, MoreHorizontal, Play, Trash2, BarChart3 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ export function ProjectCard({ project, className }: { project: ProjectDTO; class
       toast.success(`Deleted “${project.title}”`);
       invalidate("/api/projects");
       setConfirm(false);
-    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { toast.error(errorText(e)); } finally { setBusy(false); }
   };
 
   return (

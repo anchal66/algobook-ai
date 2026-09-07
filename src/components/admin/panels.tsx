@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Play, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -78,7 +79,7 @@ export function CoveragePanel() {
   const poolMin = q.data?.poolMin ?? 6;
   const run = async (action: "submit" | "collect") => {
     setBusy(action);
-    try { const r = await pregen({ action, maxRequests: 60 }); toast.success(r.message ?? (action === "collect" ? `Collected ${r.collected?.length ?? 0} job(s)` : "Batch submitted")); invalidate("/api/admin/pregen"); } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
+    try { const r = await pregen({ action, maxRequests: 60 }); toast.success(r.message ?? (action === "collect" ? `Collected ${r.collected?.length ?? 0} job(s)` : "Batch submitted")); invalidate("/api/admin/pregen"); } catch (e) { toast.error(errorText(e)); } finally { setBusy(null); }
   };
   return (
     <Card className="p-5">
@@ -113,11 +114,11 @@ export function FlaggedPanel() {
       else if (r.action === "languages_disabled") toast.warning(`“${r.title}”: disabled ${r.disabled.join(", ")} — ${summary}`);
       else toast.error(`“${r.title}” retired: the Java reference no longer passes — ${summary}`);
       invalidate("/api/admin/problems"); invalidate("/api/problems/catalog");
-    } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
+    } catch (e) { toast.error(errorText(e)); } finally { setBusy(null); }
   };
   const setStatus = async (id: string, status: "verified" | "retired") => {
     setBusy(id);
-    try { await setProblemStatus(id, status); toast.success(status === "retired" ? "Problem retired" : "Problem restored"); invalidate("/api/admin/problems"); invalidate("/api/problems/catalog"); } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
+    try { await setProblemStatus(id, status); toast.success(status === "retired" ? "Problem retired" : "Problem restored"); invalidate("/api/admin/problems"); invalidate("/api/problems/catalog"); } catch (e) { toast.error(errorText(e)); } finally { setBusy(null); }
   };
   return (
     <Card className="p-5">
@@ -162,7 +163,7 @@ export function TriggersPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const run = async (action: "snapshot" | "daily") => {
     setBusy(action);
-    try { const r = await leaderboardSnapshot(action); toast.success(action === "snapshot" ? `Snapshot done · ${r.global?.total ?? 0} ranked · ${r.ms ?? 0} ms` : r.created ? "Daily challenge created" : "Daily challenge already exists"); invalidate("/api/leaderboard"); invalidate("/api/daily"); } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
+    try { const r = await leaderboardSnapshot(action); toast.success(action === "snapshot" ? `Snapshot done · ${r.global?.total ?? 0} ranked · ${r.ms ?? 0} ms` : r.created ? "Daily challenge created" : "Daily challenge already exists"); invalidate("/api/leaderboard"); invalidate("/api/daily"); } catch (e) { toast.error(errorText(e)); } finally { setBusy(null); }
   };
   return (
     <Card className="p-5">

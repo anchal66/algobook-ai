@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { CheckCircle2, Lightbulb, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ export function PlanTab({ project }: { project: ProjectDTO }) {
   const q = useQuery(`insights:${project.id}`, () => getInsights(project.id), { staleMs: 10 * 60_000, enabled: !cached });
   const insights = (q.data?.insights ?? cached) as ProjectInsights | null;
   const [refreshing, setRefreshing] = useState(false);
-  const refresh = async () => { setRefreshing(true); try { await getInsights(project.id, true); invalidate("/api/projects"); } catch (e) { toast.error((e as Error).message); } finally { setRefreshing(false); } };
+  const refresh = async () => { setRefreshing(true); try { await getInsights(project.id, true); invalidate("/api/projects"); } catch (e) { toast.error(errorText(e)); } finally { setRefreshing(false); } };
   const solved = project.progress.solved;
 
   if (!insights) {
@@ -142,10 +143,12 @@ export function ActivityTab({ project }: { project: ProjectDTO }) {
       <div className="grid grid-cols-2 gap-px border-b border-line bg-line sm:grid-cols-4">
         {[["Active days", days.length], ["Submissions", totals.sub], ["Accepted", totals.acc], ["Time", fmtDuration(totals.time)]].map(([k, v]) => <div key={String(k)} className="bg-card p-4"><p className="text-xs text-text-3">{k}</p><p className="text-lg font-semibold tabular text-text-1">{v}</p></div>)}
       </div>
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px] text-sm">
         <thead className="bg-surface-1 text-left text-xs uppercase tracking-wider text-text-3"><tr><th className="px-4 py-2.5 font-medium">Date</th><th className="px-4 py-2.5 text-right font-medium">Runs</th><th className="px-4 py-2.5 text-right font-medium">Submissions</th><th className="px-4 py-2.5 text-right font-medium">Accepted</th><th className="px-4 py-2.5 text-right font-medium">Time</th><th className="px-4 py-2.5 text-right font-medium">XP</th></tr></thead>
         <tbody>{days.map((d) => <tr key={d.date} className="border-t border-line/70"><td className="px-4 py-2.5 text-text-1">{fmtDate(d.date + "T00:00:00Z", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}{d.dailySolved && <Badge size="sm" variant="brand" className="ml-2">Daily</Badge>}</td><td className="px-4 py-2.5 text-right tabular text-text-2">{d.runs}</td><td className="px-4 py-2.5 text-right tabular text-text-2">{d.submissions}</td><td className="px-4 py-2.5 text-right tabular text-ok">{d.accepted}</td><td className="px-4 py-2.5 text-right tabular text-text-2">{fmtDuration(d.timeSpentSec)}</td><td className="px-4 py-2.5 text-right tabular text-text-2">+{Math.round(d.xpEarned)}</td></tr>)}</tbody>
       </table>
+      </div>
     </Card>
   );
 }
@@ -166,11 +169,11 @@ export function SettingsTab({ project }: { project: ProjectDTO }) {
   const save = async () => {
     if (!title.trim()) { toast.error("Title is required."); return; }
     setSaving(true);
-    try { await patchProject(project.id, { title: title.trim(), purpose, description, selectedTopics: topics, durationDays: duration }); invalidate("/api/projects"); toast.success("Project updated"); } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
+    try { await patchProject(project.id, { title: title.trim(), purpose, description, selectedTopics: topics, durationDays: duration }); invalidate("/api/projects"); toast.success("Project updated"); } catch (e) { toast.error(errorText(e)); } finally { setSaving(false); }
   };
   const remove = async () => {
     setDeleting(true);
-    try { await deleteProject(project.id); invalidate("/api/projects"); toast.success("Project deleted"); router.push("/projects"); } catch (e) { toast.error((e as Error).message); setDeleting(false); }
+    try { await deleteProject(project.id); invalidate("/api/projects"); toast.success("Project deleted"); router.push("/projects"); } catch (e) { toast.error(errorText(e)); setDeleting(false); }
   };
 
   return (

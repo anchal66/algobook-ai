@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, invalidate } from "@/lib/app/query";
@@ -47,7 +48,7 @@ export default function NewProjectPage() {
       toast.success("Project created — building your plan…");
       router.push(`/project/${project.id}?tab=plan`);
     } catch (e) {
-      toast.error((e as Error).message || "Could not create the project.");
+      toast.error(errorText(e, "Could not create the project."));
       setBusy(false);
     }
   };
@@ -76,7 +77,7 @@ export default function NewProjectPage() {
       </div>
 
       <div className="mt-8 flex items-center justify-between border-t border-line pt-5">
-        <Button variant="ghost" onClick={() => (step === 0 ? router.push("/dashboard") : setStep(step - 1))} disabled={busy}><ArrowLeft className="size-4" /> {step === 0 ? "Cancel" : "Back"}</Button>
+        <Button variant="ghost" onClick={() => (step === 0 ? (window.history.length > 1 ? router.back() : router.push("/projects")) : setStep(step - 1))} disabled={busy}><ArrowLeft className="size-4" /> {step === 0 ? "Cancel" : "Back"}</Button>
         {step < STEPS.length - 1 ? (
           <Button variant="brand" onClick={() => setStep(step + 1)} disabled={!canNext}>Continue <ArrowRight className="size-4" /></Button>
         ) : (

@@ -984,12 +984,12 @@
       "displayValue": "Est savings of 13 KiB"
     },
     "cache-insight": {
-      "score": 0,
+      "score": 0.5,
       "title": "Use efficient cache lifetimes",
       "displayValue": "Est savings of 80 KiB"
     },
     "legacy-javascript-insight": {
-      "score": 0.5,
+      "score": 0,
       "title": "Legacy JavaScript",
       "displayValue": "Est savings of 13 KiB"
     },

@@ -961,7 +961,7 @@
     "unused-javascript": {
       "score": 0,
       "title": "Reduce unused JavaScript",
-      "displayValue": "Est savings of 217 KiB"
+      "displayValue": "Est savings of 216 KiB"
     },
     "legacy-javascript": {
       "score": 0,

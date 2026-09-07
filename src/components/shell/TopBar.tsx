@@ -74,8 +74,8 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             {pro ? (
               <span className="hidden h-8 items-center gap-1 rounded-full bg-brand px-2.5 text-xs font-semibold text-white sm:flex"><Sparkles className="size-3.5" /> Pro</span>
             ) : (
-              <Link href="/settings#plan" className="hidden h-8 items-center gap-1 rounded-full border border-brand/40 bg-brand-soft px-2.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/20 sm:flex">
-                <Sparkles className="size-3.5" /> Upgrade
+              <Link href="/settings#plan" aria-label="Upgrade to Pro" className="flex h-8 items-center gap-1 rounded-full border border-brand/40 bg-brand-soft px-2.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/20">
+                <Sparkles className="size-3.5" /> <span className="hidden sm:inline">Upgrade</span>
               </Link>
             )}
             <UserMenu />

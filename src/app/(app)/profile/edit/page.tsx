@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { errorText } from "@/lib/app/errors";
 import { AtSign, Check, Loader2, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useMe } from "@/store/me";
@@ -62,11 +63,11 @@ export default function ProfileEditPage() {
     if (!URL_OK(form.githubUrl, "github.com")) { toast.error("GitHub URL must start with https:// and point to github.com."); return; }
     if (!URL_OK(form.linkedinUrl, "linkedin.com")) { toast.error("LinkedIn URL must start with https:// and point to linkedin.com."); return; }
     setSaving(true);
-    try { await patchMe({ ...form, displayName: form.displayName.trim() }); await load(user.uid, true); toast.success("Profile saved"); router.push("/profile"); } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
+    try { await patchMe({ ...form, displayName: form.displayName.trim() }); await load(user.uid, true); toast.success("Profile saved"); router.push("/profile"); } catch (e) { toast.error(errorText(e)); } finally { setSaving(false); }
   };
   const saveUsername = async () => {
     setSavingU(true);
-    try { const r = await apiSetUsername(uname); await load(user.uid, true); toast.success(`Username is now @${r.username} · ${r.changesLeft} change${r.changesLeft === 1 ? "" : "s"} left`); } catch (e) { toast.error((e as Error).message); } finally { setSavingU(false); }
+    try { const r = await apiSetUsername(uname); await load(user.uid, true); toast.success(`Username is now @${r.username} · ${r.changesLeft} change${r.changesLeft === 1 ? "" : "s"} left`); } catch (e) { toast.error(errorText(e)); } finally { setSavingU(false); }
   };
 
   return (
