@@ -58,6 +58,10 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
   // Workspace theme preference drives next-themes while the workspace is open.
   useEffect(() => { setTheme(themePref); }, [themePref, setTheme]);
 
+  // Leaving the workspace (root unmount only — the hook is shared by the drawer and the Ask-AI form, which mount and unmount freely)
+  // stops waiting on a running generation; the server still finishes and links the problem to the project.
+  useEffect(() => () => { nav.cancelGeneration(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // "/solve/next": nothing queued → stream the next problem.
   useEffect(() => {
     if (!problemId && projectId && !generation.active && !generation.error && generation.stages.length === 0) void nav.generate();

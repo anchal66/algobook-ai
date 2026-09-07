@@ -3,7 +3,7 @@
  * Prev / next / shuffle navigation inside a project and the "Next" generation flow when
  * nothing is queued (Module 03 W-04/W-17/W-18). Explore problems (no project) have no navigation.
  */
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, nextProblemStream } from "@/lib/workspace/api";
 import { track } from "@/lib/analytics";
@@ -40,9 +40,6 @@ export function useNextProblem(): NextProblemApi {
   const index = problem ? items.findIndex((i) => i.problemId === problem.id) : -1;
   const total = items.length;
   const hasProject = !!projectId;
-
-  // Leaving the workspace stops waiting on the stream (the server finishes and links the problem; the list shows it later).
-  useEffect(() => () => { controller?.abort(); controller = null; }, []);
 
   const goTo = useCallback((problemId: string) => {
     if (!projectId) { router.push(`/problems/${problemId}`); return; }
