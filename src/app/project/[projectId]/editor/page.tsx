@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason, SolutionExplanation, SessionHealth, PracticeState } from "@/types";
+import { Question, Submission, ProjectQuestion, TestCase, RecommendationReason, SolutionExplanation, SessionHealth, PracticeState } from "@/types/legacy";
 import {
   Wand2, Loader2, Code, Play, Send, CheckCircle2, XCircle, Clock,
   AlertTriangle, ChevronLeft, ChevronRight, Menu, Sparkles, BrainCircuit,
@@ -22,7 +22,9 @@ import {
 import { createSession, recordAttempt, computeSessionHealth } from "@/lib/session-tracker";
 import type { SessionState } from "@/lib/session-tracker";
 import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, query, getDocs, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, Timestamp, where, increment } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, getDoc, updateDoc, Timestamp, where } from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
+import type { CaseResult } from "@/types";
 import TopicSelector from "@/components/TopicSelector";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
@@ -77,7 +79,7 @@ export default function ProjectPage() {
   const [recommendationReason, setRecommendationReason] = useState<RecommendationReason | null>(null);
 
   // Timing: track when user started working on a question
-  const questionStartTimeRef = useRef<number>(Date.now());
+  const questionStartTimeRef = useRef<number>(0);
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
@@ -142,11 +144,8 @@ export default function ProjectPage() {
     if (!user) return;
     const fetchPracticeState = async () => {
       try {
-        const res = await fetch(`/api/profile?userId=${user.uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.profile?.practiceState) setPracticeState(data.profile.practiceState);
-        }
+        const data = await apiFetch<{ user: { practiceState?: PracticeState } }>("/api/me");
+        if (data.user?.practiceState) setPracticeState(data.user.practiceState);
       } catch { /* silent */ }
     };
     fetchPracticeState();
@@ -165,12 +164,8 @@ export default function ProjectPage() {
     if (!question?.id || !user || !projectId) return;
     setIsReporting(true);
     try {
-      const res = await fetch("/api/question/flag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id, userId: user.uid, projectId, reason, details }),
-      });
-      if (res.ok) {
+      await apiFetch(`/api/problems/${question.id}/report`, { method: "POST", body: { reason, details } });
+      {
         // Remove the question from local state
         const removedId = question.id;
         const updated = projectQuestions.filter((pq) => pq.id !== removedId);
@@ -583,18 +578,10 @@ export default function ProjectPage() {
     hintsUsedRef.current = 0;
     runCountRef.current = 0;
     try {
-      const response = await fetch('/api/question/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptToSubmit, projectId, userId: user.uid }),
+      // Generation moves to POST /api/projects/:id/next in Module 02 (this endpoint returns 410 until then).
+      const data = await apiFetch<{ question: Question; reason?: RecommendationReason }>('/api/question/generate', {
+        method: 'POST', body: { prompt: promptToSubmit, projectId },
       });
-      if (response.status === 403) {
-        setExecutionError("You need an active subscription to generate questions. Upgrade to Pro to continue.");
-        setIsLoading(false);
-        return;
-      }
-      if (!response.ok) throw new Error('Failed to fetch question from AI');
-      const data = await response.json();
       const newQuestion = data.question as Question;
       setQuestion(newQuestion);
       setCode(newQuestion.starterCode);
@@ -660,23 +647,9 @@ export default function ProjectPage() {
 
     setIsHintLoading(true);
     try {
-      const response = await fetch("/api/hints", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questionId: question.id,
-          hintLevel: level,
-          userCode: level === 3 ? code : undefined,
-          userId: user?.uid,
-        }),
+      const data = await apiFetch<{ hint: string; label?: string }>("/api/hints", {
+        method: "POST", body: { questionId: question.id, hintLevel: level, userCode: level === 3 ? code : undefined },
       });
-      if (response.status === 403) {
-        setExecutionError("You need an active subscription to use hints. Upgrade to Pro to continue.");
-        setIsHintLoading(false);
-        return;
-      }
-      if (!response.ok) throw new Error("Failed to get hint");
-      const data = await response.json();
       setHints((prev) => {
         const updated = [...prev];
         updated[level - 1] = data.hint;
@@ -700,15 +673,8 @@ export default function ProjectPage() {
     if (!user || !question?.id || !code || isSolutionLoading) return;
     setIsSolutionLoading(true);
     try {
-      const res = await fetch('/api/solution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionId: question.id, userCode: code, userId: user.uid }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSolutionExplanation(data);
-      }
+      const data = await apiFetch<SolutionExplanation>('/api/solution', { method: 'POST', body: { questionId: question.id, userCode: code } });
+      setSolutionExplanation(data);
     } catch (err) {
       console.error('Solution fetch failed:', err);
     } finally {
@@ -716,28 +682,8 @@ export default function ProjectPage() {
     }
   };
 
-  const updateUserProfile = async (tags: string[], passed: boolean) => {
-    if (!user || !question) return;
-    const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-    try {
-      await fetch("/api/profile/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.uid,
-          tags,
-          passed,
-          difficulty: question.difficulty,
-          hintsUsed: hintsUsedRef.current,
-          timeSpentSeconds: timeSpent,
-          isFirstTry: submissionHistory.length === 0,
-          runCount: runCountRef.current,
-        }),
-      });
-    } catch (err) {
-      console.error("Profile update failed:", err);
-    }
-  };
+  // v2: mastery/streak updates happen server-side inside POST /api/submit.
+  const updateUserProfile = async (_tags: string[], _passed: boolean) => {};
 
   const handleRunCode = async (isSubmission: boolean = false) => {
     if (!code || !question?.id || !question.driverCode) {
@@ -789,44 +735,45 @@ export default function ProjectPage() {
 
     let allTestsPassed = true;
     const results: TestCaseResult[] = [];
+    const toExecutionResult = (c: CaseResult): ExecutionResult => ({
+      status: { id: c.status === "AC" ? 3 : c.status === "WA" ? 4 : c.status === "TLE" ? 5 : c.status === "CE" ? 6 : 11, description: c.status },
+      stdout: c.actual, stderr: c.stderr || null, compile_output: c.compileOutput, time: (c.timeMs / 1000).toFixed(3), memory: c.memoryKb,
+    });
 
-    for (const testCase of testCasesToRun) {
-      try {
-        const response = await fetch('/api/code/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userCode: code,
-            driverCode: question.driverCode,
-            stdin: testCase.input,
-            userId: user?.uid,
-          }),
+    try {
+      if (isSubmission) {
+        // One server-side judgement over sample + hidden tests (POST /api/submit).
+        const { submission } = await apiFetch<{ submission: { verdict: string; passed: number; total: number; failedCase: { index: number; input: string; expected: string; actual: string; stderr: string; status: CaseResult["status"] } | null; runtimeMs: number; memoryKb: number } }>("/api/submit", {
+          method: "POST",
+          body: { problemId: question.id, projectId, language: "java", code, meta: { hintsUsed: hintsUsedRef.current, editorialViewed: false, timeSpentSec: Math.round((Date.now() - questionStartTimeRef.current) / 1000), runCount: runCountRef.current } },
         });
-        if (response.status === 403) {
-          setExecutionError("You need an active subscription to run code. Upgrade to Pro to continue.");
-          setIsExecuting(false);
-          return;
-        }
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "API request failed");
-        }
-        const result: ExecutionResult = await response.json();
+        allTestsPassed = submission.verdict === "AC";
+        const fc = submission.failedCase;
         results.push({
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          result,
-          isCustom: testCase.isCustom,
+          input: fc?.input ?? testCasesToRun[0]?.input ?? "",
+          expectedOutput: fc?.expected ?? testCasesToRun[0]?.expectedOutput ?? "",
+          result: fc
+            ? toExecutionResult({ index: fc.index, status: fc.status, passed: false, input: fc.input, expected: fc.expected, actual: fc.actual, stderr: fc.stderr, compileOutput: null, timeMs: submission.runtimeMs, memoryKb: submission.memoryKb })
+            : { status: { id: 3, description: `Accepted ${submission.passed}/${submission.total}` }, stdout: testCasesToRun[0]?.expectedOutput ?? "", stderr: null, compile_output: null, time: (submission.runtimeMs / 1000).toFixed(3), memory: submission.memoryKb },
         });
-        if (result.status.id !== 3 || (testCase.expectedOutput !== "N/A (Custom Input)" && result.stdout?.trim() !== testCase.expectedOutput.trim())) {
-          allTestsPassed = false;
-        }
-      } catch (error: any) {
-        console.error("Failed to execute code:", error);
-        setExecutionError(`An unexpected error occurred: ${error.message}`);
-        allTestsPassed = false;
-        break;
+      } else {
+        const { cases } = await apiFetch<{ cases: CaseResult[] }>("/api/run", {
+          method: "POST",
+          body: {
+            problemId: question.id, language: "java", code,
+            cases: testCasesToRun.slice(0, 6).map((tc) => ({ input: tc.input, ...(tc.isCustom ? {} : { expected: tc.expectedOutput }) })),
+          },
+        });
+        cases.forEach((c, i) => {
+          results.push({ input: c.input, expectedOutput: testCasesToRun[i]?.isCustom ? "N/A (Custom Input)" : (c.expected ?? ""), result: toExecutionResult(c), isCustom: testCasesToRun[i]?.isCustom });
+          if (!c.passed) allTestsPassed = false;
+        });
       }
+    } catch (error: any) {
+      console.error("Failed to execute code:", error);
+      setExecutionError(error?.code === "PAYMENT_REQUIRED" || error?.code === "QUOTA_EXCEEDED" ? error.message : `An unexpected error occurred: ${error.message}`);
+      setIsExecuting(false);
+      return;
     }
 
     setExecutionResults(results);
@@ -838,35 +785,7 @@ export default function ProjectPage() {
 
     if (isSubmission && user) {
       const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-      const attemptNumber = submissionHistory.length + 1;
-      await addDoc(collection(firestore, "submissions"), {
-        userId: user.uid,
-        projectId,
-        questionId: question.id,
-        code,
-        status: allTestsPassed ? 'success' : 'fail',
-        attemptNumber,
-        hintsUsed: hintsUsedRef.current,
-        timeSpentSeconds: timeSpent,
-        isFirstTry: attemptNumber === 1,
-        runCount: runCountRef.current,
-        submittedAt: serverTimestamp(),
-      });
-
-      // Update today's attendance counters
-      const today = new Date().toISOString().slice(0, 10);
-      const attendanceRef = doc(firestore, "projects", projectId, "attendance", today);
-      const attendanceSnap = await getDoc(attendanceRef);
-      if (attendanceSnap.exists()) {
-        await setDoc(attendanceRef, {
-          totalSubmissions: increment(1),
-          ...(allTestsPassed
-            ? { successfulSubmissions: increment(1), questionsSolved: increment(1) }
-            : { failedSubmissions: increment(1) }),
-          timeSpentSeconds: increment(timeSpent),
-        }, { merge: true });
-      }
-
+      // v2: the submission, activity and stats were written by POST /api/submit.
       fetchSubmissionHistory(question.id);
       updateUserProfile(question.tags || [], allTestsPassed);
 
@@ -891,7 +810,7 @@ export default function ProjectPage() {
   };
 
   // Keep ref in sync for keyboard shortcuts
-  runCodeRef.current = handleRunCode;
+  useEffect(() => { runCodeRef.current = handleRunCode; });
 
   const difficultyClass = (d: string) =>
     d === 'Easy' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' :

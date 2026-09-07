@@ -1,29 +1,14 @@
-import { NextResponse } from "next/server";
-import { checkSubscriptionStatus } from "@/lib/subscription";
+import { handler } from "@/lib/api/handler";
+import { getPlan } from "@/lib/plans";
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
-
-    const status = await checkSubscriptionStatus(userId);
-    return NextResponse.json(status);
-  } catch (error: unknown) {
-    console.error("[api/subscription/status]", error);
-    const message = error instanceof Error ? error.message : String(error);
-    const missingCreds =
-      message.includes("FIREBASE_SERVICE_ACCOUNT") || message.includes("not valid JSON");
-    return NextResponse.json(
-      {
-        active: false,
-        reason: missingCreds ? "firebase_admin_misconfigured" : "server_error",
-        ...(process.env.NODE_ENV === "development" && { debug: message }),
-      },
-      { status: 500 }
-    );
-  }
-}
+/** Current user's plan (the server derives the uid from the token). */
+export const GET = handler({ evt: "subscription.status" }, async ({ user }) => {
+  const plan = user.plan.planSlug ? getPlan(user.plan.planSlug) : undefined;
+  return {
+    active: user.plan.tier === "pro",
+    tier: user.plan.tier,
+    status: user.plan.status,
+    plan: plan ? { name: plan.name, slug: plan.slug } : null,
+    endDate: user.plan.endDate,
+  };
+});

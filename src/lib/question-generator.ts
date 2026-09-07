@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { Question, UserProfile, QuestionWithReason, RecommendationReason, TemplatePoolEntry } from "@/types";
+import type { Question, UserProfile, QuestionWithReason, RecommendationReason, TemplatePoolEntry } from "@/types/legacy";
 import { buildPerformanceSummary } from "@/lib/user-profile";
 import { findPrerequisiteGaps } from "@/lib/prerequisite-graph";
 import type { Recommendation } from "@/lib/recommendation";

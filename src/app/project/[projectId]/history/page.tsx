@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { firestore } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { use } from 'react';
+import { apiFetch } from '@/lib/api-client';
+import { toLegacySubmission, type SubmissionDTO } from '@/lib/legacy/adapters';
 import { useAuth } from '@/context/AuthContext';
 import {
   Accordion,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Submission } from '@/types';
+import { Submission } from '@/types/legacy';
 
 export interface ProjectQuestion {
   id: string; // This is the questionId
@@ -24,7 +25,8 @@ interface QuestionWithSubmissions extends ProjectQuestion {
   submissions: Submission[];
 }
 
-export default function HistoryPage({ params }: { params: { projectId: string } }) {
+export default function HistoryPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const { projectId } = use(params);
   const { user } = useAuth();
   const [history, setHistory] = useState<QuestionWithSubmissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,28 +36,15 @@ export default function HistoryPage({ params }: { params: { projectId: string } 
 
     const fetchHistory = async () => {
       try {
-        // 1. Get all questions associated with this project
-        const pqSnapshot = await getDocs(
-          collection(firestore, "projects", params.projectId, "projectQuestions")
-        );
-        const projectQuestions = pqSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectQuestion[];
-
-        // 2. For each question, get its submissions for this user and project
-        const historyWithSubmissions = await Promise.all(
-          projectQuestions.map(async (question) => {
-            const subQuery = query(
-              collection(firestore, "submissions"),
-              where("projectId", "==", params.projectId),
-              where("userId", "==", user.uid),
-              where("questionId", "==", question.id),
-              orderBy("submittedAt", "desc")
-            );
-            const subSnapshot = await getDocs(subQuery);
-            const submissions = subSnapshot.docs.map(doc => doc.data()) as Submission[];
-            return { ...question, submissions };
-          })
-        );
-        
+        const [{ items }, subs] = await Promise.all([
+          apiFetch<{ items: { problemId: string; title: string; difficulty: 'Easy' | 'Medium' | 'Hard' }[] }>(`/api/projects/${projectId}`),
+          apiFetch<{ items: SubmissionDTO[] }>(`/api/submissions?projectId=${encodeURIComponent(projectId)}&limit=50`),
+        ]);
+        const byProblem: Record<string, Submission[]> = {};
+        for (const s of subs.items) (byProblem[s.problemId] ??= []).push(toLegacySubmission(s));
+        const historyWithSubmissions: QuestionWithSubmissions[] = items.map((q) => ({
+          id: q.problemId, title: q.title, difficulty: q.difficulty, submissions: byProblem[q.problemId] ?? [],
+        }));
         setHistory(historyWithSubmissions);
       } catch (error) {
         console.error("Failed to fetch history:", error);
@@ -65,7 +54,7 @@ export default function HistoryPage({ params }: { params: { projectId: string } 
     };
 
     fetchHistory();
-  }, [user, params.projectId]);
+  }, [user, projectId]);
 
   if (isLoading) {
     return (
@@ -119,7 +108,7 @@ export default function HistoryPage({ params }: { params: { projectId: string } 
         </Accordion>
       ) : (
         <p className="text-center text-muted-foreground mt-8">
-            You haven't attempted any questions in this project yet. Go to the editor to get started!
+            You haven&apos;t attempted any questions in this project yet. Go to the editor to get started!
         </p>
       )}
     </div>

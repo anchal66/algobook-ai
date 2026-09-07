@@ -1,4 +1,4 @@
-import type { UserProfile, PracticeState, GoalType, SessionHealth } from "@/types";
+import type { UserProfile, PracticeState, GoalType, SessionHealth } from "@/types/legacy";
 import { getWeakTopics } from "@/lib/user-profile";
 import { getDueTopics } from "@/lib/spaced-repetition";
 

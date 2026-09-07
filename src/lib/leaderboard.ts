@@ -1,6 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { computeMasteryScore } from "@/lib/user-profile";
-import type { LeaderboardEntry, TopicSkill } from "@/types";
+import type { LeaderboardEntry, TopicSkill } from "@/types/legacy";
 
 /**
  * Leaderboard scoring formula:

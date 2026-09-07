@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/api-client";
+import { toLegacyProfile, type SubmissionDTO, type UserDTO } from "@/lib/legacy/adapters";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,7 +14,7 @@ import {
   Building2, GraduationCap, MapPin, ExternalLink,
   Flame, Trophy, CheckCircle2, XCircle, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import type { UserProfile } from "@/types";
+import type { UserProfile } from "@/types/legacy";
 import { format } from "date-fns";
 
 interface HistorySubmission {
@@ -41,6 +43,7 @@ export default function ProfilePage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const cursorsRef = useRef<Record<number, string | undefined>>({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -48,11 +51,8 @@ export default function ProfilePage() {
 
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`/api/profile?userId=${encodeURIComponent(user.uid)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data.profile);
-        }
+        const data = await apiFetch<{ user: UserDTO }>("/api/me");
+        setProfile(toLegacyProfile(data.user));
       } catch (err) {
         console.error("Error fetching profile:", err);
       } finally {
@@ -67,14 +67,17 @@ export default function ProfilePage() {
     const fetchHistory = async () => {
       setHistoryLoading(true);
       try {
-        const res = await fetch(
-          `/api/profile/history?userId=${encodeURIComponent(user.uid)}&page=${historyPage}&limit=20`
+        const cursor = cursorsRef.current[historyPage];
+        const data = await apiFetch<{ items: SubmissionDTO[]; nextCursor: string | null }>(
+          `/api/submissions?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
         );
-        if (res.ok) {
-          const data = await res.json();
-          setHistory(data.submissions);
-          setHistoryHasMore(data.hasMore);
-        }
+        if (data.nextCursor) cursorsRef.current[historyPage + 1] = data.nextCursor;
+        setHistory(data.items.map((s) => ({
+          id: s.id, questionId: s.problemId, projectId: s.projectId ?? "", questionTitle: s.problemId, projectTitle: s.projectId ?? "—",
+          status: s.verdict === "AC" ? "success" : "fail", difficulty: null, attemptNumber: s.attemptNumber, hintsUsed: s.hintsUsed,
+          timeSpentSeconds: s.timeSpentSec, submittedAt: s.createdAt,
+        })));
+        setHistoryHasMore(!!data.nextCursor);
       } catch (err) {
         console.error("Error fetching history:", err);
       } finally {

@@ -1,5 +1,16 @@
 import { Metadata } from "next";
 import PublicProfileClient from "./_client";
+import { getByUsername, publicProfile } from "@/lib/data/users";
+import { serialize } from "@/lib/data/schema";
+import { toLegacyProfile } from "@/lib/legacy/adapters";
+
+async function loadProfile(username: string) {
+  const u = await getByUsername(username);
+  if (!u) return null;
+  const pub = serialize(publicProfile(u));
+  return toLegacyProfile({ ...pub, uid: u.id, email: "", usernameChangesLeft: 0, experienceLevel: u.experienceLevel, goalType: u.goalType,
+    practiceState: u.practiceState, calibration: u.calibration, topicSkills: {}, settings: serialize(u.settings), plan: serialize(u.plan), quotas: u.quotas, updatedAt: pub.createdAt });
+}
 
 type Props = { params: Promise<{ username: string }> };
 
@@ -13,10 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (RESERVED.has(username)) return {};
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://algobook.ai";
-    const res = await fetch(`${baseUrl}/api/profile?username=${encodeURIComponent(username)}`, { cache: "no-store" });
-    if (!res.ok) return { title: "Profile Not Found | AlgoBook" };
-    const { profile } = await res.json();
+    const profile = await loadProfile(username.toLowerCase());
+    if (!profile) return { title: "Profile Not Found | AlgoBook" };
     return {
       title: `${profile.displayName || username} | AlgoBook`,
       description: profile.bio || `${profile.displayName || username}'s coding profile on AlgoBook`,
@@ -40,5 +49,6 @@ export default async function PublicProfilePage({ params }: Props) {
       </div>
     );
   }
-  return <PublicProfileClient username={username} />;
+  const profile = await loadProfile(username.toLowerCase()).catch(() => null);
+  return <PublicProfileClient username={username} profile={profile} />;
 }

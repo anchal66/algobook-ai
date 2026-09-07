@@ -1,67 +1,101 @@
 rules_version = '2';
 
+// AlgoBook v2 (Module 01 §3.8). All writes go through firebase-admin except
+// drafts/notes. Hidden tests, drivers and gated content are never readable.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Projects ---
-    // Users can only read/write their own projects
-    match /projects/{projectId} {
-      allow read: if request.auth != null
-                  && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null
-                    && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null
-                            && resource.data.userId == request.auth.uid;
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function ownsKey(key) { return signedIn() && key.matches('^' + request.auth.uid + '_.*'); }
 
-      // --- Project Questions (subcollection) ---
-      // Authenticated users can read project questions for projects they own.
-      // Writes are handled by firebase-admin in the API route (bypasses rules).
-      match /projectQuestions/{questionId} {
-        allow read: if request.auth != null
-                    && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
-      }
-
-      // --- Attendance (subcollection) ---
-      // Users can read/write attendance records for their own projects.
-      match /attendance/{dateId} {
-        allow read: if request.auth != null
-                    && get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid;
-        allow create: if request.auth != null
-                      && request.resource.data.userId == request.auth.uid;
-        allow update: if request.auth != null
-                      && resource.data.userId == request.auth.uid;
-      }
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
     }
 
-    // --- Questions ---
-    // Any authenticated user can read questions.
-    // Writes are handled by firebase-admin in the API route (bypasses rules).
-    match /questions/{questionId} {
-      allow read: if request.auth != null;
-    }
-
-    // --- Submissions ---
-    // Users can only read/create their own submissions.
-    match /submissions/{submissionId} {
-      allow read: if request.auth != null
-                  && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null
-                    && request.resource.data.userId == request.auth.uid;
-    }
-
-    // --- User Profiles ---
-    // Users can only read their own profile.
-    // Writes are handled by firebase-admin in the API routes (bypasses rules).
-    match /userProfiles/{userId} {
-      allow read: if request.auth != null
-                  && userId == request.auth.uid;
-    }
-
-    // --- Usernames ---
-    // Anyone authenticated can check if a username exists.
-    // Writes are handled by firebase-admin (bypasses rules).
     match /usernames/{username} {
-      allow read: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /problems/{problemId} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /private/{doc} {          // hiddenTests, referenceSolution, drivers
+        allow read, write: if false;
+      }
+      match /content/{doc} {          // hints, editorial — served via API, gated by plan
+        allow read, write: if false;
+      }
+    }
+
+    match /projects/{projectId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+
+      match /items/{itemId} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/projects/$(projectId)).data.uid == request.auth.uid;
+        allow write: if false;
+      }
+      match /templatePool/{docId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /drafts/{key} {
+      allow read: if ownsKey(key);
+      allow write: if ownsKey(key)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.size() < 200 * 1024;
+    }
+
+    match /notes/{key} {
+      allow read: if ownsKey(key);
+      allow write: if ownsKey(key)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.size() < 200 * 1024;
+    }
+
+    match /activity/{key} {
+      allow read: if ownsKey(key);
+      allow write: if false;
+    }
+
+    match /leaderboard/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /dailyChallenge/{day} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /templates/{company} {
+      allow read: if signedIn();
+      allow write: if false;
+      match /items/{item} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /achievements/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // subscriptions, reports, aiUsage and anything else: no client access.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

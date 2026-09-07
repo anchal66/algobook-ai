@@ -11,8 +11,10 @@ import { Label } from "@/components/ui/label";
 import {
   Code2, ArrowLeft, Loader2, Save, Check, X, AlertCircle,
 } from "lucide-react";
-import type { UserProfile } from "@/types";
+import type { UserProfile } from "@/types/legacy";
 import { SKILLS_LIST } from "@/lib/skills";
+import { apiFetch } from "@/lib/api-client";
+import { toLegacyProfile, type UserDTO } from "@/lib/legacy/adapters";
 
 export default function EditProfilePage() {
   const { user, loading: authLoading } = useAuth();
@@ -46,10 +48,9 @@ export default function EditProfilePage() {
 
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`/api/profile?userId=${encodeURIComponent(user.uid)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const p = data.profile as UserProfile;
+        const data = await apiFetch<{ user: UserDTO }>("/api/me");
+        {
+          const p = toLegacyProfile(data.user);
           setProfile(p);
           setBio(p.bio || "");
           setCompany(p.company || "");
@@ -83,12 +84,9 @@ export default function EditProfilePage() {
     }
     setUsernameChecking(true);
     try {
-      const res = await fetch(`/api/profile/username/check?username=${encodeURIComponent(value)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUsernameAvailable(data.available);
-        setUsernameError(data.available ? "" : "Username is taken");
-      }
+      const data = await apiFetch<{ available: boolean }>(`/api/users/username/check?u=${encodeURIComponent(value)}`);
+      setUsernameAvailable(data.available);
+      setUsernameError(data.available ? "" : "Username is taken or reserved");
     } catch {
       setUsernameError("Error checking availability");
     } finally {
@@ -105,14 +103,7 @@ export default function EditProfilePage() {
     if (!user) return;
     setSaving(true);
     try {
-      await fetch("/api/profile/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.uid,
-          fields: { bio, company, address, college, githubUrl, linkedinUrl, skills },
-        }),
-      });
+      await apiFetch("/api/me", { method: "PATCH", body: { bio, company, location: address, college, githubUrl, linkedinUrl, skills } });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -126,20 +117,11 @@ export default function EditProfilePage() {
     if (!user || !usernameAvailable || username === profile?.username) return;
     setUsernameChanging(true);
     try {
-      const res = await fetch("/api/profile/username/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.uid, newUsername: username }),
-      });
-      if (res.ok) {
-        setProfile((prev) => prev ? { ...prev, username, usernameChangesLeft: prev.usernameChangesLeft - 1 } : prev);
-        setUsernameAvailable(null);
-      } else {
-        const data = await res.json();
-        setUsernameError(data.error || "Failed to update username");
-      }
-    } catch {
-      setUsernameError("Error updating username");
+      await apiFetch("/api/me/username", { method: "POST", body: { username } });
+      setProfile((prev) => prev ? { ...prev, username, usernameChangesLeft: prev.usernameChangesLeft - 1 } : prev);
+      setUsernameAvailable(null);
+    } catch (e) {
+      setUsernameError(e instanceof Error ? e.message : "Error updating username");
     } finally {
       setUsernameChanging(false);
     }

@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { firestore } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
+import { toLegacyTemplate } from "@/lib/legacy/adapters";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -42,7 +42,7 @@ import {
   Building2,
   FileText,
 } from "lucide-react";
-import type { ExperienceLevel, GoalType, TemplateInfo } from "@/types";
+import type { ExperienceLevel, GoalType, TemplateInfo } from "@/types/legacy";
 import TopicSelector from "@/components/TopicSelector";
 
 const EXPERIENCE_OPTIONS: {
@@ -90,12 +90,12 @@ export default function NewProjectPage() {
 
   // Fetch available templates
   useEffect(() => {
-    fetch("/api/templates")
-      .then((res) => res.json())
-      .then((data) => setTemplates(data.templates || []))
+    if (!user) return;
+    apiFetch<{ templates: Parameters<typeof toLegacyTemplate>[0][] }>("/api/templates")
+      .then((data) => setTemplates((data.templates || []).map(toLegacyTemplate)))
       .catch(() => {})
       .finally(() => setTemplatesLoading(false));
-  }, []);
+  }, [user]);
 
   const selectTemplate = (tmpl: TemplateInfo) => {
     setSelectedTemplate(tmpl);
@@ -131,69 +131,15 @@ export default function NewProjectPage() {
     setError("");
 
     try {
-      const projectData: Record<string, unknown> = {
-        userId: user.uid,
-        title,
-        description,
-        duration,
-        purpose,
-        experienceLevel,
-        goalType,
-        selectedTopics: selectedTopics.length > 0 ? selectedTopics : null,
-        createdAt: serverTimestamp(),
-      };
-      if (selectedTemplate) {
-        projectData.templateId = selectedTemplate.id;
-      }
-
-      const projectsCollection = collection(firestore, "projects");
-      const newProjectDoc = await addDoc(projectsCollection, projectData);
-
-      // Wait for the document to be confirmed readable before navigating.
-      // This prevents race conditions where the editor/attendance loads
-      // before the project doc is available in Firestore's cache.
-      const projectRef = doc(firestore, "projects", newProjectDoc.id);
-      for (let i = 0; i < 10; i++) {
-        const snap = await getDoc(projectRef);
-        if (snap.exists()) break;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-
-      // Seed template pool if a template was selected
-      if (selectedTemplate) {
-        try {
-          await fetch("/api/templates/seed", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId: newProjectDoc.id,
-              templateId: selectedTemplate.id,
-              userId: user.uid,
-            }),
-          });
-        } catch (seedErr) {
-          console.error("Template seed failed (non-blocking):", seedErr);
-        }
-      }
-
-      // Generate AI-powered project insights (non-blocking)
-      fetch("/api/project/insights", {
+      const { project } = await apiFetch<{ project: { id: string } }>("/api/projects", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: newProjectDoc.id,
-          userId: user.uid,
-          title,
-          description,
-          purpose,
-          duration,
-          experienceLevel,
-          goalType,
-          templateId: selectedTemplate?.id || null,
-        }),
-      }).catch((err) => console.error("Insights generation failed (non-blocking):", err));
-
-      router.push(`/project/${newProjectDoc.id}`);
+        body: {
+          title, description, purpose, durationDays: duration, experienceLevel, goalType,
+          selectedTopics, templateId: selectedTemplate?.id ?? null,
+        },
+      });
+      // AI project insights are generated server-side in Module 02.
+      router.push(`/project/${project.id}`);
     } catch (err) {
       console.error("Error creating project: ", err);
       setError("Failed to create project. Please try again.");

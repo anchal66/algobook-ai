@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { firestore } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,20 +19,17 @@ export default function ProjectHeader({ projectId }: { projectId: string }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!user) return;
     const fetchProject = async () => {
-      // Retry for newly created projects that may not be readable yet
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const docRef = doc(firestore, "projects", projectId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setProject(docSnap.data() as ProjectData);
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 400));
+      try {
+        const data = await apiFetch<{ project: ProjectData }>(`/api/projects/${projectId}`);
+        setProject({ title: data.project.title });
+      } catch (err) {
+        console.error("Failed to load project:", err);
       }
     };
     fetchProject();
-  }, [projectId]);
+  }, [projectId, user]);
 
   const isEditor = pathname.includes("/editor");
   const isHistory = pathname.includes("/history");

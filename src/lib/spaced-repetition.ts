@@ -1,4 +1,4 @@
-import type { TopicSkill, UserProfile } from "@/types";
+import type { TopicSkill, UserProfile } from "@/types/legacy";
 
 /**
  * SM-2 inspired spaced repetition adapted for coding practice.

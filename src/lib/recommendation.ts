@@ -1,4 +1,4 @@
-import type { UserProfile, RecommendationReason, TemplatePoolEntry } from "@/types";
+import type { UserProfile, RecommendationReason, TemplatePoolEntry } from "@/types/legacy";
 import {
   getWeakTopics,
   getRecommendedDifficulty,
