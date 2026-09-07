@@ -12,6 +12,8 @@ const serverSchema = z.object({
   JUDGE0_BASE_URL: z.url().default("https://judge0-ce.p.rapidapi.com"),
   JUDGE0_HOST_HEADER: z.string().default("judge0-ce.p.rapidapi.com"),
   JUDGE0_AUTH_TOKEN: z.string().optional().or(z.literal("")),
+  /** Global batches/day across the app (D-05). Empty = 45 on the RapidAPI free tier, unlimited elsewhere; 0 = unlimited. */
+  JUDGE0_DAILY_CAP: z.coerce.number().int().min(0).optional(),
   /** "local" runs code with the host toolchain (dev/eval only; never in production). */
   JUDGE_BACKEND: z.enum(["judge0", "local"]).default("judge0"),
   /** Pre-generation (Module 02): minimum verified problems per topic×difficulty cell, and the cap per batch run. */
@@ -64,8 +66,10 @@ function load() {
   if (s.JUDGE_BACKEND === "local" && s.NODE_ENV === "production") {
     throw new Error("[env] JUDGE_BACKEND=local is not allowed in production (no sandbox).");
   }
+  // A missing judge key must not take down every route (2026-09-08 production incident: /api/me 500 because
+  // RAPIDAPI_KEY was unset). Code execution reports a clear 503 instead — see judge0.ts `headers()`.
   if (s.JUDGE_BACKEND === "judge0" && s.JUDGE0_HOST_HEADER && !s.RAPIDAPI_KEY) {
-    throw new Error("[env] RAPIDAPI_KEY is required when JUDGE0_HOST_HEADER is set (RapidAPI mode).");
+    console.warn("[env] RAPIDAPI_KEY is not set — Run/Submit will fail with 503 until it is (RapidAPI mode).");
   }
   if (!s.JUDGE0_HOST_HEADER && !s.JUDGE0_AUTH_TOKEN) {
     console.warn("[env] Judge0 self-host mode without JUDGE0_AUTH_TOKEN — requests will be unauthenticated.");

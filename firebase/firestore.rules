@@ -1,105 +1,11 @@
 rules_version = '2';
 
-// AlgoBook v2 (Module 01 §3.8). All writes go through firebase-admin except
-// drafts/notes. Hidden tests, drivers and gated content are never readable.
+// AlgoBook v2 — every read and write goes through the API (firebase-admin); the browser never
+// touches Firestore directly (src/lib/firebase.ts initialises Auth only). Deny everything to clients so
+// a leaked web API key + ID token cannot enumerate users/problems or write drafts. Deploy with
+// `npm run db:deploy`. (Module 05 audit, 2026-09-08; supersedes the Module 01/04 per-collection rules.)
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function signedIn() { return request.auth != null; }
-    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    function ownsKey(key) { return signedIn() && key.matches('^' + request.auth.uid + '_.*'); }
-
-    match /users/{uid} {
-      allow read: if isOwner(uid);
-      allow write: if false;
-    }
-
-    match /usernames/{username} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /problems/{problemId} {
-      allow read: if signedIn();
-      allow write: if false;
-
-      match /private/{doc} {          // hiddenTests, referenceSolution, drivers
-        allow read, write: if false;
-      }
-      match /content/{doc} {          // hints, editorial — served via API, gated by plan
-        allow read, write: if false;
-      }
-    }
-
-    match /projects/{projectId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
-      allow write: if false;
-
-      match /items/{itemId} {
-        allow read: if signedIn()
-          && get(/databases/$(database)/documents/projects/$(projectId)).data.uid == request.auth.uid;
-        allow write: if false;
-      }
-      match /templatePool/{docId} {
-        allow read, write: if false;
-      }
-    }
-
-    match /submissions/{submissionId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
-      allow write: if false;
-    }
-
-    match /drafts/{key} {
-      allow read: if ownsKey(key);
-      allow write: if ownsKey(key)
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.size() < 200 * 1024;
-    }
-
-    match /notes/{key} {
-      allow read: if ownsKey(key);
-      allow write: if ownsKey(key)
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.size() < 200 * 1024;
-    }
-
-    match /activity/{key} {
-      allow read: if ownsKey(key);
-      allow write: if false;
-    }
-
-    match /leaderboard/{doc} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /dailyChallenge/{day} {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /templates/{company} {
-      allow read: if signedIn();
-      allow write: if false;
-      match /items/{item} {
-        allow read: if signedIn();
-        allow write: if false;
-      }
-    }
-
-    match /achievements/{uid} {
-      allow read: if isOwner(uid);
-      allow write: if false;
-    }
-
-    // Module 04: mock interviews (owner read; written by the API only)
-    match /interviews/{interviewId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
-      allow write: if false;
-    }
-
-    // subscriptions, reports, aiUsage and anything else: no client access.
     match /{document=**} {
       allow read, write: if false;
     }

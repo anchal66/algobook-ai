@@ -73,7 +73,7 @@ export default function SettingsPage() {
   const togglePublic = async (v: boolean) => { try { await patchMe({ publicProfile: v }); await load(user.uid, true); toast.success(v ? "Profile is public" : "Profile is private"); } catch (e) { toast.error((e as Error).message); } };
   const del = async () => {
     setDeleting(true);
-    try { await deleteMe(); clearQueries(); await signOut(auth); toast.success("Account deleted"); router.push("/"); } catch (e) { toast.error((e as Error).message); setDeleting(false); }
+    try { await deleteMe(); clearQueries(); useMe.getState().reset(); await signOut(auth); toast.success("Account deleted"); router.push("/"); } catch (e) { toast.error((e as Error).message); setDeleting(false); }
   };
 
   return (

@@ -17,6 +17,9 @@ export interface QueryEntry<T = unknown> {
 
 const cache = new Map<string, QueryEntry>();
 const fetchers = new Map<string, () => Promise<unknown>>();
+/** Mounted subscribers per key — `invalidate` only refetches queries something is still showing. */
+const refs = new Map<string, number>();
+const seq = new Map<string, number>();
 const listeners = new Set<() => void>();
 const EMPTY: QueryEntry = { data: undefined, error: null, loading: false, fetchedAt: 0, promise: null };
 
@@ -31,11 +34,15 @@ export function load<T>(key: string, fetcher: () => Promise<T>, force = false): 
   const cur = cache.get(key) as QueryEntry<T> | undefined;
   if (cur?.promise && !force) return cur.promise;
   fetchers.set(key, fetcher);
+  const id = (seq.get(key) ?? 0) + 1;
+  seq.set(key, id);
   const promise = fetcher()
-    .then((data) => { cache.set(key, { data, error: null, loading: false, fetchedAt: Date.now(), promise: null }); })
+    .then((data) => { if (seq.get(key) !== id) return; cache.set(key, { data, error: null, loading: false, fetchedAt: Date.now(), promise: null }); })
     .catch((e: unknown) => {
+      if (seq.get(key) !== id) return;
       const error = e instanceof Error ? e : new Error(String(e));
-      cache.set(key, { data: cur?.data, error, loading: false, fetchedAt: Date.now(), promise: null });
+      // fetchedAt 0: an error is never "fresh" — the next mount retries instead of showing it for staleMs.
+      cache.set(key, { data: cur?.data, error, loading: false, fetchedAt: 0, promise: null });
     })
     .finally(emit);
   cache.set(key, { data: cur?.data, error: null, loading: true, fetchedAt: cur?.fetchedAt ?? 0, promise });
@@ -54,7 +61,9 @@ export function setQueryData<T>(key: string, updater: T | ((prev: T | undefined)
 /** Re-fetch every cached query whose key starts with `prefix` (or all when omitted). */
 export function invalidate(prefix?: string) {
   for (const [key, fetcher] of fetchers) {
-    if (!prefix || key.startsWith(prefix)) void load(key, fetcher, true);
+    if (prefix && !key.startsWith(prefix)) continue;
+    if ((refs.get(key) ?? 0) > 0) void load(key, fetcher, true);
+    else cache.delete(key); // nothing mounted: drop it so the next mount fetches fresh (never re-runs a POST-backed query in the background)
   }
 }
 
@@ -80,9 +89,11 @@ export function useQuery<T>(key: string | null, fetcher: () => Promise<T>, opts:
 
   useEffect(() => {
     if (!active) return;
+    refs.set(key!, (refs.get(key!) ?? 0) + 1);
     const cur = cache.get(key!);
     const stale = !cur || (!cur.promise && Date.now() - cur.fetchedAt > staleMs);
     if (stale) void load(key!, fetcher);
+    return () => { refs.set(key!, Math.max(0, (refs.get(key!) ?? 1) - 1)); };
     // The fetcher identity is intentionally not a dependency: the key describes the request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, active, staleMs]);

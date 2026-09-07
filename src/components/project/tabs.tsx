@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 // ── Plan ────────────────────────────────────────────────────────────────────
 export function PlanTab({ project }: { project: ProjectDTO }) {
   const cached = project.insights as (ProjectInsights & { generatedAt?: string }) | null;
-  const q = useQuery(`/api/projects/${project.id}/insights`, () => getInsights(project.id), { staleMs: 10 * 60_000, enabled: !cached });
+  const q = useQuery(`insights:${project.id}`, () => getInsights(project.id), { staleMs: 10 * 60_000, enabled: !cached });
   const insights = (q.data?.insights ?? cached) as ProjectInsights | null;
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => { setRefreshing(true); try { await getInsights(project.id, true); invalidate("/api/projects"); } catch (e) { toast.error((e as Error).message); } finally { setRefreshing(false); } };

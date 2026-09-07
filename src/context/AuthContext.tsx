@@ -23,6 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set a timeout so the UI is never blocked for more than 4 seconds
     // even if Firebase Auth is slow to initialize
     const timeout = setTimeout(() => {
+      // Firebase has not answered in 4 s: fall back to whatever it already knows instead of flashing /login.
+      setUser(auth.currentUser ?? null);
       setLoading(false);
     }, 4000);
 

@@ -6,7 +6,8 @@ import { lintInput } from "@/lib/judge/encoding";
 import { verifyReference, type JudgeProblem } from "@/lib/judge/service";
 import type { JudgeResult } from "@/lib/judge/types";
 import { aiCall, embed, AiError } from "@/lib/ai/client";
-import { REPAIR_LADDER, modelFor, type ModelId, type ReasoningEffort } from "@/lib/ai/models";
+import { REPAIR_LADDER, generationPolicyFor, modelFor, repairEffortFor, type ModelId, type ReasoningEffort } from "@/lib/ai/models";
+import { fromHuman } from "@/lib/judge/human";
 import { ProblemSpecSchema, type ProblemSpec } from "@/lib/ai/schemas";
 import { GEN_INSTRUCTIONS, REPAIR_INSTRUCTIONS, buildGenInput, buildRepairInput, type GenInputContext, type JudgeFeedbackCase, type RepairFeedback } from "@/lib/ai/prompts";
 import { normalizeTags } from "@/lib/practice/topics";
@@ -70,10 +71,32 @@ export interface ValidationOutcome { spec: ProblemSpec; errors: string[] }
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const MIN_HIDDEN_TESTS = 8;
 
+/**
+ * Deterministic repair of the most common model slip (audit 2026-09-08): test inputs written in the human form
+ * (`[2,7,11,15]` / `9`, one value per line) instead of the canonical stdin encoding. Re-encodes through the same
+ * `fromHuman` the workspace uses; anything it cannot parse is left for the model to repair.
+ */
+export function canonicalizeInputs(spec: ProblemSpec): { spec: ProblemSpec; fixed: number } {
+  let fixed = 0;
+  const fix = (t: { input: string; expectedOutput: string }) => {
+    const lint = lintInput(spec.params, t.input);
+    if (lint.ok) return t;
+    const lines = t.input.replace(/\r\n?/g, "\n").split("\n").filter((l, i, a) => !(i === a.length - 1 && l === ""));
+    if (lines.length !== spec.params.length) return t;
+    const r = fromHuman(spec.params, lines);
+    if (!r.ok || !lintInput(spec.params, r.stdin).ok) return t;
+    fixed++;
+    return { ...t, input: r.stdin };
+  };
+  return { spec: { ...spec, sampleTests: spec.sampleTests.map(fix), hiddenTests: spec.hiddenTests.map(fix) }, fixed };
+}
+
 /** Normalises tags/title/slug and returns every contract violation the judge would otherwise hit. */
 export function validateSpec(input: ProblemSpec, fallbackTopics: string[] = []): ValidationOutcome {
   const errors: string[] = [];
-  const spec: ProblemSpec = { ...input, examples: [...input.examples], sampleTests: [...input.sampleTests], hiddenTests: [...input.hiddenTests] };
+  const canon = canonicalizeInputs(input);
+  if (canon.fixed) console.info(JSON.stringify({ evt: "generate.canonicalized_inputs", title: input.title, fixed: canon.fixed }));
+  const spec: ProblemSpec = { ...canon.spec, examples: [...input.examples], sampleTests: [...canon.spec.sampleTests], hiddenTests: [...canon.spec.hiddenTests] };
 
   spec.title = spec.title.trim().replace(/\s+/g, " ").slice(0, 80);
   if (!spec.title) errors.push("title is empty");
@@ -264,12 +287,14 @@ function genInput(ctx: GenerationContext, avoidTitles: string[], compact = false
 
 /** One generate call; a truncated output (huge tests) is retried once with the COMPACT directive. */
 async function generateOnce(ctx: GenerationContext, avoidTitles: string[]) {
+  const policy = generationPolicyFor(ctx.recommendation.difficulty);
+  const tags = { difficulty: ctx.recommendation.difficulty };
   try {
-    return await aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles)), uid: ctx.uid ?? undefined });
+    return await aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles)), uid: ctx.uid ?? undefined, reasoning: policy.reasoning, maxOutputTokens: policy.maxOutputTokens, tags });
   } catch (e) {
     if (!(e instanceof AiError) || e.kind !== "incomplete") throw e;
     console.warn(JSON.stringify({ evt: "generate.compact_retry", reason: e.message.slice(0, 120) }));
-    return aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles, true)), uid: ctx.uid ?? undefined });
+    return aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles, true)), uid: ctx.uid ?? undefined, reasoning: policy.reasoning, maxOutputTokens: policy.maxOutputTokens, tags: { ...tags, compact: 1 } });
   }
 }
 
@@ -292,7 +317,8 @@ export interface VerifyRepairResult {
  * Static validation → Judge verification → repair ladder (Luna xhigh, then Terra medium).
  * Shared by live generation, the pre-generation collector and the evaluation script.
  */
-export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?: string[]; uid?: string; onStage?: StageListener; model?: string; adoptReferenceOutputs?: boolean }): Promise<VerifyRepairResult> {
+export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?: string[]; uid?: string; onStage?: StageListener; model?: string; adoptReferenceOutputs?: boolean; ladder?: ReadonlyArray<{ model: ModelId; reasoning: ReasoningEffort }>; difficulty?: Difficulty }): Promise<VerifyRepairResult> {
+  const LADDER = o.ladder ?? REPAIR_LADDER;
   const stage = o.onStage ?? (() => undefined);
   const errorsSeen: string[] = [];
   let current = validateSpec(initial, o.fallbackTopics ?? []);
@@ -301,7 +327,7 @@ export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?
   let model: string = o.model ?? modelFor("generate");
   let titleChanged = false;
   let adopted = 0;
-  for (let round = 0; round <= REPAIR_LADDER.length; round++) {
+  for (let round = 0; round <= LADDER.length; round++) {
     let feedback: RepairFeedback | null = null;
     if (current.errors.length) {
       feedback = { staticErrors: current.errors, failing: [] };
@@ -329,13 +355,16 @@ export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?
       console.warn(JSON.stringify({ evt: "generate.verify_failed", round, title: current.spec.title, verdict: judge.verdict, passed: judge.passed, total: judge.total,
         failedIndex: first?.index, status: first?.status, expected: first?.expected?.slice(0, 120), actual: first?.actual.slice(0, 120), stderr: (first?.compileOutput || first?.stderr || "").slice(0, 300) }));
     }
-    if (round === REPAIR_LADDER.length) break;
-    const ladder = REPAIR_LADDER[round];
+    if (round === LADDER.length) break;
+    const ladder = LADDER[round];
+    const kind: "static" | "judge" = feedback.failing.length ? "judge" : "static";
+    const reasoning = repairEffortFor(kind, ladder);
     stage("repairing", { round: round + 1, model: ladder.model });
     attempts++; repairs++;
     const res = await aiCall({
-      purpose: "repair", model: ladder.model as ModelId, reasoning: ladder.reasoning as ReasoningEffort, schema: ProblemSpecSchema, schemaName: "problem_spec",
+      purpose: "repair", model: ladder.model as ModelId, reasoning, schema: ProblemSpecSchema, schemaName: "problem_spec",
       instructions: REPAIR_INSTRUCTIONS, input: buildRepairInput(current.spec, feedback), uid: o.uid,
+      tags: { round: round + 1, kind, ...(o.difficulty ? { difficulty: o.difficulty } : {}) },
     });
     costUsd += res.costUsd; model = res.model;
     if (res.data.title !== initial.title) titleChanged = true;
@@ -375,7 +404,7 @@ export async function generateSpec(ctx: GenerationContext): Promise<SpecResult> 
   if (!spec) throw new GenerationFailed("Could not generate a non-duplicate problem", attempts, costUsd, ["duplicate"]);
 
   // 2. Validate + verify (+ repair ladder).
-  const vr = await verifyAndRepair(spec, { fallbackTopics: ctx.recommendation.topics, uid: ctx.uid ?? undefined, onStage: ctx.onStage, model });
+  const vr = await verifyAndRepair(spec, { fallbackTopics: ctx.recommendation.topics, uid: ctx.uid ?? undefined, onStage: ctx.onStage, model, difficulty: ctx.recommendation.difficulty });
   attempts += vr.attempts; costUsd += vr.costUsd;
   if (!vr.ok) throw new GenerationFailed(`Problem could not be verified after ${vr.repairs} repair(s)`, attempts, costUsd, vr.errors);
   if (vr.titleChanged) embedding = null;

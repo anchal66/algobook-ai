@@ -6,7 +6,7 @@ import { sseResponse } from "@/lib/api/sse";
 import { adminDb } from "@/lib/firebase-admin";
 import * as projects from "@/lib/data/projects";
 import { serialize, type Language } from "@/lib/data/schema";
-import { assertQuota, consumeQuota } from "@/lib/auth/quotas";
+import { refundQuota, reserveQuota } from "@/lib/auth/quotas";
 import { recommend, summarizeForPrompt, getSeenProblemIds } from "@/lib/practice";
 import { generateVerifiedProblem, GenerationFailed, type GenerationContext } from "@/lib/ai/generate";
 import { fanOutLanguages } from "@/lib/ai/drivers";
@@ -54,28 +54,35 @@ export const POST = handler({ evt: "projects.next", body: BodySchema, query: Que
   });
 
   const run = async (onStage?: GenerationContext["onStage"]) => {
+    // One generation per project at a time (two tabs / a retry while the first is still running).
+    await projects.acquireGenerationLease(project.id);
+    let reserved = false;
     const ctx: GenerationContext = {
       uid: user.uid, projectId: project.id, recommendation: rec, profileSummary: summarizeForPrompt(user.doc),
       recentTitles: items.slice(-12).map((i) => i.title), userPrompt, experienceLevel: project.experienceLevel, goalType: project.goalType,
       projectDescription: project.description, seenProblemIds: seen, userRating: user.doc.stats.rating,
-      beforeGenerate: () => { assertQuota(user.plan.tier, "generate", user.quotas); },
+      // Atomic reserve (check + increment) right before the first paid model call; refunded below when nothing was generated.
+      beforeGenerate: async () => { await reserveQuota(user.uid, user.plan.tier, "generate"); reserved = true; },
       onStage,
     };
     let out;
     try {
       out = await generateVerifiedProblem(ctx);
-    } finally {
-      // nothing generated → no fan-out
+    } catch (e) {
+      if (reserved) await refundQuota(user.uid, "generate");
+      await projects.releaseGenerationLease(project.id);
+      throw e;
     }
+    await projects.releaseGenerationLease(project.id);
     const item = await projects.addItem(project.id, {
       problemId: out.problemId, title: out.problem.title, difficulty: out.problem.difficulty, tags: out.problem.tags,
       reason: rec.reason, source: out.source === "reused" ? "curated" : out.problem.source,
     });
     if (rec.templateEntry) await projects.markPoolUsed(project.id, rec.templateEntry.id, out.problemId).catch(() => undefined);
     if (out.source === "generated") {
-      await consumeQuota(user.uid, "generate");
       resolveFanOut(out.problemId);
     } else {
+      if (reserved) await refundQuota(user.uid, "generate");
       resolveFanOut(null);
     }
     const p = out.problem;

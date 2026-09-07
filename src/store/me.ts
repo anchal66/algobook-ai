@@ -10,6 +10,8 @@ interface MeState {
   me: MeResponse | null;
   loading: boolean;
   loadedFor: string | null;
+  error: string | null;
+  reset: () => void;
   load: (uid: string, force?: boolean) => Promise<MeResponse | null>;
   bumpQuota: (feature: FeatureKey) => void;
   patchStats: (patch: Partial<MeResponse["user"]["stats"]>) => void;
@@ -21,17 +23,21 @@ export const useMe = create<MeState>()((set, get) => ({
   me: null,
   loading: false,
   loadedFor: null,
+  error: null,
+  reset: () => set({ me: null, loading: false, loadedFor: null, error: null }),
   load: async (uid, force) => {
     if (!force && get().loadedFor === uid && get().me) return get().me;
     if (inflight) return inflight;
-    set({ loading: true });
+    // A different account than the cached one: never show the previous user's data.
+    if (get().loadedFor && get().loadedFor !== uid) set({ me: null, loadedFor: null });
+    set({ loading: true, error: null });
     inflight = getMe()
       .then((me) => {
-        set({ me, loading: false, loadedFor: uid });
+        set({ me, loading: false, loadedFor: uid, error: null });
         useSettings.getState().hydrateFromServer(me.user.settings);
         return me;
       })
-      .catch(() => { set({ loading: false }); return null; })
+      .catch((e: unknown) => { set({ loading: false, error: (e as Error)?.message ?? "Could not load your account" }); return null; })
       .finally(() => { inflight = null; });
     return inflight;
   },

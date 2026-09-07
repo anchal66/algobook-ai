@@ -16,6 +16,9 @@ export function describeApiError(e: unknown): string {
     if (e.code === "PAYMENT_REQUIRED") return "This feature is part of the Pro plan.";
     if (e.code === "LANGUAGE_NOT_READY") return "This language is still being prepared for the problem. Try again in a moment.";
     if (e.code === "UNAUTHENTICATED") return "Your session expired. Please sign in again.";
+    if (e.code === "UPSTREAM" && /judge|capacity|busy/i.test(e.message)) return e.message;
+    if (e.code === "UPSTREAM") return "The code runner is temporarily unavailable. Please try again in a moment.";
+    if (e.code === "CONFLICT") return e.message;
     return e.message;
   }
   return (e as Error)?.message ?? "Something went wrong";
@@ -43,14 +46,17 @@ export function useRunSubmit(): { run: () => Promise<void>; submit: () => Promis
     ws.setRun({ runState: "running", runResult: null, runError: null, activeResultCase: 0 });
     ws.setSubmit({ submitState: "idle", submitResult: null, submitError: null });
     ws.setUi({ consoleTab: "result" });
+    const runFor = problem.id;
     try {
       const res = await runCode(problem.id, language, code, encoded);
+      if (useWorkspace.getState().problem?.id !== runFor) return; // navigated away — never paint a result on another problem
       const first = res.cases.findIndex((c) => !c.passed);
       useWorkspace.getState().setRun({ runState: "done", runResult: res.cases, activeResultCase: first >= 0 ? first : 0 });
       useWorkspace.getState().incrementRuns();
       bumpQuota("run");
       track("run", { language, cases: encoded.length });
     } catch (e) {
+      if (useWorkspace.getState().problem?.id !== runFor) return;
       useWorkspace.getState().setRun({ runState: "error", runError: describeApiError(e) });
     }
   }, [bumpQuota]);
@@ -61,13 +67,15 @@ export function useRunSubmit(): { run: () => Promise<void>; submit: () => Promis
     if (!problem || ws.submitState === "running" || ws.runState === "running") return;
     const code = ws.code[language] ?? "";
     if (!code.trim()) { toast.error("Write some code first"); return; }
-    const timeSpentSec = Math.round((ws.timer.startedAt || ws.timer.accumulatedMs ? timerElapsedMs(ws.timer) : Date.now() - ws.openedAt) / 1000);
+    const timeSpentSec = Math.min(86_400, Math.round((ws.timer.startedAt || ws.timer.accumulatedMs ? timerElapsedMs(ws.timer) : Date.now() - ws.openedAt) / 1000));
+    const submitFor = problem.id;
     ws.setSubmit({ submitState: "running", submitResult: null, submitError: null });
     ws.setUi({ consoleTab: "result" });
     try {
       const res = await submitCode(problem.id, language, code, {
         hintsUsed: ws.hintsRevealed, editorialViewed: ws.editorialViewed, timeSpentSec, runCount: ws.runCount,
       }, ws.projectId ?? undefined);
+      if (useWorkspace.getState().problem?.id !== submitFor) { useMe.getState().load(useMe.getState().loadedFor ?? "", true).catch(() => undefined); return; }
       const w = useWorkspace.getState();
       w.setSubmit({ submitState: "done", submitResult: res, submittedAt: Date.now() });
       bumpQuota("submit");
@@ -80,6 +88,7 @@ export function useRunSubmit(): { run: () => Promise<void>; submit: () => Promis
         useMe.getState().load(useMe.getState().loadedFor ?? "", true).catch(() => undefined);
       }
     } catch (e) {
+      if (useWorkspace.getState().problem?.id !== submitFor) return;
       useWorkspace.getState().setSubmit({ submitState: "error", submitError: describeApiError(e) });
     }
   }, [bumpQuota]);

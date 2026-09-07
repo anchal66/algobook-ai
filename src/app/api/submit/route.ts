@@ -25,7 +25,7 @@ const BodySchema = z.object({
   meta: z.object({
     hintsUsed: z.number().int().min(0).max(3).default(0),
     editorialViewed: z.boolean().default(false),
-    timeSpentSec: z.number().int().min(0).max(86_400).default(0),
+    timeSpentSec: z.number().int().min(0).default(0).transform((n) => Math.min(n, 86_400)),
     runCount: z.number().int().min(0).max(10_000).default(0),
     /** Local hour 0–23 (night-owl achievement); UTC when omitted. */
     localHour: z.number().int().min(0).max(23).optional(),

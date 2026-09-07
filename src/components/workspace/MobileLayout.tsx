@@ -1,6 +1,6 @@
 "use client";
 /** < 1024 px layout (Module 03 W-26): segmented control Description | Code | Console (+ Notes/AI), fixed Run/Submit bar. */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace";
 import type { PanelSlot } from "@/components/workspace/Layout/PanelCard";
@@ -16,8 +16,10 @@ export function MobileLayout({ left, code, console: consoleSlot, side, onRun, on
   const runState = useWorkspace((s) => s.runState);
   const submitState = useWorkspace((s) => s.submitState);
   const active: Seg = seg === "side" && !side ? "left" : seg;
-  // Jump to the console when a run/submit starts.
+  // Jump to the console when a run/submit starts and stay there once the result lands.
   const busy = runState === "running" || submitState === "running";
+  const prevBusy = useRef(false);
+  useEffect(() => { if (busy && !prevBusy.current) setSeg("console"); prevBusy.current = busy; }, [busy]);
   const shown = busy && active !== "console" ? "console" : active;
   const slot = shown === "left" ? left : shown === "code" ? code : shown === "console" ? consoleSlot : side ?? left;
   const segments: { id: Seg; label: string }[] = [

@@ -445,6 +445,8 @@ export const AiUsageSchema = z.object({
   problemId: z.string().nullable().default(null),
   ok: z.boolean().default(true),
   error: z.string().nullable().default(null),
+  /** Module 05 audit: attribution (difficulty, repair round, feedback kind). */
+  tags: z.record(z.string(), z.union([z.string(), z.number()])).nullable().default(null),
   createdAt: timestamp,
 });
 

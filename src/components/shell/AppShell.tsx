@@ -6,7 +6,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { clearQueries } from "@/lib/app/query";
+import { Button } from "@/components/ui/button";
 import { useMe } from "@/store/me";
 import { NavRail } from "@/components/shell/NavRail";
 import { TopBar } from "@/components/shell/TopBar";
@@ -22,6 +26,8 @@ export function AppShell({ children, width = "default" }: { children: ReactNode;
   const router = useRouter();
   const path = usePathname();
   const load = useMe((s) => s.load);
+  const meError = useMe((s) => s.error);
+  const me = useMe((s) => s.me);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -29,6 +35,13 @@ export function AppShell({ children, width = "default" }: { children: ReactNode;
     if (!user) router.replace(`/login?next=${encodeURIComponent(path)}`);
     else void load(user.uid);
   }, [loading, user, router, path, load]);
+
+  // A 401 from any API call means the Firebase session is gone: sign out cleanly and go to login.
+  useEffect(() => {
+    const onUnauth = () => { clearQueries(); useMe.getState().reset(); void signOut(auth).finally(() => router.replace(`/login?next=${encodeURIComponent(path)}`)); };
+    window.addEventListener("algobook:unauthenticated", onUnauth);
+    return () => window.removeEventListener("algobook:unauthenticated", onUnauth);
+  }, [router, path]);
 
   if (loading || !user) return <ShellSkeleton />;
 
@@ -39,7 +52,15 @@ export function AppShell({ children, width = "default" }: { children: ReactNode;
       <div className="flex min-h-dvh flex-col lg:pl-16">
         <TopBar onMenu={() => setMenuOpen(true)} />
         <main id="main" tabIndex={-1} className={cn("mx-auto w-full flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8", width === "default" && "max-w-[1280px]", width === "wide" && "max-w-[1440px]")}>
-          <PageTransition id={path}>{children}</PageTransition>
+          {meError && !me ? (
+            <div className="mx-auto max-w-md py-20 text-center">
+              <h2 className="text-lg font-semibold text-text-1">Couldn&rsquo;t load your account</h2>
+              <p className="mt-2 text-sm text-text-2">{meError}</p>
+              <Button variant="brand" className="mt-5" onClick={() => void load(user.uid, true)}>Retry</Button>
+            </div>
+          ) : (
+            <PageTransition id={path}>{children}</PageTransition>
+          )}
         </main>
       </div>
       <MobileNav open={menuOpen} onOpenChange={setMenuOpen} />

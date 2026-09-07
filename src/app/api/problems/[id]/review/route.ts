@@ -2,6 +2,7 @@ import { z } from "zod";
 import { handler } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/errors";
 import * as problems from "@/lib/data/problems";
+import { assertNotInActiveInterview } from "@/lib/practice/interview";
 import * as submissions from "@/lib/data/submissions";
 import { serialize } from "@/lib/data/schema";
 import { consumeQuota } from "@/lib/auth/quotas";
@@ -14,6 +15,7 @@ const BodySchema = z.object({ submissionId: z.string().min(1) });
 export const POST = handler({ evt: "problems.review", feature: "review", body: BodySchema }, async ({ user, body, params }) => {
   const p = await problems.resolve(params.id);
   if (!p || p.status === "draft") throw ApiError.notFound("Problem not found");
+  await assertNotInActiveInterview(user.uid, p.id);
   const sub = await submissions.get(body.submissionId, user.uid);
   if (!sub || sub.problemId !== p.id) throw ApiError.notFound("Submission not found");
   const res = await reviewSubmission(p, sub, user.uid);

@@ -27,6 +27,7 @@ export default function UserMenu({ size = 32 }: { size?: number }) {
 
   const handleSignOut = async () => {
     clearQueries();
+    useMe.getState().reset();
     await signOut(auth);
     router.push("/");
   };

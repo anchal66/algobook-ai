@@ -257,6 +257,21 @@ export async function update(id: string, uid: string, patch: ProjectPatch): Prom
   return (await get(project.id))!;
 }
 
+/** One generation at a time per project: a short lease on the project doc (409 while another request holds it). */
+export const GENERATION_LEASE_MS = 5 * 60_000;
+export async function acquireGenerationLease(projectId: string): Promise<void> {
+  const ref = adminDb.collection(COL).doc(projectId);
+  await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const at = (snap.data()?.generatingAt as Timestamp | undefined)?.toMillis?.() ?? 0;
+    if (Date.now() - at < GENERATION_LEASE_MS) throw ApiError.conflict("A problem is already being generated for this project — it will appear in the list when it is ready.");
+    tx.update(ref, { generatingAt: Timestamp.now() });
+  });
+}
+export async function releaseGenerationLease(projectId: string): Promise<void> {
+  await adminDb.collection(COL).doc(projectId).update({ generatingAt: FieldValue.delete() }).catch(() => undefined);
+}
+
 /** Module 05: all project ids of a user (account deletion). */
 export async function idsForUser(uid: string): Promise<string[]> {
   const snap = await adminDb.collection(COL).where("uid", "==", uid).select().get();

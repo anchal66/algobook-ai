@@ -86,7 +86,7 @@ export async function streamChat(p: problems.ProblemPublic, o: { uid: string; la
 // ── Inline completion ────────────────────────────────────────────────────────
 
 export async function completeCode(o: { uid: string; language: Language; prefix: string; suffix: string; problemId?: string }): Promise<{ text: string; costUsd: number }> {
-  const res = await aiCall<string>({ purpose: "complete", instructions: COMPLETE_INSTRUCTIONS, input: buildCompleteInput(o.language, o.prefix, o.suffix), uid: o.uid, problemId: o.problemId, promptCacheKey: `algobook:complete:${o.uid}` });
+  const res = await aiCall<string>({ purpose: "complete", instructions: COMPLETE_INSTRUCTIONS, input: buildCompleteInput(o.language, o.prefix, o.suffix), uid: o.uid, problemId: o.problemId });
   let text = res.text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```\s*$/i, "");
   const lines = text.split("\n");
   if (lines.length > 6) text = lines.slice(0, 6).join("\n");

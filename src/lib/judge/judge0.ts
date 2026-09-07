@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { LANGUAGES, LANGUAGE_KEYS } from "@/lib/judge/languages";
+import { JUDGE_BUSY_MESSAGE, reserveBatch } from "@/lib/judge/budget";
 
 /** Judge0 status ids (https://ce.judge0.com/#statuses-and-languages). */
 export const JUDGE0_STATUS = {
@@ -31,13 +32,14 @@ export interface RawSubmission {
 }
 
 const POLL_MS = 700;
-const POLL_TIMEOUT_MS = 20_000;
+const POLL_TIMEOUT_MS = 40_000;
 const MAX_BATCH = 20; // Judge0 CE default MAX_SUBMISSION_BATCH_SIZE
 
 function headers(): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (env.JUDGE0_HOST_HEADER) {
-    h["X-RapidAPI-Key"] = env.RAPIDAPI_KEY ?? "";
+    if (!env.RAPIDAPI_KEY) throw new ApiError(503, "UPSTREAM", "Code execution is not configured on this deployment yet (missing judge credentials). Everything else works; please try again later.", { code: "JUDGE_NOT_CONFIGURED" });
+    h["X-RapidAPI-Key"] = env.RAPIDAPI_KEY;
     h["X-RapidAPI-Host"] = env.JUDGE0_HOST_HEADER;
   } else if (env.JUDGE0_AUTH_TOKEN) {
     h["X-Auth-Token"] = env.JUDGE0_AUTH_TOKEN;
@@ -56,7 +58,7 @@ async function judge0Fetch(path: string, init?: RequestInit): Promise<Response> 
   } catch (e) {
     throw ApiError.upstream("Judge0 unreachable", (e as Error).message);
   }
-  if (res.status === 429) throw ApiError.upstream("Judge0 rate limit reached, try again in a minute");
+  if (res.status === 429) throw new ApiError(503, "UPSTREAM", JUDGE_BUSY_MESSAGE, { code: "JUDGE_RATE_LIMIT" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw ApiError.upstream(`Judge0 error ${res.status}`, text.slice(0, 500));
@@ -149,6 +151,7 @@ export async function pollBatch(tokens: string[]): Promise<RawSubmission[]> {
 export async function runBatch(items: BatchItem[]): Promise<RawSubmission[]> {
   if (!items.length) return [];
   if (isLocalBackend()) { const { runBatchLocal } = await import("@/lib/judge/local"); return runBatchLocal(items); }
+  await reserveBatch();
   const tokens = await submitBatch(items);
   return pollBatch(tokens);
 }

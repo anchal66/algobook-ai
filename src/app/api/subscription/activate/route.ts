@@ -33,7 +33,9 @@ export async function GET(request: Request) {
     if (!transaction || transaction.status !== "PAID") { log({ status: "not_paid" }); return redirect("error&reason=not_paid"); }
     const plan = getPlan(transaction.metadata?.planSlug ?? "");
     if (!plan) { log({ status: "invalid_plan" }); return redirect("error&reason=invalid_plan"); }
-    if (typeof transaction.amount === "number" && transaction.amount !== plan.priceInPaise) { log({ status: "amount_mismatch", amount: transaction.amount }); return redirect("error&reason=amount_mismatch"); }
+    if (transaction.serviceName && transaction.serviceName !== "algobook") { log({ status: "wrong_service", serviceName: transaction.serviceName }); return redirect("error&reason=invalid_transaction"); }
+    if (typeof transaction.amount !== "number" || transaction.amount !== plan.priceInPaise) { log({ status: "amount_mismatch", amount: transaction.amount }); return redirect("error&reason=amount_mismatch"); }
+    if (transaction.currency && transaction.currency !== plan.currency) { log({ status: "currency_mismatch", currency: transaction.currency }); return redirect("error&reason=amount_mismatch"); }
     const uid = transaction.userId ?? "";
     try { await getAdminAuth().getUser(uid); } catch { log({ status: "unknown_user" }); return redirect("error&reason=unknown_user"); }
 

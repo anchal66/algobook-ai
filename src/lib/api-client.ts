@@ -39,6 +39,7 @@ export async function apiFetch<T = unknown>(path: string, init: ApiFetchInit = {
   if (!res.ok) {
     const env = data as Partial<ApiErrorBody> | null;
     const err = env?.error;
+    if (res.status === 401 && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("algobook:unauthenticated", { detail: err?.message }));
     throw new ApiError(res.status, err?.code ?? "INTERNAL", err?.message ?? `Request failed (${res.status})`, err?.details);
   }
   return data as T;

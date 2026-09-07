@@ -4,7 +4,7 @@ import { SubscriptionSchema } from "@/lib/data/schema";
 
 /** `GET /api/subscription/invoices` (Module 05 U-19): the user's subscription ledger, newest first. */
 export const GET = handler({ evt: "subscription.invoices" }, async ({ user }) => {
-  const snap = await adminDb.collection("subscriptions").where("uid", "==", user.uid).get();
+  const snap = await adminDb.collection("subscriptions").where("uid", "==", user.uid).limit(100).get();
   const invoices = snap.docs.map((d) => {
     const s = SubscriptionSchema.parse(d.data());
     return {

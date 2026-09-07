@@ -3,6 +3,7 @@ import { handler } from "@/lib/api/handler";
 import { ApiError } from "@/lib/api/errors";
 import { sseResponse } from "@/lib/api/sse";
 import * as problems from "@/lib/data/problems";
+import { assertNotInActiveInterview } from "@/lib/practice/interview";
 import { LanguageSchema } from "@/lib/data/schema";
 import { consumeQuota } from "@/lib/auth/quotas";
 import { ChatTurnSchema } from "@/lib/ai/schemas";
@@ -19,6 +20,7 @@ const BodySchema = z.object({
 export const POST = handler({ evt: "problems.chat", feature: "chat", body: BodySchema }, async ({ user, body, params }) => {
   const p = await problems.resolve(params.id);
   if (!p || p.status === "draft") throw ApiError.notFound("Problem not found");
+  await assertNotInActiveInterview(user.uid, p.id);
   if (body.messages[body.messages.length - 1].role !== "user") throw ApiError.validation("The last message must be from the user");
   return sseResponse(async (send) => {
     try {

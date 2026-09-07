@@ -31,6 +31,14 @@ export async function getInterview(id: string, uid: string): Promise<WithId<Inte
   return it;
 }
 
+/** 403 when `problemId` belongs to the caller's running mock interview (no hints / editorial / tutor / review / explain). */
+export async function assertNotInActiveInterview(uid: string, problemId: string): Promise<void> {
+  const it = await activeInterview(uid);
+  if (it && it.endsAt.toMillis() > Date.now() && it.problems.some((p) => p.problemId === problemId)) {
+    throw ApiError.forbidden("Not available during a mock interview — finish the session first.");
+  }
+}
+
 export async function activeInterview(uid: string): Promise<WithId<Interview> | null> {
   const snap = await adminDb.collection(COL).where("uid", "==", uid).where("status", "==", "active").limit(1).get();
   if (snap.empty) return null;
@@ -160,7 +168,7 @@ export async function finishInterview(id: string, uid: string): Promise<{ interv
 
 /** Module 05: the user's interviews, newest first (single-field query, sorted in memory). */
 export async function listInterviews(uid: string, limit = 30): Promise<WithId<Interview>[]> {
-  const snap = await adminDb.collection("interviews").where("uid", "==", uid).get();
+  const snap = await adminDb.collection("interviews").where("uid", "==", uid).limit(200).get();
   return snap.docs
     .map((d) => ({ id: d.id, ...InterviewSchema.parse(d.data()) }))
     .sort((a, b) => b.startedAt.toMillis() - a.startedAt.toMillis())

@@ -12,7 +12,7 @@ function parse(snap: FirebaseFirestore.DocumentSnapshot): WithId<Subscription> |
 
 /** Single-field query + in-memory filter: a user has a handful of subscriptions, and this needs no composite index. */
 export async function getActiveSubscription(uid: string): Promise<WithId<Subscription> | null> {
-  const snap = await adminDb.collection(COL).where("uid", "==", uid).get();
+  const snap = await adminDb.collection(COL).where("uid", "==", uid).limit(50).get();
   const now = Date.now();
   let best: WithId<Subscription> | null = null;
   for (const d of snap.docs) {

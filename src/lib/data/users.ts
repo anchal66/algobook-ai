@@ -164,7 +164,7 @@ export async function updateUsername(uid: string, newUsername: string): Promise<
     const [userSnap, newSnap] = await Promise.all([tx.get(userRef), tx.get(newRef)]);
     if (!userSnap.exists) throw ApiError.notFound("User not found");
     const data = userSnap.data()!;
-    const changesLeft = (data.usernameChangesLeft as number) ?? 0;
+    const changesLeft = typeof data.usernameChangesLeft === "number" ? data.usernameChangesLeft : 2;
     if (data.username === newUsername) throw ApiError.validation("Same as current username");
     if (changesLeft <= 0) throw ApiError.forbidden("No username changes remaining");
     if (newSnap.exists) throw ApiError.conflict("Username already taken");

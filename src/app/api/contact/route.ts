@@ -16,11 +16,14 @@ const Body = z.object({
 
 export const POST = handler({ evt: "contact.send", body: Body, auth: "optional" }, async ({ req, body, user }) => {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-  // Single-field query + in-memory window so no composite index is needed.
-  const since = Date.now() - 60 * 60 * 1000;
-  const recent = await adminDb.collection("contactMessages").where("ip", "==", ip).limit(50).get();
-  const inWindow = recent.docs.filter((d) => ((d.data().createdAt as Timestamp | undefined)?.toMillis?.() ?? 0) > since).length;
-  if (inWindow >= 5) throw ApiError.quotaExceeded(new Date(Date.now() + 3600_000).toISOString(), "Too many messages — please try again in an hour.");
+  // Atomic per-IP hourly counter (no read-then-write race, no composite index).
+  const bucket = `${ip.replace(/[^a-zA-Z0-9:.]/g, "_")}_${new Date().toISOString().slice(0, 13)}`;
+  const counter = adminDb.collection("contactRate").doc(bucket);
+  await adminDb.runTransaction(async (tx) => {
+    const n = Number((await tx.get(counter)).data()?.n ?? 0);
+    if (n >= 5) throw ApiError.quotaExceeded(new Date(Date.now() + 3600_000).toISOString(), "Too many messages — please try again in an hour.");
+    tx.set(counter, { n: n + 1, updatedAt: Timestamp.now() }, { merge: true });
+  });
   await adminDb.collection("contactMessages").add({
     name: body.name, email: body.email, subject: body.subject, message: body.message,
     uid: user?.uid ?? null, ip, userAgent: req.headers.get("user-agent") ?? "", status: "new", createdAt: Timestamp.now(),

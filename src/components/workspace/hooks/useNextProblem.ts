@@ -3,7 +3,7 @@
  * Prev / next / shuffle navigation inside a project and the "Next" generation flow when
  * nothing is queued (Module 03 W-04/W-17/W-18). Explore problems (no project) have no navigation.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, nextProblemStream } from "@/lib/workspace/api";
 import { track } from "@/lib/analytics";
@@ -41,6 +41,9 @@ export function useNextProblem(): NextProblemApi {
   const total = items.length;
   const hasProject = !!projectId;
 
+  // Leaving the workspace stops waiting on the stream (the server finishes and links the problem; the list shows it later).
+  useEffect(() => () => { controller?.abort(); controller = null; }, []);
+
   const goTo = useCallback((problemId: string) => {
     if (!projectId) { router.push(`/problems/${problemId}`); return; }
     router.push(`/project/${projectId}/solve/${problemId}`);
@@ -63,12 +66,14 @@ export function useNextProblem(): NextProblemApi {
       track("next_problem", { source: result.source, latencyMs: result.latencyMs });
       useWorkspace.getState().setContext({ items: [...useWorkspace.getState().items.filter((i) => i.problemId !== result.item.problemId), result.item] });
       useWorkspace.getState().setGeneration({ active: false });
-      router.replace(`/project/${projectId}/solve/${result.problem.id}`);
+      if (!controller?.signal.aborted && useWorkspace.getState().projectId === projectId) router.replace(`/project/${projectId}/solve/${result.problem.id}`);
     } catch (e) {
       if ((e as Error)?.name === "AbortError") { useWorkspace.getState().setGeneration({ active: false }); return; }
       const msg = e instanceof ApiError
         ? e.code === "QUOTA_EXCEEDED" ? "You have used today's AI generations. Pick a problem from the list or come back tomorrow."
-          : e.code === "PAYMENT_REQUIRED" ? "AI generation needs a Pro plan." : e.message
+          : e.code === "PAYMENT_REQUIRED" ? "AI generation needs a Pro plan."
+          : e.code === "CONFLICT" ? e.message
+          : e.code === "UPSTREAM" ? "We couldn't produce a verified problem right now. Nothing was charged — please try again in a moment." : e.message
         : "Generation failed. Please try again.";
       useWorkspace.getState().setGeneration({ active: false, error: msg });
     }

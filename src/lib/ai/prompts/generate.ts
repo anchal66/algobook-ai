@@ -106,6 +106,7 @@ export function buildGenInput(ctx: GenInputContext): string {
   if (ctx.isCalibration) lines.push("CALIBRATION: yes — a straightforward, representative problem to assess the user's current level.");
   if (ctx.projectDescription) lines.push(`PROJECT: "${clip(ctx.projectDescription, 200)}"`);
   if (ctx.compact) lines.push("COMPACT: your previous attempt exceeded the output budget and was discarded. Keep the statement under 180 words, every test input under 600 characters (stress cases: at most ~150 elements), at most 10 hidden tests, and no commentary inside code.");
+  else if (ctx.difficulty !== "Hard") lines.push("SIZE: keep every test input under 600 characters (stress cases: at most ~150 elements; describe long strings with patterns, never emit repeated characters) and at most 10 non-sample tests.");
   const up = sanitizeUserPrompt(ctx.userPrompt, 300);
   if (up) {
     lines.push(`USER_REQUEST: "${up}"`);

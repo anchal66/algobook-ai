@@ -39,11 +39,38 @@ export const MODEL_POLICY: Record<AiPurpose, PurposePolicy> = {
   embed: { model: "text-embedding-3-small", maxOutputTokens: 0 },
 };
 
-/** D-03 default: repair #1 Luna xhigh (with judge feedback), repair #2 Terra medium. */
+/** D-03 default: repair #1 Luna (effort chosen per feedback, see `repairEffortFor`), repair #2 Terra medium. */
 export const REPAIR_LADDER: ReadonlyArray<{ model: ModelId; reasoning: ReasoningEffort }> = [
-  { model: "gpt-5.6-luna", reasoning: "xhigh" },
+  { model: "gpt-5.6-luna", reasoning: "high" },
   { model: "gpt-5.6-terra", reasoning: "medium" },
 ];
+/** Bulk pre-generation never waits on a user: a Terra repair ($0.04) costs 8× a fresh batch generation, so Luna only. */
+export const PREGEN_REPAIR_LADDER: ReadonlyArray<{ model: ModelId; reasoning: ReasoningEffort }> = [{ model: "gpt-5.6-luna", reasoning: "high" }];
+
+/**
+ * Repair effort by what went wrong (audit 2026-09-08): static contract errors (encoding, duplicate sample, class
+ * names) are mechanical rewrites — `medium`; judge failures (WA/RE/CE/TLE) get `high`. `xhigh` measured 9k reasoning
+ * tokens for a `[0,5,10]` → `3\n0 5 10` fix, which is where repair spend went.
+ */
+export function repairEffortFor(kind: "static" | "judge", rung: { model: ModelId; reasoning: ReasoningEffort }): ReasoningEffort {
+  const override = process.env.AI_REASONING_OVERRIDE_REPAIR;
+  if (override && EFFORTS.has(override)) return override as ReasoningEffort;
+  if (rung.model !== "gpt-5.6-luna") return rung.reasoning;
+  return kind === "static" ? "medium" : "high";
+}
+
+/**
+ * Generation effort/budget by difficulty. Easy problems' failure modes are spec discipline, not reasoning depth
+ * (measured `medium` ≈ same verification outcome at ½ cost, ⅓ latency). `AI_REASONING_OVERRIDE_GENERATE` still wins.
+ */
+export function generationPolicyFor(difficulty: "Easy" | "Medium" | "Hard"): { reasoning: ReasoningEffort; maxOutputTokens: number } {
+  const base = reasoningFor("generate") ?? "high";
+  const override = process.env.AI_REASONING_OVERRIDE_GENERATE;
+  if (override && EFFORTS.has(override)) return { reasoning: override as ReasoningEffort, maxOutputTokens: MODEL_POLICY.generate.maxOutputTokens };
+  if (difficulty === "Easy") return { reasoning: "medium", maxOutputTokens: 12000 };
+  if (difficulty === "Medium") return { reasoning: base, maxOutputTokens: 14000 };
+  return { reasoning: base, maxOutputTokens: MODEL_POLICY.generate.maxOutputTokens };
+}
 
 /** Batch API is 50% off list price (Master Plan §7). */
 export const BATCH_DISCOUNT = 0.5;

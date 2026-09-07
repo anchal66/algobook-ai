@@ -69,7 +69,7 @@ function PaletteDialog() {
     close();
     try { const r = await randomProblem(); if (r.item) router.push(`/problems/${r.item.slug}`); } catch { /* ignore */ }
   };
-  const logout = async () => { close(); clearQueries(); await signOut(auth); router.push("/"); };
+  const logout = async () => { close(); clearQueries(); useMe.getState().reset(); await signOut(auth); router.push("/"); };
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>

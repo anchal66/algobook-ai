@@ -12,7 +12,7 @@ export const POST = handler({ evt: "projects.insights", body: BodySchema }, asyn
   const project = await projects.getOwned(params.id, user.uid);
   const existing = project.insights as (Record<string, unknown> & { generatedAt?: { toMillis(): number } }) | null;
   const generatedAt = existing?.generatedAt && typeof existing.generatedAt.toMillis === "function" ? existing.generatedAt.toMillis() : 0;
-  if (existing && !body.force && Date.now() - generatedAt < FRESH_MS) {
+  if (existing && !(body.force && user.isAdmin) && Date.now() - generatedAt < FRESH_MS) {
     const { generatedAt: _g, ...rest } = existing;
     return { insights: rest, cached: true };
   }

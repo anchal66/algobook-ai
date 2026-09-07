@@ -43,6 +43,36 @@ export function checkQuota(tier: PlanTier, feature: FeatureKey, quotas: Partial<
   return { ok: true, limit, used, remaining: limit - used, resetAt };
 }
 
+/**
+ * Atomic check-and-increment: reserves one unit of `feature` inside a transaction so N parallel requests
+ * cannot all pass the snapshot check. Throws 402/429 like `assertQuota`. Pair with `refundQuota` on failure.
+ */
+export async function reserveQuota(uid: string, tier: PlanTier, feature: FeatureKey): Promise<QuotaCheck> {
+  const ref = adminDb.collection("users").doc(uid);
+  return adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = (snap.data()?.quotas ?? {}) as Partial<Quotas>;
+    const check = checkQuota(tier, feature, current);
+    if (!check.ok) {
+      if (check.reason === "not_in_plan") throw ApiError.paymentRequired(`"${feature}" is not included in the ${tier} plan`);
+      throw ApiError.quotaExceeded(check.resetAt, `Daily ${feature} limit (${check.limit}) reached`);
+    }
+    tx.update(ref, { quotas: applyConsume(current, feature), updatedAt: FieldValue.serverTimestamp() });
+    return check;
+  });
+}
+
+/** Gives a reserved unit back (generation failed or a pool problem was reused). */
+export async function refundQuota(uid: string, feature: FeatureKey): Promise<void> {
+  const ref = adminDb.collection("users").doc(uid);
+  await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = (snap.data()?.quotas ?? {}) as Partial<Quotas>;
+    const eff = effectiveQuotas(current);
+    tx.update(ref, { quotas: { ...eff, [feature]: Math.max(0, (eff[feature] ?? 0) - 1) } });
+  }).catch(() => undefined);
+}
+
 /** Pure counterpart of consumeQuota: returns the updated counters. */
 export function applyConsume(quotas: Partial<Quotas> | undefined, feature: FeatureKey, now: Date = new Date(), amount = 1): Quotas {
   const eff = effectiveQuotas(quotas, now);

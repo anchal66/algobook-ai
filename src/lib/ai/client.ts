@@ -51,6 +51,8 @@ export interface AiCallOptions<T> {
   problemId?: string;
   /** Groups requests for prompt caching (defaults to the purpose). */
   promptCacheKey?: string;
+  /** Free-form attribution written to `aiUsage` (difficulty, repair round, feedback kind) for cost analysis. */
+  tags?: Record<string, string | number>;
 }
 
 export interface AiResult<T> {
@@ -98,13 +100,13 @@ export function toTokenUsage(u: OpenAI.Responses.ResponseUsage | null | undefine
   };
 }
 
-export interface LogFields { purpose: AiPurpose | string; model: string; usage: TokenUsage; costUsd: number; latencyMs: number; uid?: string; problemId?: string; ok: boolean; error?: string }
+export interface LogFields { purpose: AiPurpose | string; model: string; usage: TokenUsage; costUsd: number; latencyMs: number; uid?: string; problemId?: string; ok: boolean; error?: string; tags?: Record<string, string | number> }
 
 /** Writes the telemetry doc + log line. Never throws, never awaited by callers. */
 export function logUsage(f: LogFields): void {
   console.info(JSON.stringify({ evt: "ai.call", purpose: f.purpose, model: f.model, ...f.usage, costUsd: f.costUsd, latencyMs: f.latencyMs, ok: f.ok, error: f.error, uid: f.uid, problemId: f.problemId }));
   void aiUsage.log({
-    purpose: f.purpose, model: f.model,
+    purpose: f.purpose, model: f.model, tags: f.tags ?? null,
     inputTokens: f.usage.inputTokens, cachedTokens: f.usage.cachedTokens, outputTokens: f.usage.outputTokens, reasoningTokens: f.usage.reasoningTokens,
     costUsd: f.costUsd, latencyMs: f.latencyMs, uid: f.uid ?? null, problemId: f.problemId ?? null, ok: f.ok, error: f.error ?? null,
   });
@@ -154,7 +156,7 @@ export async function aiCall<T = string>(o: AiCallOptions<T>): Promise<AiResult<
 
   const finish = (ok: boolean, error?: string) => {
     const costUsd = estimateCost(model, total);
-    logUsage({ purpose: o.purpose, model, usage: total, costUsd, latencyMs: Date.now() - started, uid: o.uid, problemId: o.problemId, ok, error });
+    logUsage({ purpose: o.purpose, model, usage: total, costUsd, latencyMs: Date.now() - started, uid: o.uid, problemId: o.problemId, ok, error, tags: o.tags });
     return costUsd;
   };
 

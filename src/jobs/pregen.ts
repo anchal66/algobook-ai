@@ -11,6 +11,7 @@ import { BATCH_DISCOUNT, MODEL_POLICY, estimateCost, modelFor } from "@/lib/ai/m
 import { ProblemSpecSchema } from "@/lib/ai/schemas";
 import { GEN_INSTRUCTIONS, buildGenInput } from "@/lib/ai/prompts";
 import { persistSpec, verifyAndRepair } from "@/lib/ai/generate";
+import { PREGEN_REPAIR_LADDER } from "@/lib/ai/models";
 import { fanOutLanguages } from "@/lib/ai/drivers";
 import { CORE_TOPICS } from "@/lib/practice/topics";
 
@@ -176,7 +177,7 @@ export async function collectPregenJob(job: WithId<PregenJob>, chunk = COLLECT_C
     let spec;
     try { spec = ProblemSpecSchema.parse(JSON.parse(text ?? "")); } catch (e) { results.failed++; console.warn(JSON.stringify({ evt: "pregen.parse_failed", customId: parsed.custom_id, message: (e as Error).message?.slice(0, 200) })); continue; }
     try {
-      const vr = await verifyAndRepair(spec, { fallbackTopics: meta.topics, model });
+      const vr = await verifyAndRepair(spec, { fallbackTopics: meta.topics, model, ladder: PREGEN_REPAIR_LADDER });
       results.costUsd += vr.costUsd;
       if (!vr.ok) { results.failed++; console.warn(JSON.stringify({ evt: "pregen.unverified", customId: parsed.custom_id, errors: vr.errors })); continue; }
       if (vr.repairs) results.repaired++;

@@ -90,6 +90,10 @@ export async function runCases(problem: JudgeProblem, language: Language, userCo
     const again = await runBatch(retryIdx.map((i) => items[i]));
     retryIdx.forEach((i, k) => { raws[i] = again[k]; });
   }
+  if (raws.some((r) => r.status.id === JUDGE0_STATUS.INTERNAL_ERROR)) {
+    console.warn(JSON.stringify({ evt: "judge0.internal_error_persisting", problemId: problem.id }));
+    throw new ApiError(503, "UPSTREAM", "The judge is busy right now — please try again in a moment. Nothing was recorded.", { code: "JUDGE_BUSY" });
+  }
   return raws.map((raw, i) => toCaseResult(i, cases[i], raw, problem.checker));
 }
 
