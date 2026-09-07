@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { browserLocalPersistence, GoogleAuthProvider, indexedDBLocalPersistence, initializeAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration from the .env.local file
 const firebaseConfig = {
@@ -16,7 +16,9 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Get Firebase services
-const auth = getAuth(app);
+// No popupRedirectResolver here: the default `getAuth()` loads the auth iframe + gapi (~130 KB) on every page.
+// The login page passes `browserPopupRedirectResolver` explicitly to signInWithPopup/Redirect/getRedirectResult.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
 const googleProvider = new GoogleAuthProvider();
 
 // Client Firestore is intentionally not initialised: every read/write goes through /api/* (Module 05 dropped it from the bundle).

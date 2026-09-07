@@ -7,7 +7,7 @@ import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { OfflineToast } from "@/components/shell/OfflineToast";
 import { Maintenance } from "@/app/maintenance";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap", axes: ["opsz"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://algobook.ai";

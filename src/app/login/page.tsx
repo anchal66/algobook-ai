@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getRedirectResult, signInWithPopup, signInWithRedirect } from "firebase/auth";
+import { browserPopupRedirectResolver, getRedirectResult, signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { CheckCircle2, ShieldCheck, Sparkles, Timer } from "lucide-react";
 import { auth, googleProvider } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -34,17 +34,17 @@ function LoginInner() {
   useEffect(() => { if (!loading && user) router.replace(next); }, [loading, user, next, router]);
   useEffect(() => {
     // Completes the redirect flow used when popups are blocked.
-    getRedirectResult(auth).catch((e: { code?: string; message?: string }) => setError(friendly(e)));
+    getRedirectResult(auth, browserPopupRedirectResolver).catch((e: { code?: string; message?: string }) => setError(friendly(e)));
   }, []);
 
   const signIn = async () => {
     setBusy(true); setError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     } catch (e) {
       const code = (e as { code?: string }).code ?? "";
       if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
-        try { await signInWithRedirect(auth, googleProvider); return; } catch (e2) { setError(friendly(e2 as { code?: string })); }
+        try { await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver); return; } catch (e2) { setError(friendly(e2 as { code?: string })); }
       } else if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
         setError(friendly(e as { code?: string }));
       }
