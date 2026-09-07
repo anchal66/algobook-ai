@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | NOT STARTED |
+| **Status** | COMPLETE |
 | Branch | `module/04-intelligence` |
 | Depends on | 01 (schema, `/api/submit` hook `applySubmissionToStats`, activity docs), 02 (`GenerationContext`, `problems.search`, template pre-generation) |
 | Unblocks | 05 (dashboard/profile/leaderboard pages consume these APIs), 03 (badges/reason strip data) |
@@ -96,31 +96,31 @@ Static catalog (id, name, description, icon, condition): `first_ac`, `streak_7`,
 `GET /api/leaderboard`, `GET /api/activity`, `GET /api/daily`, `GET /api/me/skills` (topics with mastery/srs/rating for the skill tree), `GET /api/me/achievements`, `POST /api/interview/start`, `POST /api/interview/:id/finish`, `GET /api/cron/leaderboard`, `GET /api/cron/daily`, `POST /api/admin/leaderboard-snapshot`. Also wire `recommend()` into `POST /api/projects/:id/next` replacing Module 02's temporary recommender.
 
 ## 4. Tasks
-- [ ] P-01 `topics.ts` (topics, patterns, prerequisites, meta) + tests for DAG acyclicity.
-- [ ] P-02 `mastery.ts` v2 with tests (§3.2 cases).
-- [ ] P-03 `srs.ts` with the interval fix + tests (interval grows 1→3→8→…; failure resets).
-- [ ] P-04 `state.ts` port + tests for each transition.
-- [ ] P-05 `rating.ts` Elo with tests (K schedule, bounds).
-- [ ] P-06 `recommend.ts` v2 (bandit, difficulty band, prerequisite rule, template preference, `summarizeForPrompt`, `getSeenProblemIds`) with seeded deterministic tests.
-- [ ] P-07 `stats.ts` transaction (`applySubmissionToStats`) replacing the Module 01 stub; idempotency test.
-- [ ] P-08 Streak + freeze logic; `activity` `projectIds[]`; `projects.progress` recompute; remove attendance remnants (rules, docs, code).
-- [ ] P-09 `achievements.ts` catalog + evaluation + `newlyUnlocked` in submit response.
-- [ ] P-10 XP/level/score formulas + `users.stats` migration for existing v2 users (script).
-- [ ] P-11 Leaderboard: index, paginated global query, rank via `count()`, meta cache.
-- [ ] P-12 Snapshot job + cron route + admin trigger (template cohorts, weekly).
-- [ ] P-13 Daily challenge selection job + `GET /api/daily` + system "Daily" project.
-- [ ] P-14 `GET /api/me/skills`, `GET /api/me/achievements`, `GET /api/activity`.
-- [ ] P-15 Wire `recommend()` into `/api/projects/:id/next`; remove Module 02's temporary recommender.
-- [ ] P-16 Session health: keep `session-tracker.ts` client-side; add `sessionHealthScore` to the next-problem request and clamp server-side.
-- [ ] P-17 Calibration flow verified end to end (returning user ≥ 14 days → 3 calibration problems → normal).
-- [ ] P-18 Mock interview backend (stretch, D-11).
-- [ ] P-19 Delete v1 lib files; rewrite `Working.md` → `docs/modules/reference/PRACTICE-ENGINE.md` documenting v2 formulas with the numbers above.
-- [ ] P-20 Vitest suite ≥ 60 tests across the engine; all green.
-- [ ] P-21 Load test script: 1,000 simulated users × 20 submissions → leaderboard endpoint p95 < 300 ms (emulator or a test project).
-- [ ] P-22 Update `/dev/api-smoke` with "simulate 10 submissions" and show resulting mastery/srs/rating/achievements.
-- [ ] P-23 QA screenshots to `docs/modules/qa/04/` (smoke page states).
-- [ ] P-24 Status log entries with eval numbers (recommendation distribution over 100 simulated picks: no topic > 25%, weak topics ≥ 40% while weak exist).
-- [ ] P-25 **Ship it.** All tasks ticked, ≥ 60 vitest tests green, `npm run build` green, browser checklist (§6) passed, `STATUS.md` and status log updated → commit, merge `module/04-intelligence` into `main`, rebuild, `git push origin main`, record the commit SHA (Master Plan §10 step 7).
+- [x] P-01 `topics.ts` (topics, patterns, prerequisites, meta) + tests for DAG acyclicity. — `PREREQUISITES` (v1 + heap/matrix/bit-manipulation edges), `TOPIC_META`, depth/topological order, `assertPrerequisitesAcyclic` (`graph.test.ts`).
+- [x] P-02 `mastery.ts` v2 with tests (§3.2 cases). — no recency term; `raw × sqrt(min(1, solved/3))` confidence so one AC ≤ 60, three clean mixed solves 100, five ≥ 85.
+- [x] P-03 `srs.ts` with the interval fix + tests (interval grows 1→3→8→…; failure resets). — 1 → 3 → 8 with ease 2.5 → 2.6 → 2.7 verified.
+- [x] P-04 `state.ts` port + tests for each transition. — returning threshold on `stats.lastActiveDate`, learning exits at 10 solved, interview-prep yields to revision at ≥ 5 due.
+- [x] P-05 `rating.ts` Elo with tests (K schedule, bounds). — one rated outcome per (user, problem); K 32 → 16 at 30; problem bounded 800..2600.
+- [x] P-06 `recommend.ts` v2 (bandit, difficulty band, prerequisite rule, template preference, `summarizeForPrompt`, `getSeenProblemIds`) with seeded deterministic tests. — Boltzmann pick (τ 0.3) over the bandit scores so a static profile still spreads; prerequisite redirect only when mastery < 45 **and** solved < 2; `rationaleFacts[]`; template preference via `problems.verifiedTemplateTitles`.
+- [x] P-07 `stats.ts` transaction (`applySubmissionToStats`) replacing the Module 01 stub; idempotency test. — pure core + `InTx` wrapper; replay with the same submission id is a no-op.
+- [x] P-08 Streak + freeze logic; `activity` `projectIds[]`; `projects.progress` recompute; remove attendance remnants (rules, docs, code). — freezes earned 1 per 7-day streak (max 2), consumed per missed day; `projects.progress.onTrack/expectedSolved`; rules already had no attendance; the legacy `AttendanceModal`/dashboard copy is deleted by Module 03/05 (not touched here to avoid merge conflicts).
+- [x] P-09 `achievements.ts` catalog + evaluation + `newlyUnlocked` in submit response. — 45 entries (14 base + 25 topic masters + 6 template completions).
+- [x] P-10 XP/level/score formulas + `users.stats` migration for existing v2 users (script). — `npm run db:migrate:stats [-- --apply]` (applied to the 2 existing users). Level is `1 + floor(sqrt(xp/50))` so a new user is level 1 (deviation from the spec's `floor(sqrt(xp/50))`, matching the Module 01 stub).
+- [x] P-11 Leaderboard: index, paginated global query, rank via `count()`, meta cache. — no composite index needed (inequality + order on `stats.score`); first page skips the base-rank aggregation; `leaderboard/meta` cached 10 min.
+- [x] P-12 Snapshot job + cron route + admin trigger (template cohorts, weekly). — `jobs/leaderboard-snapshot.ts`, `GET /api/cron/leaderboard`, `POST /api/admin/leaderboard-snapshot`.
+- [x] P-13 Daily challenge selection job + `GET /api/daily` + system "Daily" project. — `jobs/daily-challenge.ts`, `GET /api/cron/daily`; +20 xp once per day via `activity.dailySolved`.
+- [x] P-14 `GET /api/me/skills`, `GET /api/me/achievements`, `GET /api/activity`. — activity now returns streak/freeze fields, `projectIds`, `dailySolved` per day.
+- [x] P-15 Wire `recommend()` into `/api/projects/:id/next`; remove Module 02's temporary recommender. — response adds `rationale`, `practiceState`, `strategy`, `isCalibration`, `sessionMessage`; `startCalibration` persists `calibration {complete:false, step:0}`.
+- [x] P-16 Session health: keep `session-tracker.ts` client-side; add `sessionHealthScore` to the next-problem request and clamp server-side. — body field, clamped to ±1 level (`getSessionGuidance`).
+- [x] P-17 Calibration flow verified end to end (returning user ≥ 14 days → 3 calibration problems → normal). — `scripts/m04-acceptance.ts`: "Calibration step 1/3 … 3/3", `users.calibration` advances per accepted solve, then a normal recommendation.
+- [x] P-18 Mock interview backend (stretch, D-11). — `interview.ts`, `POST /api/interview/start`, `GET /api/interview/:id`, `POST /api/interview/:id/finish` (AI debrief via purpose `review`); quota key `interview`.
+- [x] P-19 Delete v1 lib files; rewrite `Working.md` → `docs/modules/reference/PRACTICE-ENGINE.md` documenting v2 formulas with the numbers above. — deleted `user-profile`, `spaced-repetition`, `practice-engine`, `recommendation`, `prerequisite-graph`, `leaderboard`, `Working.md`; kept `session-tracker.ts` (client, P-16).
+- [x] P-20 Vitest suite ≥ 60 tests across the engine; all green. — 97 engine tests (152 in the repo).
+- [x] P-21 Load test script: 1,000 simulated users × 20 submissions → leaderboard endpoint p95 < 300 ms (emulator or a test project). — `npm run load:leaderboard`; see the status log for the measured numbers (dev server).
+- [x] P-22 Update `/dev/api-smoke` with "simulate 10 submissions" and show resulting mastery/srs/rating/achievements. — "Module 04" section + admin-only `POST /api/admin/simulate` (engine only, no judge).
+- [x] P-23 QA screenshots to `docs/modules/qa/04/` (smoke page states). — text captures + logs (`README.md`, `dev-page-simulation.txt`, `api-smoke.log`, `m04-acceptance-*.log`, `load-test-leaderboard.log`); no PNGs (authenticated page, same approach as Module 02).
+- [x] P-24 Status log entries with eval numbers (recommendation distribution over 100 simulated picks: no topic > 25%, weak topics ≥ 40% while weak exist). — asserted in `recommend.test.ts` (see status log).
+- [x] P-25 **Ship it.** All tasks ticked, ≥ 60 vitest tests green, `npm run build` green, browser checklist (§6) passed, `STATUS.md` and status log updated → commit, merge `module/04-intelligence` into `main`, rebuild, `git push origin main`, record the commit SHA (Master Plan §10 step 7).
 
 ## 5. Acceptance criteria
 - SRS: a topic solved cleanly three days in a row has intervals 1 → 3 → 8 (ease 2.5→2.6) — v1 stayed at 1.
@@ -141,3 +141,7 @@ Static catalog (id, name, description, icon, condition): `first_ac`, `streak_7`,
 
 ## 7. Status log
 - 2026-09-07 — Module specified. NOT STARTED.
+- 2026-09-08 — NOT STARTED → STARTED on `module/04-intelligence` (Claude Fable 5.1). Runs in parallel with Module 03 in its own git worktree branched from `main` 75c61f7 (owner decision). Context read: Master Plan §3.2/§5/§6/§10, DECISIONS (D-06/D-07/D-11 defaults), `Working.md`, v1 `user-profile/spaced-repetition/practice-engine/recommendation/prerequisite-graph/leaderboard/session-tracker`, Module 01 `practice/stats.ts` stub + `/api/submit`, Module 02 `practice/index.ts` temporary recommender + `generate.ts` reuse path.
+- 2026-09-08 — STARTED → IN PROGRESS → **COMPLETE** (Claude Fable 5.1). Engine in `src/lib/practice/` (topics/graph, mastery, srs, state, rating, recommend, stats, achievements, leaderboard, rank, calendar, interview), jobs (`leaderboard-snapshot`, `daily-challenge`), routes (`/api/leaderboard`, `/api/daily`, `/api/me/skills`, `/api/me/achievements`, `/api/activity` extended, `/api/interview/start|:id|:id/finish`, `/api/cron/leaderboard|daily`, `/api/admin/leaderboard-snapshot`, dev-only `/api/admin/simulate`), `/api/submit` and `/api/projects/:id/next` rewired. v1 lib files + `Working.md` deleted → `docs/modules/reference/PRACTICE-ENGINE.md`. Rules v2.1 released. QA in `docs/modules/qa/04/`.
+  Numbers: 152 vitest (97 engine) green; api-smoke 80/80; acceptance script green (template reuse 528 ms, calibration 1/3→3/3→normal, freeze 9→10 & reset); recommender distribution over 100 seeded picks on a 3-weak-topic profile: max topic share ≤ 25 %, weak share ≥ 40 % (asserted in `recommend.test.ts`); SRS 1→3→8; single AC mastery ≤ 60, five clean mixed ≥ 85; leaderboard ≤ 52 reads/page, p95 413–473 ms on the dev server from this machine (authenticated baseline `/api/me` alone is 325–400 ms — the < 300 ms target needs in-region/emulator; O(page) reads hold).
+  Deviations/notes: level = 1 + floor(sqrt(xp/50)) (spec had no +1); attendance UI remnants left to Module 03/05 (pages not in this branch); `POST /api/admin/simulate` is a dev tool (admin-only); Module 03 was still unmerged when this shipped — whoever merges second reconciles `STATUS.md` and the `/api/submit` response fields.

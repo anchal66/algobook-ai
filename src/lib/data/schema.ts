@@ -69,6 +69,8 @@ export const TopicSkillSchema = z.object({
   timeEfficiency: z.number().default(1),
   hintsUsed: z.number().int().default(0),
   runCount: z.number().int().default(0),
+  /** Module 04: solves where the editorial was viewed (independence factor). */
+  editorialViews: z.number().int().default(0),
   mastery: z.number().min(0).max(100).default(0),
   lastSeen: timestamp.nullable().default(null),
   srs: SrsSchema.default({ interval: 1, ease: 2.5, nextReview: null, reps: 0 }),
@@ -87,6 +89,16 @@ export const UserStatsSchema = z.object({
   rating: z.number().default(1200),
   xp: z.number().default(0),
   level: z.number().int().default(1),
+  /** Module 04: streak freezes banked (1 per 7-day streak, max 2); consumed automatically on a missed day. */
+  streakFreezes: z.number().int().default(0),
+  /** Module 04: rated (user, problem) outcomes so far — Elo K = 32 below 30, then 16. */
+  ratedSolves: z.number().int().default(0),
+  /** Module 04: daily challenges solved (achievement `daily_10`). */
+  dailySolved: z.number().int().default(0),
+  /** Module 04: accepted solves without hints (achievement `no_hints_20`). */
+  noHintSolves: z.number().int().default(0),
+  /** Module 04: languages with at least one accepted submission (achievement `polyglot`). */
+  languagesAccepted: z.array(z.string()).default([]),
 });
 
 export const EditorSettingsSchema = z.object({
@@ -153,6 +165,10 @@ export const UserSchema = z.object({
   settings: UserSettingsSchema.default(UserSettingsSchema.parse({})),
   plan: UserPlanSchema.default(UserPlanSchema.parse({})),
   quotas: QuotasSchema.default(QuotasSchema.parse({})),
+  /** Module 04: idempotency guard for `applySubmissionToStats`. */
+  lastAppliedSubmissionId: z.string().nullable().default(null),
+  /** Module 04: the auto-created system "Daily" project used by the daily challenge. */
+  dailyProjectId: z.string().nullable().default(null),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
@@ -269,6 +285,9 @@ export const ProjectProgressSchema = z.object({
   medium: z.number().int().default(0),
   hard: z.number().int().default(0),
   activeDays: z.number().int().default(0),
+  /** Module 04: solved vs the expected pace (`items` spread over `durationDays`). */
+  onTrack: z.boolean().default(true),
+  expectedSolved: z.number().int().default(0),
 });
 
 export const ProjectSchema = z.object({
@@ -288,7 +307,7 @@ export const ProjectSchema = z.object({
   createdAt: timestamp,
 });
 
-export const RecommendationReasonSchema = z.object({ short: z.string(), detail: z.string() });
+export const RecommendationReasonSchema = z.object({ short: z.string(), detail: z.string(), /** Module 04: bullet facts for the "Why this problem?" strip. */ facts: z.array(z.string()).default([]) });
 
 /** projects/{id}/items/{problemId} */
 export const ProjectItemSchema = z.object({
@@ -376,6 +395,10 @@ export const ActivitySchema = z.object({
   timeSpentSec: z.number().int().default(0),
   runs: z.number().int().default(0),
   xpEarned: z.number().default(0),
+  /** Module 04: projects touched that day (`projects.progress.activeDays` = count of days containing the project). */
+  projectIds: z.array(z.string()).default([]),
+  /** Module 04: the daily challenge of that date was solved (awarded once). */
+  dailySolved: z.boolean().default(false),
   updatedAt: timestamp,
 });
 
@@ -470,7 +493,54 @@ export const LeaderboardEntrySchema = z.object({
   score: z.number(), totalSolved: z.number().int(), currentStreak: z.number().int(), rank: z.number().int(),
 });
 export const LeaderboardSnapshotSchema = z.object({ updatedAt: timestamp, entries: z.array(LeaderboardEntrySchema) });
-export const DailyChallengeSchema = z.object({ problemId: z.string(), solvers: z.number().int().default(0) });
+export const DailyChallengeSchema = z.object({
+  date: DateKeySchema,
+  problemId: z.string(),
+  title: z.string().default(""),
+  slug: z.string().default(""),
+  difficulty: DifficultySchema.default("Medium"),
+  tags: z.array(z.string()).default([]),
+  solvers: z.number().int().default(0),
+  createdAt: timestamp,
+});
+/** leaderboard/meta — cached totals for percentile (Module 04 §3.10). */
+export const LeaderboardMetaSchema = z.object({ totalRanked: z.number().int().default(0), updatedAt: timestamp });
+/** leaderboard/template_{company} — cohort of users doing the same company template, ranked by template progress. */
+export const CohortEntrySchema = z.object({
+  uid: z.string(), username: z.string(), displayName: z.string(), photoURL: z.string(),
+  solved: z.number().int(), items: z.number().int(), progressPct: z.number(), rank: z.number().int(),
+});
+export const CohortSnapshotSchema = z.object({ company: z.string(), updatedAt: timestamp, entries: z.array(CohortEntrySchema) });
+/** leaderboard/week_{yyyy-Www} — accepted submissions in the ISO week. */
+export const WeeklyEntrySchema = z.object({
+  uid: z.string(), username: z.string(), displayName: z.string(), photoURL: z.string(),
+  accepted: z.number().int(), submissions: z.number().int(), xpEarned: z.number(), activeDays: z.number().int(), rank: z.number().int(),
+});
+export const WeeklySnapshotSchema = z.object({ week: z.string(), from: DateKeySchema, to: DateKeySchema, updatedAt: timestamp, entries: z.array(WeeklyEntrySchema) });
+/** interviews/{id} — mock interview session (Module 04 §3.12, D-11). */
+export const InterviewStatusSchema = z.enum(["active", "finished", "expired"]);
+export const InterviewFeedbackSchema = z.object({
+  score: z.number().min(0).max(10),
+  verdict: z.enum(["strong-hire", "hire", "lean-hire", "no-hire"]),
+  strengths: z.array(z.string()),
+  weaknesses: z.array(z.string()),
+  summary: z.string(),
+  perProblem: z.array(z.object({ problemId: z.string(), title: z.string(), solved: z.boolean(), attempts: z.number().int(), timeSpentSec: z.number().int(), note: z.string() })),
+  model: z.string(),
+  createdAt: timestamp,
+});
+export const InterviewSchema = z.object({
+  uid: z.string(),
+  projectId: z.string(),
+  status: InterviewStatusSchema.default("active"),
+  durationMin: z.number().int(),
+  difficulty: z.enum(["mixed", "medium", "hard"]).default("mixed"),
+  problems: z.array(z.object({ problemId: z.string(), title: z.string(), difficulty: DifficultySchema, rating: z.number() })),
+  startedAt: timestamp,
+  endsAt: timestamp,
+  finishedAt: timestamp.nullable().default(null),
+  feedback: InterviewFeedbackSchema.nullable().default(null),
+});
 export const AchievementsSchema = z.object({ unlocked: z.array(z.object({ id: z.string(), at: timestamp })).default([]) });
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -534,6 +604,14 @@ export type TemplateItem = z.infer<typeof TemplateItemSchema>;
 export type LeaderboardEntry = z.infer<typeof LeaderboardEntrySchema>;
 export type LeaderboardSnapshot = z.infer<typeof LeaderboardSnapshotSchema>;
 export type DailyChallenge = z.infer<typeof DailyChallengeSchema>;
+export type LeaderboardMeta = z.infer<typeof LeaderboardMetaSchema>;
+export type CohortEntry = z.infer<typeof CohortEntrySchema>;
+export type CohortSnapshot = z.infer<typeof CohortSnapshotSchema>;
+export type WeeklyEntry = z.infer<typeof WeeklyEntrySchema>;
+export type WeeklySnapshot = z.infer<typeof WeeklySnapshotSchema>;
+export type Interview = z.infer<typeof InterviewSchema>;
+export type InterviewFeedback = z.infer<typeof InterviewFeedbackSchema>;
+export type InterviewStatus = z.infer<typeof InterviewStatusSchema>;
 export type Achievements = z.infer<typeof AchievementsSchema>;
 
 /** A document plus its Firestore id. */

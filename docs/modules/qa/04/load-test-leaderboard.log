@@ -1,0 +1,9 @@
+
+> algobook-ai@0.1.0 load:leaderboard
+> NODE_OPTIONS=--conditions=react-server tsx scripts/load-test-leaderboard.ts --uid biu416WkoScEkqNMtY09YpFlarE3 --users 1000 --subs 20 --requests 40 --base http://localhost:3004
+
+seeded 100/1000seeded 200/1000seeded 300/1000seeded 400/1000seeded 500/1000seeded 600/1000seeded 700/1000seeded 800/1000seeded 900/1000seeded 1000/1000
+seeded 1000 users × 20 submissions in 55159 ms
+GET /api/leaderboard × 40: p50 398 ms, p95 548 ms, max 2173 ms, reads/page ≤ 52, my rank 189
+FAIL  p95 ≥ 300 ms
+run with --cleanup to remove the seeded users

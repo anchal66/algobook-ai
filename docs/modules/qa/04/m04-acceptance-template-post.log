@@ -1,0 +1,12 @@
+  (reset A's generate quota)
+  (deleted leftover project "AI smoke project")
+  (deleted leftover project "M04 calibration")
+  (deleted leftover project "M04 template A")
+  (deleted leftover project "Smoke project")
+  (deleted leftover project "AI smoke project")
+PASS    another user's google template → prefers the pre-generated entry: source=reused, templateRef present  — reason="google list #3" source=reused title="Orbit Glyph Charge Encoder" (B generated "(existing)") 528 ms rationale=["google interview list #3: \"Integer to Roman\" (Medium)","A verified problem for this entry is already prepared"]
+PASS    after calibration → normal (non-calibration) recommendation with rationale  — reason="Prerequisite: string" state=revision strategy=familiar source=reused rationale=["Practice state: revision","trie mastery 35% (1/1 solved)","Due for review 2 day(s) ago","Rating 1376 → Medium (state bias → Easy)","string is a prerequisite of trie (mastery 0%, 0 solved)"]
+
+ALL CHECKS PASSED
+
+[exited with code 0]

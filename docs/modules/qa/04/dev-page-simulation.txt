@@ -1,0 +1,56 @@
+/dev/api-smoke — Module 04 section, Browser pane, http://localhost:3004 (worktree dev server, JUDGE_BACKEND=local), 2026-09-08 IST
+Signed in as user A (biu416…, @delta_craft_168, free plan, admin) with a custom token.
+
+Action: "Simulate 10 submissions (engine only)" (seed 1, daysBack 10) → POST /api/admin/simulate → the real engine
+(mastery, SRS, rating, xp/level/score, streak + freezes, achievements) applied to the caller's own user doc.
+
+state revision — Review 11 due topic(s): matrix, linked list, queue…. · rating 1381 → Medium · level 3 · xp 410 · score 163 · streak 10 (best 10, freezes 1) · mastered 0 · weak 9 · due 11
+topic	status	mastery	solved/attempts	srs interval	next review	suggested
+Arrays	learning	69	10/17	1d (ease 1.3, reps 0)	2026-09-03	Medium
+Strings	weak	47	1/1	1d (ease 2.6, reps 1)	2026-09-06	Medium
+Hash Maps	learning	69	9/15	1d (ease 1.3, reps 1)	2026-09-08	Medium
+Two Pointers	weak	32	1/1	1d (ease 2.5, reps 1)	2026-09-04	Medium
+Sliding Window	weak	23	1/2	1d (ease 2.3, reps 0)	2026-09-07	Medium
+Stacks	weak	35	1/1	1d (ease 2.5, reps 1)	2026-09-02	Medium
+Queues	learning	52	1/1	1d (ease 2.6, reps 1)	2026-08-30	Medium
+Linked Lists	weak	31	1/1	1d (ease 2.3, reps 0)	2026-08-31	Medium
+Binary Search	weak	25	0/1	1d (ease 2.3, reps 0)	2026-09-01	Medium
+Trees	locked	0	0/0	—	—	Medium
+Binary Trees	learning	52	1/1	1d (ease 2.6, reps 1)	2026-08-30	Medium
+Binary Search Trees	locked	0	0/0	—	—	Medium
+BFS	locked	0	0/0	—	—	Medium
+DFS	learning	63	2/2	1d (ease 2.4, reps 1)	2026-09-06	Medium
+Dynamic Programming	locked	0	0/0	—	—	Medium
+Backtracking	locked	0	0/0	—	—	Medium
+Tries	weak	23	1/2	1d (ease 2.3, reps 0)	2026-09-07	Medium
+Bit Manipulation	locked	0	0/0	—	—	Medium
+Math	weak	25	0/1	1d (ease 2.3, reps 0)	2026-09-03	Medium
+Matrices	weak	46	1/1	1d (ease 2.6, reps 1)	2026-08-29	Medium
+
+10 synthetic submissions through the engine:
+
+2026-08-28 AC  Medium attempt 1 matrix                       xp +32  rating 1271→1296 (+25.5)  streak 1 (freezes 0)  lvl 3  score 90  matrix: mastery 46 srs 1d→2026-08-29
+2026-08-29 AC  Medium attempt 1 queue+binary tree            xp +32  rating 1296→1305 (+9.2)  streak 2 (freezes 0)  lvl 3  score 99  queue: mastery 52 srs 1d→2026-08-30; binary tree: mastery 52 srs 1d→2026-08-30
+2026-08-30 AC  Medium attempt 2 linked list+dfs              xp +27  rating 1305→1327 (+21.8)  streak 3 (freezes 0)  lvl 3  score 107  linked list: mastery 31 srs 1d→2026-08-31; dfs: mastery 31 srs 1d→2026-08-31
+2026-08-31 WA  Easy   attempt 1 binary search                xp +2  rating —  streak 4 (freezes 0)  lvl 3  score 112  binary search: mastery 25 srs 1d→2026-09-01
+2026-09-01 AC  Easy   attempt 2 stack                        xp +12  rating 1327→1348 (+21.4)  streak 5 (freezes 0)  lvl 3  score 121  stack: mastery 35 srs 1d→2026-09-02
+2026-09-02 WA  Hard   attempt 3 math+array                   xp +2  rating 1348→1345 (-3.2)  streak 6 (freezes 0)  lvl 3  score 127  math: mastery 25 srs 1d→2026-09-03; array: mastery 69 srs 1d→2026-09-03
+2026-09-03 AC  Easy   attempt 2 two pointers                 xp +12  rating 1345→1360 (+15.1)  streak 7 (freezes 1)  lvl 3  score 135  two pointers: mastery 32 srs 1d→2026-09-04  🏆 streak_7
+2026-09-04 AC  Medium attempt 2 trie+sliding window          xp +27  rating 1360→1376 (+15.8)  streak 8 (freezes 1)  lvl 3  score 146  trie: mastery 35 srs 1d→2026-09-05; sliding window: mastery 35 srs 1d→2026-09-05
+2026-09-05 AC  Easy   attempt 1 string+dfs                   xp +17  rating 1376→1406 (+29.6)  streak 9 (freezes 1)  lvl 3  score 157  string: mastery 47 srs 1d→2026-09-06; dfs: mastery 63 srs 1d→2026-09-06
+2026-09-06 WA  Easy   attempt 3 trie+sliding window          xp +2  rating 1406→1381 (-25)  streak 10 (freezes 1)  lvl 3  score 163  trie: mastery 23 srs 1d→2026-09-07; sliding window: mastery 23 srs 1d→2026-09-07
+
+stats after: {"totalSolved":30,"totalFailed":17,"easy":6,"medium":5,"hard":2,"currentStreak":10,"longestStreak":10,"lastActiveDate":"2026-09-06","score":163,"rating":1380.7,"xp":410,"level":3,"streakFreezes":1,"ratedSolves":12,"dailySolved":1,"noHintSolves":15,"languagesAccepted":["java","python","cpp","javascript"]}
+
+Reading the table: a 7-day streak banked a freeze (streak_7 unlocked); the third failed attempt on 2026-09-02 and 2026-09-06 were rated
+as failed-out (rating −3.2 / −25 — the second because the problem was rated 1100 vs the user's 1406); 11 topics are due so the
+state moved to "revision"; "locked" topics have unmet prerequisites (e.g. BFS needs graph + queue).
+
+GET /api/me/achievements → unlocked [streak_7, polyglot, speedrunner, first_ac] + catalog (45 entries, unlocked flags)
+GET /api/leaderboard?scope=global → entries + me {rank, percentile, total} (2 real users + 1000 load-test users at the time)
+GET /api/daily →
+{
+  "date": "2026-09-07", "challenge": { "id": "2026-09-07", "problemId": "two-sum", "title": "Two Sum", "difficulty": "Easy", "tags": ["array", "hash map"], "solvers": 2 },
+  "solved": true, "projectId": "bJazN8k1KI8DYwgcF4qJ", "itemStatus": "todo", "xpBonus": 20, "dailySolvedTotal": 1
+}
+Console: no errors (read_console_messages onlyErrors → none).

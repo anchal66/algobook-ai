@@ -13,6 +13,10 @@ export interface ActivityDelta {
   timeSpentSec?: number;
   runs?: number;
   xpEarned?: number;
+  /** Module 04: project touched that day (arrayUnion) — `projects.progress.activeDays` source. */
+  projectId?: string;
+  /** Module 04: today's daily challenge was solved (set once). */
+  dailySolved?: boolean;
 }
 
 export function ref(uid: string, date: string) {
@@ -28,7 +32,20 @@ export function recordInTx(tx: FirebaseFirestore.Transaction, uid: string, date:
   if (delta.runs) data.runs = FieldValue.increment(delta.runs);
   if (delta.xpEarned) data.xpEarned = FieldValue.increment(delta.xpEarned);
   if (delta.problemSolved) data.problemsSolved = FieldValue.arrayUnion(delta.problemSolved);
+  if (delta.projectId) data.projectIds = FieldValue.arrayUnion(delta.projectId);
+  if (delta.dailySolved) data.dailySolved = true;
   tx.set(ref(uid, date), data, { merge: true });
+}
+
+/** Activity docs for a date range (inclusive) across all users — leaderboard weekly snapshot. Single-field range on `date`. */
+export async function listRange(from: string, to: string, limit = 20_000): Promise<WithId<Activity>[]> {
+  const snap = await adminDb.collection(COL).where("date", ">=", from).where("date", "<=", to).limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...ActivitySchema.parse(d.data()) }));
+}
+
+export async function getDay(uid: string, date: string): Promise<WithId<Activity> | null> {
+  const snap = await ref(uid, date).get();
+  return snap.exists ? { id: snap.id, ...ActivitySchema.parse(snap.data()) } : null;
 }
 
 /** Standalone upsert (used by /api/run). */

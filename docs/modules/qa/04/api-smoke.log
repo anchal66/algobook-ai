@@ -1,0 +1,86 @@
+
+> algobook-ai@0.1.0 api:smoke
+> NODE_OPTIONS=--conditions=react-server tsx scripts/api-smoke.ts --uidA biu416WkoScEkqNMtY09YpFlarE3 --uidB Wa9MsGIdZnaAxcxCFwVSkRZzAy13 --base http://localhost:3004 --finishInterview
+
+PASS  no token → 401 UNAUTHENTICATED  — {"error":{"code":"UNAUTHENTICATED","message":"Missing Authorization: Bearer <Firebase ID token>"}}
+PASS  bad token → 401
+PASS  GET /api/me → user doc + plan  — plan=free username=delta_craft_168
+PASS  users/{uid} exists with username
+PASS  POST /api/projects  — id=0QDz8VDoOAzfIGRWrKUW
+PASS  user B GET user A's project → 404 (not 403)  — status=404
+PASS  owner GET project → 200
+PASS  GET /api/problems/two-sum  — languages=java,python,cpp,javascript
+PASS  response has no hiddenTests/drivers/referenceSolution
+PASS  response has no embedding
+PASS  POST /api/run java: 4 results, all AC, custom output [1,2]  — ms=87,84,93,79
+PASS  POST /api/run python: 4 results, all AC, custom output [1,2]  — ms=56,51,48,46
+PASS  POST /api/run cpp: 4 results, all AC, custom output [1,2]  — ms=12,9,7,6
+PASS  POST /api/run javascript: 4 results, all AC, custom output [1,2]  — ms=56,52,49,49
+PASS  POST /api/submit java → AC 13/13 with beats%  — runtime=48ms mem=0KB beats=56% attempt=14
+PASS    submission doc uid set by server (java)
+PASS  POST /api/submit python → AC 13/13 with beats%  — runtime=46ms mem=0KB beats=0% attempt=15
+PASS    submission doc uid set by server (python)
+PASS  POST /api/submit cpp → AC 13/13 with beats%  — runtime=21ms mem=0KB beats=0% attempt=16
+PASS    submission doc uid set by server (cpp)
+PASS  POST /api/submit javascript → AC 13/13 with beats%  — runtime=57ms mem=0KB beats=0% attempt=17
+PASS    submission doc uid set by server (javascript)
+PASS  activity/{uid}_{today}.accepted incremented  — accepted=24
+PASS  project item status=solved, progress.solved=1
+PASS  wrong → WA with failedCase.index/expected/actual  — passed=0/13 failed#0
+PASS    WA response contains exactly one case input (no hidden leak)
+PASS  infinite loop → TLE  — verdict=TLE
+PASS  syntax error → CE with compiler text  — /var/folders/fk/bfg70gn96_s921c35bl3r0_w0000gn/T/algobook-judge-Xub6vC/Main.java:6: error: incompatible types: String cannot be converted to int
+PASS  GET /api/submissions (no code in rows)
+PASS  GET /api/submissions/:id includes code
+PASS  GET /api/templates → 6
+PASS  GET /api/activity
+PASS  GET /api/problems explore list
+PASS  quotas.used.run / submit counted  — run=22 submit=41 limits={"generate":3,"run":30,"submit":50,"hint3":0,"editorial":0,"chat":0,"completion":0,"review":0,"interview":0}
+PASS  user B with an active subscription → plan pro  — tier=pro status=active end=2027-09-07T17:55:20.173Z
+PASS  client read of problems/two-sum/private/tests → denied  — status=403
+PASS  client read of problems/two-sum (public) → allowed under rules v2  — status=200 (403 means rules v2 are not deployed yet)
+PASS  v1 /api/hints removed → 404  — status=404
+PASS  free user GET editorial → 402 PAYMENT_REQUIRED  — status=402
+PASS  free user hint 1 → stored text  — label=Pattern Recognition
+PASS  free user hint 3 → 402  — status=402
+PASS  POST /api/projects (user B)
+PASS  POST /api/projects/:id/next → verified problem linked  — source=reused title="Exact-Frequency Value Count" attempts=0 1976 ms
+PASS    problems/{id}/private/tests has ≥ 8 hidden tests + java reference  — hidden=10
+PASS    response has no hidden tests / drivers
+PASS    chat streams deltas and a done event  — reply="I can’t provide the full solution while it’s unsolved, but here’s the next step:"
+PASS    chat refuses to paste the full solution  — no full class Solution in the reply
+PASS    stored reference solution → AC via /api/submit  — 13/13
+PASS    POST review → score + isOptimal  — score=10
+PASS  free user, matching verified problem exists → source=reused, fast  — title="Forward Difference Pair Count" 1142 ms
+PASS    pro hint 3 (contextual) mentions the code  — Your method has the wrong return type and currently does not count frequencies or distinct values. B
+PASS    pro editorial → ≥ 1 approach with java code  — approaches=3 cached=false
+PASS    second editorial call is cached  — 407 ms
+PASS    explain-error → short explanation  — 53 words
+PASS    completion → ≤ 6 lines  — "i < a.length; i++) {\n            s += a[i];\n        }"
+PASS    free user completion → 402
+PASS    insights → milestones + weeklyPlan  — total=36
+PASS    non-admin GET /api/admin/ai-usage → 403  — status=200
+PASS    admin GET /api/admin/ai-usage → totals by purpose  — status=200 calls=145
+PASS  M04 stats applied on submit: xp > 0, level ≥ 1, lastAppliedSubmissionId set  — xp=493 level=4 rating=1420.2 score=129 streak=1 freezes=0 ratedSolves=14 (two-sum was already accepted → unrated, as specified)
+PASS  M04 rating moves on a first AC (user B, fresh problem): ratedSolves ≥ 1, rating ≠ 1200 or ratedSolves > 0  — rating=1245.7 ratedSolves=3 xp=112
+PASS  M04 topic skills carry mastery + srs  — array,hash map
+PASS  GET /api/me/skills → 25 topics, state, band  — state=revision band=Medium mastered=0 weak=9
+PASS  GET /api/me/achievements → first_ac unlocked + catalog  — unlocked=no_hints_20,streak_7,polyglot,speedrunner,first_ac
+PASS  GET /api/activity → streak summary + projectIds on today  — streak=1 max=10 active=1
+PASS  GET /api/leaderboard global → entries, my rank, ≤ 51 reads  — rank=574 pct=-1002 total=52 reads=51 entries=50
+PASS    ranks are consistent (sorted by score, ties share)
+PASS  GET /api/leaderboard week → snapshot shape  — week=2026-W37 updated=2026-09-07T20:38:04.640Z
+PASS  GET /api/leaderboard template → cohort shape
+PASS  GET /api/daily → challenge + system Daily project  — date=2026-09-07 problem=Two Sum solved=true project=bJazN8k1KI8DYwgcF4qJ
+PASS  cron leaderboard without secret → 401/403  — status=403
+PASS  cron daily without secret → 401/403  — status=403
+PASS  admin leaderboard snapshot → 200 (admin) / 403  — status=200 global=100 week=2 ms=190
+PASS  next-problem rejects sessionHealthScore > 100 (400/404)  — status=400
+PASS  free user interview start → 402  — status=402
+PASS  pro user interview start → 200 (2 problems, endsAt) or 409 when the bank is too small  — status=200 Depth-Shifted Folds | Orbit Glyph Charge Encoder
+PASS    GET /api/interview/:id → remainingSec
+PASS    other user → 404
+PASS    finish → feedback with score + verdict  — score=0 verdict=no-hire
+PASS  DELETE /api/projects/:id (recursive)
+
+ALL CHECKS PASSED  (admin=true)

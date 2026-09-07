@@ -218,6 +218,56 @@ async function main() {
     await call(base, `/api/projects/${pidB}`, B.idToken, { method: "DELETE" });
   }
 
+  // 10. Module 04 — practice intelligence
+  r = await call(base, "/api/me", A.idToken);
+  const st = r.body.user?.stats ?? {};
+  check("M04 stats applied on submit: xp > 0, level ≥ 1, lastAppliedSubmissionId set", st.xp > 0 && st.level >= 1 && typeof r.body.user?.lastAppliedSubmissionId === "string",
+    `xp=${st.xp} level=${st.level} rating=${st.rating} score=${st.score} streak=${st.currentStreak} freezes=${st.streakFreezes} ratedSolves=${st.ratedSolves} (two-sum was already accepted → unrated, as specified)`);
+  r = await call(base, "/api/me", B.idToken);
+  const stB = r.body.user?.stats ?? {};
+  check("M04 rating moves on a first AC (user B, fresh problem): ratedSolves ≥ 1, rating ≠ 1200 or ratedSolves > 0", stB.ratedSolves >= 1, `rating=${stB.rating} ratedSolves=${stB.ratedSolves} xp=${stB.xp}`);
+  check("M04 topic skills carry mastery + srs", Object.values(r.body.user?.topicSkills ?? {}).some((s: any) => s.mastery > 0 && s.srs?.nextReview), Object.keys(r.body.user?.topicSkills ?? {}).join(","));
+  r = await call(base, "/api/me/skills", A.idToken);
+  check("GET /api/me/skills → 25 topics, state, band", r.status === 200 && r.body.topics?.length === 25 && r.body.state && r.body.band, `state=${r.body.state} band=${r.body.band} mastered=${r.body.counts?.mastered} weak=${r.body.counts?.weak}`);
+  r = await call(base, "/api/me/achievements", A.idToken);
+  check("GET /api/me/achievements → first_ac unlocked + catalog", r.status === 200 && r.body.unlocked?.some((u: any) => u.id === "first_ac") && r.body.catalog?.length > 40, `unlocked=${r.body.unlocked?.map((u: any) => u.id).join(",")}`);
+  r = await call(base, "/api/activity", A.idToken);
+  check("GET /api/activity → streak summary + projectIds on today", r.status === 200 && typeof r.body.currentStreak === "number" && r.body.streak && r.body.days?.some((d: any) => d.projectIds?.includes(projectId)), `streak=${r.body.currentStreak} max=${r.body.maxStreak} active=${r.body.activeDays}`);
+  r = await call(base, "/api/leaderboard?scope=global", A.idToken);
+  check("GET /api/leaderboard global → entries, my rank, ≤ 51 reads", r.status === 200 && Array.isArray(r.body.entries) && r.body.me?.rank >= 1 && r.body.reads <= 51, `rank=${r.body.me?.rank} pct=${r.body.me?.percentile} total=${r.body.me?.total} reads=${r.body.reads} entries=${r.body.entries?.length}`);
+  check("  ranks are consistent (sorted by score, ties share)", (r.body.entries ?? []).every((e: any, i: number, arr: any[]) => i === 0 || (e.score <= arr[i - 1].score && (e.score < arr[i - 1].score ? e.rank === arr[0].rank + i : e.rank === arr[i - 1].rank))));
+  r = await call(base, "/api/leaderboard?scope=week", A.idToken);
+  check("GET /api/leaderboard week → snapshot shape", r.status === 200 && r.body.week && Array.isArray(r.body.entries), `week=${r.body.week} updated=${r.body.updatedAt}`);
+  r = await call(base, "/api/leaderboard?scope=template&company=google", A.idToken);
+  check("GET /api/leaderboard template → cohort shape", r.status === 200 && r.body.company === "google" && Array.isArray(r.body.entries));
+  r = await call(base, "/api/daily", A.idToken);
+  check("GET /api/daily → challenge + system Daily project", r.status === 200 && (r.body.challenge === null || (r.body.challenge.problemId && r.body.projectId)), `date=${r.body.date} problem=${r.body.challenge?.title} solved=${r.body.solved} project=${r.body.projectId}`);
+  const dailyProjectId = r.body.projectId as string | null;
+  r = await call(base, "/api/cron/leaderboard", null);
+  check("cron leaderboard without secret → 401/403", r.status === 401 || r.status === 403, `status=${r.status}`);
+  r = await call(base, "/api/cron/daily", null);
+  check("cron daily without secret → 401/403", r.status === 401 || r.status === 403, `status=${r.status}`);
+  r = await call(base, "/api/admin/leaderboard-snapshot", A.idToken, { method: "POST", json: { action: "snapshot" } });
+  check("admin leaderboard snapshot → 200 (admin) / 403", r.status === 403 || (r.status === 200 && r.body.global?.entries >= 1), `status=${r.status} global=${r.body.global?.entries} week=${r.body.week?.entries} ms=${r.body.ms}`);
+  r = await call(base, "/api/projects/nope/next", A.idToken, { method: "POST", json: { sessionHealthScore: 150 } });
+  check("next-problem rejects sessionHealthScore > 100 (400/404)", r.status === 400 || r.status === 404, `status=${r.status}`);
+  r = await call(base, "/api/interview/start", A.idToken, { method: "POST", json: { durationMin: 45 } });
+  check("free user interview start → 402", r.status === 402, `status=${r.status}`);
+  r = await call(base, "/api/interview/start", B.idToken, { method: "POST", json: { durationMin: 30, difficulty: "mixed" } });
+  check("pro user interview start → 200 (2 problems, endsAt) or 409 when the bank is too small", (r.status === 200 && r.body.interview?.problems?.length === 2 && r.body.interview?.endsAt) || r.status === 409, `status=${r.status} ${r.body.interview?.problems?.map((p: any) => p.title).join(" | ") ?? JSON.stringify(r.body).slice(0, 120)}`);
+  if (r.status === 200) {
+    const interviewId = r.body.interview.id as string;
+    r = await call(base, `/api/interview/${interviewId}`, B.idToken);
+    check("  GET /api/interview/:id → remainingSec", r.status === 200 && r.body.remainingSec > 0);
+    r = await call(base, `/api/interview/${interviewId}`, A.idToken);
+    check("  other user → 404", r.status === 404);
+    if (a.finishInterview) {
+      r = await call(base, `/api/interview/${interviewId}/finish`, B.idToken, { method: "POST" });
+      check("  finish → feedback with score + verdict", r.status === 200 && typeof r.body.interview?.feedback?.score === "number" && r.body.interview?.feedback?.verdict, `score=${r.body.interview?.feedback?.score} verdict=${r.body.interview?.feedback?.verdict}`);
+    }
+  }
+  if (dailyProjectId && a.keepDaily !== true) await call(base, `/api/projects/${dailyProjectId}`, A.idToken, { method: "DELETE" });
+
   // cleanup
   r = await call(base, `/api/projects/${projectId}`, A.idToken, { method: "DELETE" });
   check("DELETE /api/projects/:id (recursive)", r.status === 200 && !(await db.collection("projects").doc(projectId).get()).exists);

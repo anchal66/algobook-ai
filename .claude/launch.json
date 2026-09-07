@@ -19,6 +19,15 @@
       ],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "dev-m04",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "JUDGE_BACKEND=local npx next dev --turbopack -p 3004"
+      ],
+      "port": 3004
     }
   ]
 }

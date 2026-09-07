@@ -115,7 +115,7 @@ export function applySubmitInTx(
   tx: FirebaseFirestore.Transaction,
   ctx: { projectRef: FirebaseFirestore.DocumentReference; project: FirebaseFirestore.DocumentData; item: FirebaseFirestore.DocumentData | null },
   outcome: { problemId: string; accepted: boolean; difficulty: ProjectItem["difficulty"]; title: string; tags: string[] },
-): { itemStatus: ItemStatus } {
+): { itemStatus: ItemStatus; solved: number; items: number } {
   const now = Timestamp.now();
   const today = todayKey();
   const updates: Record<string, unknown> = { lastActivityAt: now };
@@ -148,8 +148,18 @@ export function applySubmitInTx(
     tx.update(itemRef, { status: "attempting" });
     updates["progress.attempting"] = FieldValue.increment(1);
   }
+
+  // Module 04 §3.13: pace against the project's duration.
+  const progress = (ctx.project.progress ?? {}) as Partial<Project["progress"]>;
+  const items = (progress.items ?? 0) + (ctx.item ? 0 : 1);
+  const solved = (progress.solved ?? 0) + (itemStatus === "solved" && prevStatus !== "solved" ? 1 : 0);
+  const createdAt = ctx.project.createdAt instanceof Timestamp ? ctx.project.createdAt : now;
+  const pace = paceFor({ durationDays: (ctx.project.durationDays as number) ?? 30, createdAt, progress: { items, solved } });
+  updates["progress.onTrack"] = pace.onTrack;
+  updates["progress.expectedSolved"] = pace.expectedSolved;
+
   tx.update(ctx.projectRef, updates);
-  return { itemStatus };
+  return { itemStatus, solved, items };
 }
 
 export async function markPoolUsed(projectId: string, poolDocId: string, problemId: string): Promise<void> {
@@ -159,6 +169,50 @@ export async function markPoolUsed(projectId: string, poolDocId: string, problem
 export async function nextPoolEntry(projectId: string): Promise<WithId<TemplatePoolEntry> | null> {
   const snap = await adminDb.collection(COL).doc(projectId).collection("templatePool").where("status", "==", "pending").orderBy("order", "asc").limit(1).get();
   return snap.empty ? null : { id: snap.docs[0].id, ...TemplatePoolEntrySchema.parse(snap.docs[0].data()) };
+}
+
+/** Number of problems on a company template (`templates/{company}.count`); 0 when unknown. */
+export async function templateItemCount(templateId: string): Promise<number> {
+  const snap = await adminDb.collection("templates").doc(templateId).get();
+  return snap.exists ? ((snap.data()?.count as number) ?? 0) : 0;
+}
+
+/**
+ * Finds or creates the user's system project (`purpose` = "daily" | "interview"): the daily challenge
+ * and mock interviews solve through the normal workspace, which needs a project to submit into.
+ */
+export async function ensureSystemProject(uid: string, purpose: "daily" | "interview", title: string, description: string, existingId?: string | null): Promise<WithId<Project>> {
+  if (existingId) {
+    const p = await get(existingId);
+    if (p && p.uid === uid) return p;
+  }
+  const snap = await adminDb.collection(COL).where("uid", "==", uid).where("purpose", "==", purpose).limit(1).get();
+  if (!snap.empty) return parse(snap.docs[0])!;
+  return create({ uid, title, description, purpose, durationDays: 365, selectedTopics: [], templateId: null });
+}
+
+/** Pending company-list entries in list order (Module 04 `recommendFromTemplate`). */
+export async function listPendingPool(projectId: string, limit = 40): Promise<WithId<TemplatePoolEntry>[]> {
+  const snap = await adminDb.collection(COL).doc(projectId).collection("templatePool").where("status", "==", "pending").orderBy("order", "asc").limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...TemplatePoolEntrySchema.parse(d.data()) }));
+}
+
+/** Projects of every user for a company template (leaderboard cohorts). Single-field query, no composite index. */
+export async function listByTemplate(templateId: string, limit = 2000): Promise<WithId<Project>[]> {
+  const snap = await adminDb.collection(COL).where("templateId", "==", templateId).limit(limit).get();
+  return snap.docs.map((d) => parse(d)!).filter(Boolean);
+}
+
+/**
+ * Recomputes `progress.onTrack` / `expectedSolved` (Module 04 §3.13): expected pace is `items`
+ * spread evenly over `durationDays` since creation; on track when solved ≥ expected − 1.
+ */
+export function paceFor(project: Pick<Project, "durationDays" | "createdAt"> & { progress: Pick<Project["progress"], "items" | "solved"> }, now: Date = new Date()): { expectedSolved: number; onTrack: boolean } {
+  const items = project.progress.items;
+  const elapsedDays = Math.max(0, (now.getTime() - project.createdAt.toMillis()) / 86_400_000);
+  const frac = Math.min(1, elapsedDays / Math.max(1, project.durationDays));
+  const expectedSolved = Math.floor(items * frac);
+  return { expectedSolved, onTrack: project.progress.solved >= Math.max(0, expectedSolved - 1) };
 }
 
 /** Problem ids linked to any of the user's projects (Module 02 reuse exclusion). */
