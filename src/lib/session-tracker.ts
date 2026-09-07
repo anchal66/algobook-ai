@@ -1,4 +1,4 @@
-import type { SessionAttempt, SessionHealth } from "@/types";
+import type { SessionAttempt, SessionHealth } from "@/types/legacy";
 
 /**
  * Client-side session health tracker.

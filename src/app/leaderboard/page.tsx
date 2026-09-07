@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { firestore } from "@/lib/firebase";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -25,7 +24,7 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
-import type { LeaderboardEntry } from "@/types";
+import type { LeaderboardEntry } from "@/types/legacy";
 import UserMenu from "@/components/UserMenu";
 
 interface Project {
@@ -62,13 +61,8 @@ export default function LeaderboardPage() {
     const fetchProjects = async () => {
       setProjectsLoading(true);
       try {
-        const q = query(
-          collection(firestore, "projects"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        const snap = await getDocs(q);
-        const list = snap.docs.map((d) => ({ id: d.id, title: d.data().title as string }));
+        const data = await apiFetch<{ projects: { id: string; title: string }[] }>("/api/projects");
+        const list = data.projects.map((d) => ({ id: d.id, title: d.title }));
         setProjects(list);
         if (list.length > 0 && !selectedProjectId) {
           setSelectedProjectId(list[0].id);
@@ -87,32 +81,12 @@ export default function LeaderboardPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        scope: tab,
-        userId: user.uid,
-        limit: String(PAGE_SIZE),
-        offset: String(page * PAGE_SIZE),
-      });
-      if (tab === "project" && selectedProjectId) {
-        params.set("projectId", selectedProjectId);
-      }
-
-      const res = await fetch(`/api/leaderboard?${params}`);
-      if (!res.ok) {
-        const data = await res.json();
-        if (data.code === "SUBSCRIPTION_REQUIRED") {
-          setEntries([]);
-          setLoading(false);
-          return;
-        }
-        throw new Error(data.error);
-      }
-
-      const data = await res.json();
-      setEntries(data.entries || []);
-      setUserRank(data.userRank);
-      setUserPercentile(data.userPercentile);
-      setTotal(data.total || 0);
+      // The leaderboard snapshot (GET /api/leaderboard) returns in Module 04; show an empty state until then.
+      void page; void selectedProjectId;
+      setEntries([]);
+      setUserRank(null);
+      setUserPercentile(null);
+      setTotal(0);
     } catch (err) {
       console.error("Leaderboard fetch error:", err);
     } finally {

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { apiFetch } from "@/lib/api-client";
+import type { SubmissionDTO } from "@/lib/legacy/adapters";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,15 +52,25 @@ export default function ActivitySheet({ open, onOpenChange, projectId, projectTi
     const fetchActivity = async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/project/activity?projectId=${encodeURIComponent(projectId)}&userId=${encodeURIComponent(user.uid)}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setAttendance(data.attendance || []);
-          setSubmissions(data.submissions || []);
-          setQuestionTitles(data.questionTitles || {});
+        const data = await apiFetch<{ items: SubmissionDTO[] }>(`/api/submissions?projectId=${encodeURIComponent(projectId)}&limit=50`);
+        const subs: SubmissionRecord[] = data.items.map((s) => ({
+          id: s.id, questionId: s.problemId, status: s.verdict === "AC" ? "success" : "fail",
+          attemptNumber: s.attemptNumber, timeSpentSeconds: s.timeSpentSec, submittedAt: s.createdAt,
+        }));
+        // Attendance is derived from activity now (D-07): one row per day with submissions.
+        const byDay = new Map<string, AttendanceDay>();
+        for (const s of subs) {
+          const date = (s.submittedAt ?? "").slice(0, 10);
+          if (!date) continue;
+          const d = byDay.get(date) ?? { date, markedAt: null, questionsGenerated: 0, questionsSolved: 0, totalSubmissions: 0, successfulSubmissions: 0, failedSubmissions: 0, timeSpentSeconds: 0 };
+          d.totalSubmissions++;
+          if (s.status === "success") { d.successfulSubmissions++; d.questionsSolved++; } else d.failedSubmissions++;
+          d.timeSpentSeconds += s.timeSpentSeconds;
+          byDay.set(date, d);
         }
+        setAttendance([...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1)));
+        setSubmissions(subs);
+        setQuestionTitles(Object.fromEntries(subs.map((s) => [s.questionId, s.questionId])));
       } catch (err) {
         console.error("Error fetching activity:", err);
       } finally {

@@ -1,13 +1,13 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getAuth, type Auth } from "firebase-admin/auth";
 import path from "path";
 
 let _app: App | null = null;
 let _db: Firestore | null = null;
 
-function getAdminApp(): App {
+export function getAdminApp(): App {
   if (_app) return _app;
-
   if (getApps().length) {
     _app = getApps()[0];
     return _app;
@@ -16,46 +16,38 @@ function getAdminApp(): App {
   let credential;
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
     try {
-      const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
-      const serviceAccount = JSON.parse(raw);
-      credential = cert(serviceAccount);
+      credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim()));
     } catch {
-      throw new Error(
-        "FIREBASE_SERVICE_ACCOUNT_KEY is set but is not valid JSON. Paste the full service account JSON as one line in Vercel."
-      );
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is set but is not valid JSON. Paste the full service account JSON as one line.");
     }
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-    const resolvedPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-    credential = cert(resolvedPath);
+    credential = cert(path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH));
   } else {
-    throw new Error(
-      "Either FIREBASE_SERVICE_ACCOUNT_KEY or FIREBASE_SERVICE_ACCOUNT_PATH must be set."
-    );
+    throw new Error("Either FIREBASE_SERVICE_ACCOUNT_KEY or FIREBASE_SERVICE_ACCOUNT_PATH must be set.");
   }
 
   _app = initializeApp({ credential });
   return _app;
 }
 
-function getAdminDbInternal(): Firestore {
+export function getAdminDb(): Firestore {
   if (!_db) {
     _db = getFirestore(getAdminApp());
+    _db.settings({ ignoreUndefinedProperties: true });
   }
   return _db;
 }
 
-/**
- * Lazy Firestore client so missing/invalid env fails on first use (not at import).
- * On Vercel, use FIREBASE_SERVICE_ACCOUNT_KEY (JSON string); file paths usually do not exist.
- */
+export function getAdminAuth(): Auth {
+  return getAuth(getAdminApp());
+}
+
+/** Lazy Firestore client so a missing/invalid credential fails on first use, not at import. */
 export const adminDb = new Proxy({} as Firestore, {
   get(_target, prop) {
-    const db = getAdminDbInternal();
+    const db = getAdminDb();
     const value = (db as unknown as Record<string | symbol, unknown>)[prop];
-    if (typeof value === "function") {
-      return value.bind(db);
-    }
-    return value;
+    return typeof value === "function" ? value.bind(db) : value;
   },
 }) as Firestore;
 
@@ -63,9 +55,6 @@ export const adminApp = new Proxy({} as App, {
   get(_target, prop) {
     const app = getAdminApp();
     const value = (app as unknown as Record<string | symbol, unknown>)[prop];
-    if (typeof value === "function") {
-      return value.bind(app);
-    }
-    return value;
+    return typeof value === "function" ? value.bind(app) : value;
   },
 }) as App;

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 interface SubscriptionPlan {
   name: string;
@@ -69,18 +70,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(`/api/subscription/status?userId=${encodeURIComponent(user.uid)}`);
-      if (res.ok) {
-        const data = await res.json();
-        const isActive = data.active ?? false;
-        setActive(isActive);
-        setPlan(data.plan ?? null);
-        setCurrentPeriodEnd(data.endDate ?? null);
-        setStatus(isActive ? "active" : "inactive");
-        writeCache(user.uid, { active: isActive, plan: data.plan ?? null, endDate: data.endDate ?? null, ts: Date.now() });
-      } else {
-        setActive(false);
-      }
+      const data = await apiFetch<{ active: boolean; plan: SubscriptionPlan | null; endDate: string | null }>("/api/subscription/status");
+      const isActive = data.active ?? false;
+      setActive(isActive);
+      setPlan(data.plan ?? null);
+      setCurrentPeriodEnd(data.endDate ?? null);
+      setStatus(isActive ? "active" : "inactive");
+      writeCache(user.uid, { active: isActive, plan: data.plan ?? null, endDate: data.endDate ?? null, ts: Date.now() });
     } catch {
       setActive(false);
     } finally {
@@ -121,23 +117,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (!user) return;
 
       try {
-        const res = await fetch("/api/subscription/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            planSlug,
-            userId: user.uid,
-            userEmail: user.email,
-            userName: user.displayName,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.checkoutUrl) {
-            window.location.href = data.checkoutUrl;
-          }
-        }
+        const data = await apiFetch<{ checkoutUrl: string }>("/api/subscription/checkout", { method: "POST", body: { planSlug } });
+        if (data.checkoutUrl) window.location.href = data.checkoutUrl;
       } catch (error) {
         console.error("Checkout redirect error:", error);
       }

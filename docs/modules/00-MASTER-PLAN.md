@@ -139,9 +139,9 @@ Decision D-02 (decided 2026-09-07: **full wipe of every collection, including `s
 
 | Collection / doc | Client read? | Purpose & key fields |
 |---|---|---|
-| `users/{uid}` | own | `username, displayName, email, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills[]`, `experienceLevel, goalType, practiceState, calibration{complete,step}`, `stats{totalSolved,totalFailed,easy,medium,hard,currentStreak,longestStreak,lastActiveDate,score,rating,xp,level}`, `topicSkills{[topic]: TopicSkill}`, `settings{editor{font,fontSize,ligatures,keyBinding,tabSize,wordWrap,relativeLineNumbers,theme,language,aiCompletion}, layout, timer, shortcuts, notifications}`, `plan{slug,status,endDate}` (denormalized from subscriptions), `quotas{date, aiGenerations, aiChat, runs}`, `createdAt, updatedAt` |
+| `users/{uid}` | own | `username, displayName, email, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills[]`, `experienceLevel, goalType, practiceState, calibration{complete,step}`, `stats{totalSolved,totalFailed,easy,medium,hard,currentStreak,longestStreak,lastActiveDate,score,rating,xp,level}`, `topicSkills{[topic]: TopicSkill}`, `settings{editor{font,fontSize,ligatures,keyBinding,tabSize,wordWrap,relativeLineNumbers,theme,language,aiCompletion}, layout, timer, shortcuts, notifications}`, `plan{slug,planSlug,status,endDate,checkedAt}` (denormalized from subscriptions, 5-min cache), `quotas{date, generate, run, submit, hint3, editorial, chat, completion, review, interview}` (Module 01: one counter per feature key, reset when the UTC date changes), `createdAt, updatedAt` |
 | `usernames/{username}` | any auth | `{ uid }` — uniqueness lock |
-| `problems/{problemId}` | any auth (public fields only) | `slug, number, title, difficulty, tags[], companies[], statementMd, examples[] {input,output,explanation}, constraints[], followUp, params[] {name,type}, returnType, functionName, sampleTests[] {input,expectedOutput}` (visible cases only), `checker{type: 'exact'|'unordered_lines'|'float', eps?}`, `limits{cpuTimeSec, memoryKb}`, `languages[]` (which drivers are verified), `starter{[lang]: string}`, `hintsPreview` (count only), `stats{attempts,accepted,acceptanceRate,avgRuntimeMs{[lang]}, runtimeSamples{[lang]: number[]}}`, `rating` (Elo, starts 1200/1500/1900 by difficulty), `source: 'generated'|'template'|'curated'`, `templateRef{company,number,title}`, `embedding` (vector, 1536), `flagged{count, reasons[]}`, `status: 'draft'|'verified'|'retired'`, `createdBy, createdAt, verifiedAt, model` |
+| `problems/{problemId}` | any auth (public fields only) | `slug, number, title, difficulty, tags[], companies[], statementMd, examples[] {input,output,explanation}, constraints[], followUp, params[] {name,type}, returnType, functionName, sampleTests[] {input,expectedOutput}` (visible cases only), `checker{type: 'exact'|'unordered_lines'|'float', eps?}`, `limits{cpuTimeSec, memoryKb}`, `languages[]` (which drivers are verified), `starter{[lang]: string}`, `hintsPreview` (count only), `stats{attempts,accepted,acceptanceRate,avgRuntimeMs{[lang]}, runtimeSamples{[lang]: number[]}, memorySamples{[lang]: number[]}}` (Module 01: memory samples added for Beats % on memory), `rating` (Elo, starts 1200/1500/1900 by difficulty), `source: 'generated'|'template'|'curated'`, `templateRef{company,number,title}`, `embedding` (vector, 1536), `flagged{count, reasons[]}`, `status: 'draft'|'verified'|'retired'`, `createdBy, createdAt, verifiedAt, model` |
 | `problems/{id}/private/tests` | **no** | `hiddenTests[] {input, expectedOutput}` (8–15), `referenceSolution{[lang]: string}` |
 | `problems/{id}/private/drivers` | **no** | `drivers{[lang]: string}` (verified harness per language) |
 | `problems/{id}/content/hints` | via API | `hints[3] {label, text}` |
@@ -156,7 +156,7 @@ Decision D-02 (decided 2026-09-07: **full wipe of every collection, including `s
 | `leaderboard/global` | any auth | snapshot `{ updatedAt, entries[100] }`; user rank computed by `count()` on `users.stats.score` |
 | `leaderboard/project_{projectId}` | own | snapshot for project scope |
 | `dailyChallenge/{YYYY-MM-DD}` | any auth | `problemId, solvers` |
-| `subscriptions/{id}` | no | unchanged from v1 (`uid, planSlug, status, startDate, endDate, gatewayTransactionId, amountPaid, currency`) |
+| `subscriptions/{id}` | no | as v1 but keyed by `uid` (v1 used `userId`): `uid, planSlug, planName, status, startDate, endDate, gatewayTransactionId, amountPaid, currency, createdAt` |
 | `reports/{id}` | no | `problemId, uid, reason, details, resolved` |
 | `aiUsage/{id}` | admin | `purpose, model, inputTokens, cachedTokens, outputTokens, reasoningTokens, costUsd, latencyMs, uid?, problemId?, ok, createdAt` |
 | `templates/{company}` | any auth | `company, title, description, purpose, count, difficulties{}`, subcollection `items/{n}` `{number,title,difficulty,order}` (seeded from `templates/*.md`) |
@@ -167,6 +167,8 @@ TopicSkill (unchanged shape, fixed semantics): `solved, failed, easy, medium, ha
 ---
 
 ## 6. API surface v2 (route handlers)
+
+Problem I/O contract (canonical stdin/stdout encodings shared by all languages and by Module 02 prompts / Module 03 UI): `docs/modules/reference/IO-FORMAT.md` (Module 01).
 
 All routes: `Authorization: Bearer <FirebaseIdToken>` required unless marked public. Errors are always `{ error: { code: string, message: string } }` with proper HTTP status. Bodies validated with zod.
 
@@ -192,7 +194,7 @@ All routes: `Authorization: Bearer <FirebaseIdToken>` required unless marked pub
 | `POST /api/ai/complete` | inline completion (ghost text) | 02 |
 | `POST /api/problems/:id/report` | flag | 01 |
 | `GET /api/leaderboard?scope&projectId&cursor` | snapshot + my rank | 04 |
-| `GET /api/activity?year=` | heatmap from `activity` docs | 04 |
+| `GET /api/activity?year=` | heatmap from `activity` docs | 01 (basic) / 04 (extend) |
 | `GET /api/daily` | daily challenge | 04 |
 | `POST /api/interview/start`, `POST /api/interview/:id/finish` | mock interview | 04 |
 | `GET /api/templates` | templates from Firestore | 01 |

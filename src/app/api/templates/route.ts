@@ -1,12 +1,5 @@
-import { NextResponse } from "next/server";
-import { getTemplateList } from "@/lib/templates";
+import { handler } from "@/lib/api/handler";
+import * as templates from "@/lib/data/templates";
+import { serialize } from "@/lib/data/schema";
 
-export async function GET() {
-  try {
-    const templates = getTemplateList();
-    return NextResponse.json({ templates });
-  } catch (error) {
-    console.error("Templates API error:", error);
-    return NextResponse.json({ error: "Failed to load templates" }, { status: 500 });
-  }
-}
+export const GET = handler({ evt: "templates.list" }, async () => ({ templates: serialize(await templates.list()) }));

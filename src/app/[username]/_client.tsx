@@ -5,31 +5,13 @@ import Link from "next/link";
 import {
   Code2, Loader2, Building2, GraduationCap, MapPin, ExternalLink,
 } from "lucide-react";
-import type { UserProfile } from "@/types";
+import type { UserProfile } from "@/types/legacy";
 import SubmissionHeatmap from "@/components/SubmissionHeatmap";
 
-export default function PublicProfileClient({ username }: { username: string }) {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`/api/profile?username=${encodeURIComponent(username)}`);
-        if (res.status === 404) { setNotFound(true); return; }
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data.profile);
-        }
-      } catch {
-        setNotFound(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [username]);
+export default function PublicProfileClient({ username, profile }: { username: string; profile: UserProfile | null }) {
+  const loading = false;
+  const notFound = !profile;
+  void username;
 
   if (loading) {
     return (

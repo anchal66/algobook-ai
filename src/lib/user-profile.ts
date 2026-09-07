@@ -1,7 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { UserProfile, TopicSkill, ExperienceLevel, GoalType, PracticeState } from "@/types";
-import { computeReviewQuality, updateSpacedRepetition } from "@/lib/spaced-repetition";
+import type { UserProfile, TopicSkill, ExperienceLevel, GoalType, PracticeState } from "@/types/legacy";
+import { computeReviewQuality, updateSpacedRepetition, getDueTopics } from "@/lib/spaced-repetition";
 
 const PROFILES_COLLECTION = "userProfiles";
 const USERNAMES_COLLECTION = "usernames";
@@ -541,7 +541,6 @@ export function buildPerformanceSummary(profile: UserProfile): string {
     lines.push(`Weak areas (mastery < 50): ${weak.join(", ")}`);
   }
 
-  const { getDueTopics } = require("@/lib/spaced-repetition");
   const due = getDueTopics(profile);
   if (due.length > 0) {
     lines.push(`Topics due for spaced review: ${due.join(", ")}`);

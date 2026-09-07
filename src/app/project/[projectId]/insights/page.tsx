@@ -2,10 +2,8 @@
 
 import { useEffect, useState, use } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { firestore } from "@/lib/firebase";
-import {
-  doc, getDoc, collection, getDocs, query, where, orderBy,
-} from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
+import { toLegacyProject, toLegacySubmission, type ProjectDTO, type SubmissionDTO } from "@/lib/legacy/adapters";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -16,7 +14,7 @@ import {
   BarChart3, Zap,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import type { ProjectInsights, Submission } from "@/types";
+import type { ProjectInsights, Submission } from "@/types/legacy";
 
 interface ProjectData {
   title: string;
@@ -56,24 +54,13 @@ export default function ProjectInsightsPage({ params }: { params: Promise<{ proj
     if (!user) return;
     const fetchData = async () => {
       try {
-        const projectDoc = await getDoc(doc(firestore, "projects", projectId));
-        if (!projectDoc.exists()) return;
-        setProject(projectDoc.data() as ProjectData);
-
-        // Fetch project questions
-        const pqSnap = await getDocs(collection(firestore, "projects", projectId, "projectQuestions"));
-        const pqs = pqSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as QuestionData[];
-
-        // Fetch all submissions for this project
-        const subSnap = await getDocs(
-          query(
-            collection(firestore, "submissions"),
-            where("projectId", "==", projectId),
-            where("userId", "==", user.uid),
-            orderBy("submittedAt", "desc")
-          )
-        );
-        const allSubs = subSnap.docs.map((d) => d.data()) as Submission[];
+        const [{ project: proj, items }, subs] = await Promise.all([
+          apiFetch<{ project: ProjectDTO; items: { problemId: string; title: string; difficulty: "Easy" | "Medium" | "Hard"; tags: string[] }[] }>(`/api/projects/${projectId}`),
+          apiFetch<{ items: SubmissionDTO[] }>(`/api/submissions?projectId=${encodeURIComponent(projectId)}&limit=50`),
+        ]);
+        setProject(toLegacyProject(proj) as ProjectData);
+        const pqs: QuestionData[] = items.map((q) => ({ id: q.problemId, title: q.title, difficulty: q.difficulty, tags: q.tags }));
+        const allSubs: Submission[] = subs.items.map(toLegacySubmission);
 
         // Group submissions by question
         const subsByQ: Record<string, Submission[]> = {};

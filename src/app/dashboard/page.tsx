@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { firestore } from "@/lib/firebase";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { apiFetch } from "@/lib/api-client";
+import { toLegacyProfile, toLegacyProject, toLegacyProgress, type ProjectDTO, type UserDTO } from "@/lib/legacy/adapters";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,7 +41,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import type { UserProfile } from "@/types";
+import type { UserProfile } from "@/types/legacy";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ActivitySheet from "@/components/ActivitySheet";
 import UserMenu from "@/components/UserMenu";
-import type { ProjectInsights } from "@/types";
+import type { ProjectInsights } from "@/types/legacy";
 
 interface Project {
   id: string;
@@ -107,126 +107,28 @@ export default function DashboardPage() {
       return;
     }
 
-    const fetchProjects = async () => {
+    const load = async () => {
       try {
-        const q = query(
-          collection(firestore, "projects"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(q);
-        const userProjects = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Project[];
-        setProjects(userProjects);
-        setFilteredProjects(userProjects);
+        const [pr, me] = await Promise.all([
+          apiFetch<{ projects: ProjectDTO[] }>("/api/projects"),
+          apiFetch<{ user: UserDTO }>("/api/me"),
+        ]);
+        const list = pr.projects.map(toLegacyProject) as Project[];
+        setProjects(list);
+        setFilteredProjects(list);
+        const progress: Record<string, ProjectProgress> = {};
+        for (const p of pr.projects) progress[p.id] = toLegacyProgress(p);
+        setProjectProgress(progress);
+        setProfile(toLegacyProfile(me.user));
       } catch (error) {
-        console.error("Error fetching projects:", error);
+        console.error("Error loading dashboard:", error);
       } finally {
         setLoading(false);
       }
     };
-
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`/api/profile?userId=${user.uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data.profile);
-        }
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-      }
-    };
-
-    fetchProjects().then(() => fetchProjectProgress());
-    fetchProfile();
-
-    async function fetchRank() {
-      if (!user) return;
-      try {
-        const res = await fetch(`/api/leaderboard?scope=global&userId=${user.uid}&limit=1`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.userRank !== null) {
-            setRankData({ rank: data.userRank, percentile: data.userPercentile ?? 0 });
-          }
-        }
-      } catch {}
-    }
-    fetchRank();
-
-    async function fetchProjectProgress() {
-      if (!user) return;
-      try {
-        const projQuery = query(
-          collection(firestore, "projects"),
-          where("userId", "==", user.uid)
-        );
-        const projSnap = await getDocs(projQuery);
-        const projectIds = projSnap.docs.map((d) => d.id);
-        if (projectIds.length === 0) return;
-
-        const progressMap: Record<string, ProjectProgress> = {};
-
-        // Fetch question counts and submissions per project in parallel
-        await Promise.all(
-          projectIds.map(async (pid) => {
-            const [qSnap, subSnap] = await Promise.all([
-              getDocs(collection(firestore, "projects", pid, "projectQuestions")),
-              getDocs(
-                query(
-                  collection(firestore, "submissions"),
-                  where("userId", "==", user.uid),
-                  where("projectId", "==", pid),
-                  orderBy("submittedAt", "desc")
-                )
-              ),
-            ]);
-            const subs = subSnap.docs.map((d) => d.data());
-            const successCount = subs.filter((s) => s.status === "success").length;
-            const lastSub = subs[0]?.submittedAt;
-
-            // Per-difficulty solved counts
-            const solvedQuestionIds = new Set(
-              subs.filter((s) => s.status === "success").map((s) => s.questionId)
-            );
-            const attemptedNotSolvedIds = new Set(
-              subs.filter((s) => s.status !== "success").map((s) => s.questionId)
-            );
-            // Remove solved from attempting
-            solvedQuestionIds.forEach((id) => attemptedNotSolvedIds.delete(id));
-
-            // Map question IDs to difficulty
-            const qDiffById: Record<string, string> = {};
-            qSnap.docs.forEach((d) => { qDiffById[d.id] = d.data().difficulty || "Medium"; });
-
-            let easySolved = 0, mediumSolved = 0, hardSolved = 0;
-            solvedQuestionIds.forEach((qId) => {
-              const diff = qDiffById[qId];
-              if (diff === "Easy") easySolved++;
-              else if (diff === "Medium") mediumSolved++;
-              else if (diff === "Hard") hardSolved++;
-            });
-
-            progressMap[pid] = {
-              totalQuestions: qSnap.size,
-              totalSubmissions: subs.length,
-              successfulSubmissions: successCount,
-              lastActivity: lastSub?.toDate ? lastSub.toDate() : null,
-              easySolved,
-              mediumSolved,
-              hardSolved,
-              attempting: attemptedNotSolvedIds.size,
-            };
-          })
-        );
-        setProjectProgress(progressMap);
-      } catch (err) {
-        console.error("Error fetching project progress:", err);
-      }
-    }
+    load();
+    // Global rank returns with the leaderboard snapshot (Module 04).
+    setRankData(null);
   }, [user, authLoading, router]);
 
   useEffect(() => {
@@ -240,15 +142,11 @@ export default function DashboardPage() {
     if (!user) return;
     setDeletingProjectId(projectId);
     try {
-      const res = await fetch(`/api/project/delete?projectId=${encodeURIComponent(projectId)}&userId=${encodeURIComponent(user.uid)}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setProjects((prev) => prev.filter((p) => p.id !== projectId));
-        setFilteredProjects((prev) => prev.filter((p) => p.id !== projectId));
-        const { [projectId]: _, ...rest } = projectProgress;
-        setProjectProgress(rest);
-      }
+      await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`, { method: "DELETE" });
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setFilteredProjects((prev) => prev.filter((p) => p.id !== projectId));
+      const { [projectId]: _, ...rest } = projectProgress;
+      setProjectProgress(rest);
     } catch (err) {
       console.error("Error deleting project:", err);
     } finally {

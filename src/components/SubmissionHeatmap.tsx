@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { apiFetch } from "@/lib/api-client";
+import { auth } from "@/lib/firebase";
 
 interface HeatmapProps {
   userId: string;
@@ -34,7 +36,7 @@ function buildGrid(year: number) {
   firstDay.setDate(firstDay.getDate() - firstDay.getDay());
 
   const weeks: Date[][] = [];
-  let currentDate = new Date(firstDay);
+  const currentDate = new Date(firstDay);
 
   while (currentDate <= endDate || (weeks.length > 0 && weeks[weeks.length - 1].length < 7)) {
     if (weeks.length === 0 || weeks[weeks.length - 1].length === 7) {
@@ -63,12 +65,18 @@ export default function SubmissionHeatmap({ userId }: HeatmapProps) {
     const fetchHeatmap = async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/profile/heatmap?userId=${encodeURIComponent(userId)}&year=${year}`
-        );
-        if (res.ok) {
-          setData(await res.json());
+        // /api/activity is always the signed-in user's own data; other users' heatmaps return in Module 05.
+        if (auth.currentUser?.uid !== userId) { setData({ heatmap: {}, totalSubmissions: 0, activeDays: 0, maxStreak: 0, year }); return; }
+        const d = await apiFetch<{ heatmap: Record<string, number>; totalSubmissions: number; activeDays: number; year: number }>(`/api/activity?year=${year}`);
+        const days = Object.keys(d.heatmap).sort();
+        let maxStreak = 0, run = 0, prev = "";
+        for (const day of days) {
+          const p = new Date(prev + "T00:00:00Z").getTime(), c = new Date(day + "T00:00:00Z").getTime();
+          run = prev && c - p === 86_400_000 ? run + 1 : 1;
+          maxStreak = Math.max(maxStreak, run);
+          prev = day;
         }
+        setData({ ...d, maxStreak });
       } catch (err) {
         console.error("Error fetching heatmap:", err);
       } finally {

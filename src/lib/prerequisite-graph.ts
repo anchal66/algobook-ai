@@ -1,4 +1,4 @@
-import type { UserProfile, PrerequisiteGap } from "@/types";
+import type { UserProfile, PrerequisiteGap } from "@/types/legacy";
 import { computeMasteryScore } from "@/lib/user-profile";
 
 /**
