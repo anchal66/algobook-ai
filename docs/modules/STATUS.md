@@ -20,7 +20,7 @@ Update this table **and** the header of the module file whenever a status change
 |---|---|---|---|---|
 | 01 | 27 | 27 | 0 | `1afb319` (module ship), docs through `bd3fb73` |
 | 02 | 23 | 23 | 0 | `fbf0b60` (merge of `module/02-ai-engine`, pushed 2026-09-08) |
-| 03 | 35 | 35 | 0 | see history (merge SHA recorded after push) |
+| 03 | 35 | 35 | 0 | `8b8dbc5` (merge of `module/03-workspace`, pushed 2026-09-08) |
 | 04 | 25 | 0 | 0 | — |
 | 05 | 29 | 0 | 0 | — |
 
@@ -40,4 +40,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-08 | 02 | IN PROGRESS → COMPLETE; merged into `main` and pushed as `fbf0b60` | Claude |
 | 2026-09-08 | 01 | D-02 wipe run by the owner; fixtures restored; acceptance suite re-run on real Judge0 against the post-wipe data → Module 01 **COMPLETE** | Claude (Opus 5) |
 | 2026-09-08 | 03 | NOT STARTED → STARTED on `module/03-workspace`; context read; Module 03 deps installed | Claude (Fable 5.1) |
-| 2026-09-08 | 03 | IN PROGRESS → COMPLETE; workspace delivered and browser-verified; merged into `main` (SHA below) | Claude (Fable 5.1) |
+| 2026-09-08 | 03 | IN PROGRESS → COMPLETE; workspace delivered and browser-verified; merged into `main` and pushed as `8b8dbc5` | Claude (Fable 5.1) |
