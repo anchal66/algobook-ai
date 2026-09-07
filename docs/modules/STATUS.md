@@ -9,7 +9,7 @@ Update this table **and** the header of the module file whenever a status change
 | # | Module | Status | Branch | Started | Completed | Owner / assistant | Notes |
 |---|---|---|---|---|---|---|---|
 | 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | IN PROGRESS (merged) | `module/01-foundation` | 2026-09-07 | — | Claude (Opus 5) + Avinash | Merged into `main` and pushed. Rules v2 + indexes deployed 2026-09-07. api-smoke 32/33 (the last failure was Judge0's free-tier rate limit, not code). Not COMPLETE until the D-02 wipe runs — the classifier refuses that command. |
-| 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | NOT STARTED | `module/02-ai-engine` | — | — | — | Blocked by 01. |
+| 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | STARTED | `module/02-ai-engine` | 2026-09-07 | — | Claude (Fable 5.1) | Depends only on Module 01 code (all merged); the pending wipe does not block it. |
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | NOT STARTED | `module/03-workspace` | — | — | — | Blocked by 01, 02. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | NOT STARTED | `module/04-intelligence` | — | — | — | Blocked by 01, 02. Can run in parallel with 03. |
 | 05 | Design System & Pages — tokens, motion/3D, landing, dashboard, explore, wizard, profile, leaderboard, settings, admin, final QA | NOT STARTED | `module/05-design-pages` | — | — | — | Blocked by 01–04. |
@@ -35,3 +35,5 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-07 | 01 | STARTED → IN PROGRESS; all code delivered on `module/01-foundation`; deps bumped to latest; Two Sum verified on Judge0 in 4 languages; API + browser checks pass except the 3 that need the Firestore deploy | Claude |
 | 2026-09-07 | 01 | Missing-index fallbacks + programmatic `npm run db:deploy`; api-smoke 32/33; merged into `main` and pushed as `1afb319` | Claude |
 | 2026-09-07 | 01 | Firestore rules v2 released and all 13 indexes issued; rules verified from a client token. Only the D-02 wipe remains | Claude |
+| 2026-09-07 | 01 | Rules v2 confirmed live (ruleset created 17:44 UTC, matches `firebase/firestore.rules`); indexes CREATING; wipe not yet run | Claude |
+| 2026-09-07 | 02 | NOT STARTED → STARTED on `module/02-ai-engine`; context read; OpenAI Responses API + zod v4 structured outputs probed OK on `gpt-5.6-luna` | Claude |

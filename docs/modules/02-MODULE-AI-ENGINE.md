@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | NOT STARTED |
+| **Status** | STARTED |
 | Branch | `module/02-ai-engine` |
 | Depends on | 01 (auth, repositories, Judge `verifyReference`, quotas) |
 | Unblocks | 03, 04 |
@@ -210,3 +210,4 @@ Generates N (default 15) problems across a difficulty mix without persisting, pr
 
 ## 7. Status log
 - 2026-09-07 — Module specified. NOT STARTED.
+- 2026-09-07 — NOT STARTED → STARTED (branch `module/02-ai-engine`). Module 01 rules v2 are live; the D-02 wipe is still pending but nothing here depends on it. Probe: `client.responses.parse` with `zodTextFormat` (zod v4) on `gpt-5.6-luna` accepts array `minItems/maxItems`, nullable fields and integer bounds; `reasoning.effort` + `text.verbosity` work; usage reports `cached_tokens`/`reasoning_tokens`.

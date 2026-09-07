@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | IN PROGRESS (code complete and verified; `firebase deploy` / wipe / `git push` are refused by the permission classifier — see status log) |
+| **Status** | IN PROGRESS (merged + pushed; rules v2 deployed 2026-09-07; only the D-02 wipe remains — owner runs `npm run db:wipe -- --yes`) |
 | Branch | `module/01-foundation` |
 | Depends on | — (first module) |
 | Unblocks | 02, 03, 04, 05 |
@@ -212,3 +212,4 @@ Rewrite `README.md` to describe v2 (setup, env, scripts, architecture pointer to
 - 2026-09-07 — Merged `module/01-foundation` into `main` (`--no-ff`); merged tree rebuilt (`next build` green), `vitest` 19/19, `eslint` 0 errors. Branch and `main` pushed to `origin`.
 - 2026-09-07 — **Rules v2 and indexes are live.** `npm run db:deploy` published the ruleset and updated the `cloud.firestore` release; api-smoke's rules checks now pass (public problem doc 200, `private/tests` 403). Indexes were created with owner gcloud credentials after the service account got `PERMISSION_DENIED`; they build asynchronously and the in-memory fallbacks cover the app until each is `READY`. Note: Judge0's RapidAPI free tier rate-limits after a few dozen submissions in a row — `/api/submit` then returns `502 UPSTREAM "Judge0 rate limit reached"`, which is correct behaviour, not a regression (D-05's self-host path removes it).
 - 2026-09-07 — **Remaining owner to-do** (both actions were blocked for the assistant): (1) ~~deploy rules/indexes~~ **done**; (2) `npm run db:wipe -- --yes` then `npm run db:seed:templates && npm run db:seed:sample && npm run db:grant-plan -- --uid Wa9MsGIdZnaAxcxCFwVSkRZzAy13 --plan pro-yearly`; (3) `npm run api:smoke -- --uidA biu416WkoScEkqNMtY09YpFlarE3 --uidB Wa9MsGIdZnaAxcxCFwVSkRZzAy13` → expect 33/33 once rules v2 are live. Merge/push (Master Plan §10 step 7) is **done**. If the app is hosted, add `NEXT_PUBLIC_APP_URL` and `ADMIN_UIDS` to the hosting environment (`JUDGE0_*` have defaults, `NEXT_PUBLIC_RAPIDAPI_HOST` is no longer read).
+- 2026-09-07 — Rules v2 verified live (ruleset `0aaa50ed…`, created 17:44 UTC, byte-identical to `firebase/firestore.rules`) via the new read-only `scripts/check-firestore-status.ts`; 13 composite indexes CREATING, the single-field `users.stats.score` entry is unnecessary (single-field indexes are automatic). F-10 done. F-07 (wipe) still pending: `questions` (24), `userProfiles` (3), v1 `projects` (7) remain.
