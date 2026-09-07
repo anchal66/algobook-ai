@@ -14,6 +14,7 @@ export type {
   ProjectProgress, Project, RecommendationReason, ProjectItem, TemplatePoolEntry,
   FailedCase, Submission, Draft, Note, Activity, Subscription, Report, AiUsage,
   Template, TemplateItem, LeaderboardEntry, LeaderboardSnapshot, DailyChallenge, Achievements,
+  Interview, InterviewFeedback, InterviewStatus, LeaderboardMeta, CohortEntry, WeeklyEntry,
   WithId, Serialized,
 } from "@/lib/data/schema";
 

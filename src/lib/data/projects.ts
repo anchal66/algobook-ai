@@ -226,6 +226,43 @@ export async function itemProblemIdsForUser(uid: string, maxProjects = 50): Prom
   return [...ids];
 }
 
+/** Module 05: problem ids currently `attempting` in any of the user's projects (Explore status column). */
+export async function attemptingProblemIdsForUser(uid: string, maxProjects = 50): Promise<string[]> {
+  const projectsSnap = await adminDb.collection(COL).where("uid", "==", uid).select().limit(maxProjects).get();
+  const ids = new Set<string>();
+  await Promise.all(projectsSnap.docs.map(async (p) => {
+    const items = await p.ref.collection("items").where("status", "==", "attempting").select().get();
+    items.docs.forEach((d) => ids.add(d.id));
+  }));
+  return [...ids];
+}
+
+/** Module 05: the most recent project of the user that contains `problemId` (≤ 10 project reads). */
+export async function findProjectWithItem(uid: string, problemId: string, maxProjects = 10): Promise<string | null> {
+  const list = await listForUser(uid, maxProjects);
+  if (!list.length) return null;
+  const refs = list.map((p) => adminDb.collection(COL).doc(p.id).collection("items").doc(problemId));
+  const snaps = await adminDb.getAll(...refs);
+  const hit = snaps.findIndex((s) => s.exists);
+  return hit >= 0 ? list[hit].id : null;
+}
+
+export interface ProjectPatch { title?: string; description?: string; purpose?: string; selectedTopics?: string[]; durationDays?: number }
+/** Module 05: owner-only project settings update. */
+export async function update(id: string, uid: string, patch: ProjectPatch): Promise<WithId<Project>> {
+  const project = await getOwned(id, uid);
+  const clean: Record<string, unknown> = {};
+  for (const k of ["title", "description", "purpose", "selectedTopics", "durationDays"] as const) if (patch[k] !== undefined) clean[k] = patch[k];
+  if (Object.keys(clean).length) await adminDb.collection(COL).doc(project.id).update(clean);
+  return (await get(project.id))!;
+}
+
+/** Module 05: all project ids of a user (account deletion). */
+export async function idsForUser(uid: string): Promise<string[]> {
+  const snap = await adminDb.collection(COL).where("uid", "==", uid).select().get();
+  return snap.docs.map((d) => d.id);
+}
+
 export async function setInsights(projectId: string, insights: Record<string, unknown>): Promise<void> {
   await adminDb.collection(COL).doc(projectId).update({ insights: { ...insights, generatedAt: Timestamp.now() } });
 }

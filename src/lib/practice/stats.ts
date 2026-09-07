@@ -205,7 +205,18 @@ export function applySubmissionToStats(userData: FirebaseFirestore.DocumentData,
     lastAppliedSubmissionId: o.submissionId,
     updatedAt: Timestamp.fromDate(now),
   };
+  // Module 05: rating history (one point per UTC day, capped) for the profile chart.
+  if (rating) updates.ratingHistory = appendRatingHistory(user.ratingHistory ?? [], today, stats.rating);
   return { applied: true, xpEarned, rating, newlyUnlocked, streakFreezeUsed: streak.freezesUsed, stats, topicSkills, practiceState, calibration, updates };
+}
+
+export const RATING_HISTORY_CAP = 180;
+
+/** Appends/replaces today's rating point and caps the series. Pure. */
+export function appendRatingHistory(history: { d: string; r: number }[], today: string, rating: number): { d: string; r: number }[] {
+  const r = Math.round(rating * 10) / 10;
+  const next = history.length && history[history.length - 1].d === today ? [...history.slice(0, -1), { d: today, r }] : [...history, { d: today, r }];
+  return next.length > RATING_HISTORY_CAP ? next.slice(next.length - RATING_HISTORY_CAP) : next;
 }
 
 export interface TxRefs {

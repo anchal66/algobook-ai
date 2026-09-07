@@ -3,205 +3,387 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
+/* ═══════════════════════════════════════════════════════════════════════════
+   AlgoBook design tokens (Master Plan §8, Module 05 U-01).
+   Raw palette lives on :root (light) and .dark; the @theme block maps it to
+   Tailwind utilities. shadcn aliases (--background, --card, …) are re-pointed
+   at the same palette so the workspace (Module 03) and the new pages share one
+   surface scale.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  /* ── Master Plan §8 design tokens (Module 03 added them early; Module 05 owns the rest) ── */
-  --color-bg-0: var(--bg-0);
-  --color-bg-1: var(--bg-1);
-  --color-bg-2: var(--bg-2);
-  --color-bg-3: var(--bg-3);
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Type scale: 12/13/14/16/20/24/32/48 (+ display) */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.5rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 2rem;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 2rem;
+  --text-2xl--line-height: 2.375rem;
+  --text-2xl--letter-spacing: -0.02em;
+  --text-3xl: 3rem;
+  --text-3xl--line-height: 1.08;
+  --text-3xl--letter-spacing: -0.028em;
+  --text-display: 4rem;
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.035em;
+
+  /* Surfaces & text (semantic aliases) */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
   --color-line: var(--line);
-  --color-fg-1: var(--fg-1);
-  --color-fg-2: var(--fg-2);
-  --color-fg-3: var(--fg-3);
-  /* Workspace surfaces (LeetCode measured 2026-09-08: page #1a1a1a / panel #262626 in dark, #f0f0f0 / #ffffff in light) */
+  --color-line-strong: var(--line-strong);
+
+  /* Legacy names kept for Module 03 (bg-0..3 / fg-1..3) */
+  --color-bg-0: var(--surface-0);
+  --color-bg-1: var(--surface-1);
+  --color-bg-2: var(--surface-2);
+  --color-bg-3: var(--surface-3);
+  --color-fg-1: var(--text-1);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+
+  /* Workspace surfaces (LeetCode measured 2026-09-08: page #1a1a1a / panel #262626 dark, #f0f0f0 / #ffffff light) */
   --color-ws-page: var(--ws-page);
   --color-ws-panel: var(--ws-panel);
   --color-ws-bar: var(--ws-bar);
   --color-ws-chip: var(--ws-chip);
   --color-ws-hover: var(--ws-hover);
+
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-from: #6366f1;
+  --color-brand-to: #22d3ee;
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+
+  /* Semantics */
+  --color-diff-easy: #00b8a3;
+  --color-diff-medium: #ffc01e;
+  --color-diff-hard: #ff375f;
   --color-easy: #00b8a3;
   --color-medium: #ffc01e;
   --color-hard: #ff375f;
+  --color-ok: #2cbb5d;
+  --color-err: #ef4743;
+  --color-warn: #ffc01e;
   --color-accepted: #2cbb5d;
   --color-wrong: #ef4743;
-  --color-brand-from: #6366f1;
-  --color-brand-to: #22d3ee;
+  --color-info: #1a90ff;
+
+  /* shadcn aliases */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--brand);
+  --color-chart-2: var(--brand-2);
+  --color-chart-3: #00b8a3;
+  --color-chart-4: #ffc01e;
+  --color-chart-5: #ff375f;
+
+  /* Radii: 6 chips · 8 inputs/buttons · 12 cards · 16 modals (workspace panels 8) */
   --radius-chip: 6px;
   --radius-input: 8px;
   --radius-card: 12px;
   --radius-modal: 16px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Motion: 120 hover · 200 tabs/toggles · 320 panels/modals · 600 hero */
   --ease-out-quart: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-shimmer: shimmer 1.4s ease infinite;
+  --animate-aurora: aurora 18s ease-in-out infinite alternate;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-pulse-ring: pulse-ring 1.8s var(--ease-out-quart) infinite;
+  --animate-caret: caret 1s steps(1) infinite;
+
+  @keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+  @keyframes aurora {
+    0% { transform: translate3d(-6%, -4%, 0) rotate(0deg) scale(1); }
+    50% { transform: translate3d(4%, 6%, 0) rotate(12deg) scale(1.08); }
+    100% { transform: translate3d(-2%, 2%, 0) rotate(-6deg) scale(1.02); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+  @keyframes caret {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
 }
 
+/* ── Light palette (§8) ─────────────────────────────────────────────────── */
 :root {
-  --bg-0: #ffffff;
-  --bg-1: #f7f8fa;
-  --bg-2: #eff1f4;
-  --bg-3: #e5e7eb;
+  --surface-0: #ffffff;
+  --surface-1: #f7f8fa;
+  --surface-2: #eff1f4;
+  --surface-3: #e5e7eb;
   --line: #d0d4da;
-  --fg-1: #111827;
-  --fg-2: #4b5563;
-  --fg-3: #6b7280;
+  --line-strong: #b4bac3;
+  --text-1: #111827;
+  --text-2: #4b5563;
+  --text-3: #6b7280;
+
   --ws-page: #f0f0f0;
   --ws-panel: #ffffff;
   --ws-bar: rgba(0, 0, 0, 0.04);
   --ws-chip: rgba(0, 0, 0, 0.06);
   --ws-hover: rgba(0, 0, 0, 0.06);
-  --radius: 0.625rem;
-  --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.13 0.028 261);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.13 0.028 261);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0.028 261);
-  --primary: oklch(0.488 0.217 264);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.012 260);
-  --secondary-foreground: oklch(0.205 0.028 261);
-  --muted: oklch(0.96 0.012 260);
-  --muted-foreground: oklch(0.52 0.025 260);
-  --accent: oklch(0.94 0.022 260);
-  --accent-foreground: oklch(0.205 0.028 261);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.015 260);
-  --input: oklch(0.91 0.015 260);
-  --ring: oklch(0.488 0.217 264);
-  --chart-1: oklch(0.488 0.217 264);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.002 260);
-  --sidebar-foreground: oklch(0.13 0.028 261);
-  --sidebar-primary: oklch(0.488 0.217 264);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0.022 260);
-  --sidebar-accent-foreground: oklch(0.205 0.028 261);
-  --sidebar-border: oklch(0.91 0.015 260);
-  --sidebar-ring: oklch(0.488 0.217 264);
+
+  --brand: #6366f1;
+  --brand-2: #0891b2; /* cyan-600: readable on light surfaces */
+  --brand-soft: rgba(99, 102, 241, 0.1);
+  --brand-ink: #4f46e5;
+  /* Chart marks: deeper steps of the difficulty hues so bars/lines clear 3:1 on white */
+  --chart-easy: #008f7e;
+  --chart-medium: #b58500;
+  --chart-hard: #e11d48;
+  --chart-brand: #6366f1;
+  --chart-brand-2: #0891b2;
+  --chart-grid: #e5e7eb;
+
+  /* shadcn aliases → palette */
+  --radius: 0.5rem;
+  --background: var(--surface-1);
+  --foreground: var(--text-1);
+  --card: var(--surface-0);
+  --card-foreground: var(--text-1);
+  --popover: var(--surface-0);
+  --popover-foreground: var(--text-1);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-1);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-2);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text-1);
+  --destructive: #dc2626;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
+
+  --legacy-og-bg: #0f0f10;
+  color-scheme: light;
 }
 
+/* ── Dark palette (§8) — the default theme ──────────────────────────────── */
 .dark {
-  --bg-0: #0f0f10;
-  --bg-1: #1a1a1a;
-  --bg-2: #262626;
-  --bg-3: #333333;
+  --surface-0: #0f0f10;
+  --surface-1: #1a1a1a;
+  --surface-2: #262626;
+  --surface-3: #333333;
   --line: #3e3e3e;
-  --fg-1: #f5f5f5;
-  --fg-2: #a3a3a3;
-  --fg-3: #737373;
+  --line-strong: #525252;
+  --text-1: #f5f5f5;
+  --text-2: #a3a3a3;
+  --text-3: #8a8a8a; /* lifted from #737373 so small tertiary text still passes 4.5:1 on #262626 */
+
   --ws-page: #1a1a1a;
   --ws-panel: #262626;
   --ws-bar: rgba(255, 255, 255, 0.06);
   --ws-chip: rgba(255, 255, 255, 0.1);
   --ws-hover: rgba(255, 255, 255, 0.08);
-  --background: oklch(0.1 0.015 261);
-  --foreground: oklch(0.97 0.005 260);
-  --card: oklch(0.155 0.02 261);
-  --card-foreground: oklch(0.97 0.005 260);
-  --popover: oklch(0.155 0.02 261);
-  --popover-foreground: oklch(0.97 0.005 260);
-  --primary: oklch(0.61 0.22 264);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.21 0.025 261);
-  --secondary-foreground: oklch(0.97 0.005 260);
-  --muted: oklch(0.21 0.025 261);
-  --muted-foreground: oklch(0.65 0.025 260);
-  --accent: oklch(0.21 0.025 261);
-  --accent-foreground: oklch(0.97 0.005 260);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.61 0.22 264);
-  --chart-1: oklch(0.61 0.22 264);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.13 0.018 261);
-  --sidebar-foreground: oklch(0.97 0.005 260);
-  --sidebar-primary: oklch(0.61 0.22 264);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.21 0.025 261);
-  --sidebar-accent-foreground: oklch(0.97 0.005 260);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.61 0.22 264);
+
+  --brand: #818cf8; /* indigo-400 for text/icons on dark */
+  --brand-2: #22d3ee;
+  --brand-soft: rgba(129, 140, 248, 0.14);
+  --brand-ink: #a5b4fc;
+  --chart-easy: #00b8a3;
+  --chart-medium: #ffc01e;
+  --chart-hard: #ff375f;
+  --chart-brand: #818cf8;
+  --chart-brand-2: #22d3ee;
+  --chart-grid: #2e2e2e;
+
+  --background: var(--surface-0);
+  --foreground: var(--text-1);
+  --card: var(--surface-1);
+  --card-foreground: var(--text-1);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--text-1);
+  --primary: var(--brand);
+  --primary-foreground: #0f0f10;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-1);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-2);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text-1);
+  --destructive: #ef4743;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
+  color-scheme: dark;
 }
 
+/* ── Base ───────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 {
+    @apply text-balance tracking-tight;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 30%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  button, [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled, [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
   }
 }
 
+/* ── Utilities ──────────────────────────────────────────────────────────── */
 @layer utilities {
-  .bg-grid {
-    background-image:
-      linear-gradient(to right, oklch(0.5 0.02 260 / 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(0.5 0.02 260 / 0.06) 1px, transparent 1px);
-    background-size: 64px 64px;
-  }
-  .dark .bg-grid {
-    background-image:
-      linear-gradient(to right, oklch(0.8 0.02 260 / 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(0.8 0.02 260 / 0.05) 1px, transparent 1px);
-    background-size: 64px 64px;
-  }
+  .tabular { font-variant-numeric: tabular-nums; }
   .text-gradient {
-    background: linear-gradient(135deg, oklch(0.61 0.22 264), oklch(0.7 0.18 280));
+    background: linear-gradient(120deg, #6366f1 0%, #22d3ee 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  .bg-brand {
-    background-image: linear-gradient(135deg, #6366f1, #22d3ee);
+  .bg-brand { background-image: linear-gradient(135deg, #6366f1, #22d3ee); }
+  .bg-brand-soft { background-color: var(--brand-soft); }
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--text-3) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--text-3) 14%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
   }
-  /* Thin, LeetCode-like scrollbars inside workspace panels */
-  .ws-scroll {
+  .bg-dots {
+    background-image: radial-gradient(color-mix(in srgb, var(--text-3) 26%, transparent) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .mask-fade-b { mask-image: linear-gradient(to bottom, black 55%, transparent 100%); }
+  .mask-fade-x { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
+  /* Marketing only (§8 elevation) */
+  .glass {
+    background: color-mix(in srgb, var(--surface-0) 55%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--text-1) 8%, transparent);
+  }
+  .dark .glass { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
+  /* Gradient border that appears on hover (Card "glow" variant) */
+  .glow-card { position: relative; isolation: isolate; }
+  .glow-card::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, #6366f1, #22d3ee 60%, #6366f1);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 200ms var(--ease-out-quart);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .glow-card:hover::before, .glow-card:focus-within::before { opacity: 1; }
+  .shimmer {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--text-3) 12%, transparent) 25%, color-mix(in srgb, var(--text-3) 26%, transparent) 37%, color-mix(in srgb, var(--text-3) 12%, transparent) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  .scroll-thin {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--fg-3) 45%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--text-3) 45%, transparent) transparent;
   }
+  .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text-3) 45%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .skip-link {
+    position: absolute; left: 8px; top: -100px; z-index: 100;
+    padding: 8px 12px; border-radius: 8px; background: var(--brand); color: #fff; font-weight: 600;
+  }
+  .skip-link:focus { top: 8px; }
+  /* Aurora blobs for the marketing hero */
+  .aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .aurora > i {
+    position: absolute; display: block; border-radius: 9999px; filter: blur(80px); opacity: 0.55;
+    animation: aurora 18s ease-in-out infinite alternate;
+  }
+  .aurora > i:nth-child(1) { width: 52vw; height: 52vw; left: -10vw; top: -20vh; background: #6366f1; }
+  .aurora > i:nth-child(2) { width: 44vw; height: 44vw; right: -12vw; top: -10vh; background: #22d3ee; animation-delay: -6s; opacity: 0.35; }
+  .aurora > i:nth-child(3) { width: 36vw; height: 36vw; left: 30vw; bottom: -30vh; background: #a855f7; animation-delay: -12s; opacity: 0.25; }
+  .light .aurora > i, :root:not(.dark) .aurora > i { opacity: 0.22; }
+
+  /* Legacy helpers still used by older pages */
+  .ws-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg-3) 45%, transparent) transparent; }
   .ws-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
   .ws-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg-3) 45%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
   .ws-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -212,13 +394,10 @@
 .ws-root { font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .ws-root .katex { font-size: 1em; }
 .ws-root .katex-display { margin: 0.5em 0; }
-/* Monaco ghost text (inline AI completion) */
 .ws-root .monaco-editor .ghost-text-decoration,
 .ws-root .monaco-editor .ghost-text { opacity: 0.55; font-style: italic; }
-/* monaco-vim status bar */
 .ws-vim-status { font-family: var(--font-mono), monospace; font-size: 12px; padding: 0 8px; }
 .ws-vim-status input { background: transparent; border: none; outline: none; color: inherit; font: inherit; }
-
 .ws-shimmer {
   background: linear-gradient(90deg, color-mix(in srgb, var(--fg-3) 15%, transparent) 25%, color-mix(in srgb, var(--fg-3) 30%, transparent) 37%, color-mix(in srgb, var(--fg-3) 15%, transparent) 63%);
   background-size: 400% 100%;
@@ -228,6 +407,12 @@
 @keyframes ws-orb { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.08) rotate(180deg); } }
 .ws-orb { animation: ws-orb 3.2s var(--ease-out-quart) infinite; }
 
+/* ── Reduced motion: global guard (Module 05 §1) ───────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .ws-root *, .ws-root *::before, .ws-root *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

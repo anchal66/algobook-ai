@@ -158,4 +158,13 @@ export async function finishInterview(id: string, uid: string): Promise<{ interv
   return { interview: { ...it, status: "finished", finishedAt: feedback.createdAt, feedback }, cached: false, costUsd: res.costUsd };
 }
 
+/** Module 05: the user's interviews, newest first (single-field query, sorted in memory). */
+export async function listInterviews(uid: string, limit = 30): Promise<WithId<Interview>[]> {
+  const snap = await adminDb.collection("interviews").where("uid", "==", uid).get();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...InterviewSchema.parse(d.data()) }))
+    .sort((a, b) => b.startedAt.toMillis() - a.startedAt.toMillis())
+    .slice(0, limit);
+}
+
 export { RATING_SEED };
