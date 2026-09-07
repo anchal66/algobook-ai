@@ -199,6 +199,12 @@ export async function setStatus(id: string, status: ProblemStatus): Promise<void
   catalogCache = null;
 }
 
+/** Admin re-verification: keep only the languages whose reference still passes. */
+export async function setLanguages(id: string, languages: Language[]): Promise<void> {
+  await adminDb.collection(COL).doc(id).update({ languages });
+  catalogCache = null;
+}
+
 /** Problems with at least one flag, most-flagged first (single-field range query on `flagged.count`). */
 export async function listFlagged(limit = 100): Promise<(ProblemPublic & { flagCount: number; flagReasons: string[] })[]> {
   const snap = await adminDb.collection(COL).where("flagged.count", ">", 0).orderBy("flagged.count", "desc").limit(limit).get();

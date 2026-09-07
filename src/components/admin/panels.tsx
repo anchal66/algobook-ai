@@ -11,7 +11,9 @@ import { Badge, DifficultyBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHART, ChartTooltip, Legend } from "@/components/charts";
 import { useQuery, invalidate } from "@/lib/app/query";
-import { getAiUsage, getFlagged, leaderboardSnapshot, pregen, setProblemStatus, type AiUsageResponse, type UsageBucket } from "@/lib/app/api";
+import { getAiUsage, getFlagged, leaderboardSnapshot, pregen, reverifyProblem, setProblemStatus, type AiUsageResponse, type UsageBucket } from "@/lib/app/api";
+import { Input } from "@/components/ui/input";
+import { ShieldCheck } from "lucide-react";
 import { fmtDate, fmtNumber, titleCase } from "@/lib/app/format";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/lib/app/useNow";
@@ -102,6 +104,17 @@ export function CoveragePanel() {
 export function FlaggedPanel() {
   const q = useQuery("/api/admin/problems/flagged", getFlagged, { staleMs: 30_000 });
   const [busy, setBusy] = useState<string | null>(null);
+  const reverify = async (id: string) => {
+    setBusy(id);
+    try {
+      const r = await reverifyProblem(id);
+      const summary = r.results.map((x) => `${x.language} ${x.verdict} ${x.passed}/${x.total}`).join(" · ");
+      if (r.action === "kept") toast.success(`Re-verified “${r.title}”: all languages pass — ${summary}`);
+      else if (r.action === "languages_disabled") toast.warning(`“${r.title}”: disabled ${r.disabled.join(", ")} — ${summary}`);
+      else toast.error(`“${r.title}” retired: the Java reference no longer passes — ${summary}`);
+      invalidate("/api/admin/problems"); invalidate("/api/problems/catalog");
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
+  };
   const setStatus = async (id: string, status: "verified" | "retired") => {
     setBusy(id);
     try { await setProblemStatus(id, status); toast.success(status === "retired" ? "Problem retired" : "Problem restored"); invalidate("/api/admin/problems"); invalidate("/api/problems/catalog"); } catch (e) { toast.error((e as Error).message); } finally { setBusy(null); }
@@ -120,6 +133,7 @@ export function FlaggedPanel() {
                 <Badge variant={p.status === "retired" ? "err" : p.status === "verified" ? "ok" : "neutral"} size="sm">{titleCase(p.status)}</Badge>
                 <Badge variant="warn" size="sm">{p.flagCount} flag{p.flagCount === 1 ? "" : "s"}</Badge>
                 <span className="ml-auto flex gap-2">
+                  <Button size="xs" variant="outline" loading={busy === p.id} onClick={() => void reverify(p.id)}><ShieldCheck className="size-3" /> Re-verify</Button>
                   {p.status !== "retired" ? <Button size="xs" variant="destructive" loading={busy === p.id} onClick={() => void setStatus(p.id, "retired")}><Trash2 className="size-3" /> Retire</Button> : <Button size="xs" variant="outline" loading={busy === p.id} onClick={() => void setStatus(p.id, "verified")}><RotateCcw className="size-3" /> Restore</Button>}
                 </span>
               </div>
@@ -128,7 +142,19 @@ export function FlaggedPanel() {
           ))}
         </ul>
       ) : <p className="mt-3 text-sm text-text-3">Queue is empty.</p>}
+      <ReverifyAny onRun={reverify} busy={busy} />
     </Card>
+  );
+}
+
+function ReverifyAny({ onRun, busy }: { onRun: (id: string) => Promise<void>; busy: string | null }) {
+  const [id, setId] = useState("");
+  return (
+    <form className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4" onSubmit={(e) => { e.preventDefault(); if (id.trim()) void onRun(id.trim()); }}>
+      <p className="basis-full text-xs text-text-3">Re-verify any problem by id or slug: every stored reference solution is executed again against all tests. A failing language is disabled; a failing Java reference retires the problem.</p>
+      <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="problem id or slug" className="h-8 w-64" aria-label="Problem id or slug" />
+      <Button type="submit" size="sm" variant="outline" loading={!!busy && busy === id.trim()} disabled={!id.trim()}><ShieldCheck className="size-4" /> Re-verify</Button>
+    </form>
   );
 }
 

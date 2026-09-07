@@ -2,16 +2,20 @@
 /** Landing sections (Module 05 U-10): hero, trust row, live stats, feature bento, how it works. */
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { ArrowRight, BrainCircuit, CalendarCheck, Code2, GitBranch, Mic2, ShieldCheck, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeroSceneLazy } from "@/components/design/HeroSceneLazy";
-import { AnimatedNumber, EASE, Magnetic, Reveal, TiltCard } from "@/components/design/motion";
+import { AnimatedNumber, Reveal } from "@/components/design/motion";
+
+const Magnetic = dynamic(() => import("@/components/design/motion-fx").then((m) => m.Magnetic), { ssr: false, loading: () => <span className="inline-block"><CtaButton /></span> });
+const TiltCard = dynamic(() => import("@/components/design/motion-fx").then((m) => m.TiltCard), { ssr: true });
 import { apiFetch } from "@/lib/api-client";
 import { useQuery } from "@/lib/app/query";
 import { cn } from "@/lib/utils";
 
 const COMPANIES = ["Google", "Amazon", "Meta", "Microsoft", "Apple", "Uber"];
+function CtaButton() { return <Button asChild variant="brand" size="xl"><Link href="/login">Start free <ArrowRight className="size-4" /></Link></Button>; }
 
 export function Hero() {
   const stats = useQuery("/api/public/stats", () => apiFetch<{ problemsVerified: number; solvesToday: number; usersRanked: number; languages: number }>("/api/public/stats", { anonymous: true }), { staleMs: 60_000 });
@@ -32,7 +36,7 @@ export function Hero() {
             AI-generated, judge-verified problems in Java, Python, C++ and JavaScript. A LeetCode-parity editor, an AI tutor that won&rsquo;t spoil the answer, spaced repetition, a rating and a daily challenge — planned around your goal.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both delay-200">
-            <Magnetic><Button asChild variant="brand" size="xl"><Link href="/login">Start free <ArrowRight className="size-4" /></Link></Button></Magnetic>
+            <Magnetic><CtaButton /></Magnetic>
             <Button asChild variant="outline" size="xl"><a href="#demo">See a problem</a></Button>
             <span className="text-sm text-text-3">No credit card. Google sign-in.</span>
           </div>
@@ -130,9 +134,9 @@ function PlanArt() {
   return (
     <div className="flex h-full flex-col justify-center gap-2 p-5">
       {["Week 1 · Arrays, Hash map", "Week 2 · Two pointers, Sliding window", "Week 3 · Trees, BFS/DFS"].map((t, i) => (
-        <motion.div key={t} initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.15 * i, duration: 0.45, ease: EASE }} className="flex items-center gap-2 rounded-[8px] border border-line bg-card px-3 py-1.5 text-xs text-text-2">
+        <Reveal key={t} delay={0.15 * i} y={0} className="flex items-center gap-2 rounded-[8px] border border-line bg-card px-3 py-1.5 text-xs text-text-2" style={{ transform: undefined }}>
           <span className="size-2 rounded-full bg-brand" />{t}
-        </motion.div>
+        </Reveal>
       ))}
     </div>
   );
@@ -143,8 +147,8 @@ function VerifyArt() {
     <div className="flex h-full items-center justify-center gap-1 p-4">
       {steps.map((s, i) => (
         <div key={s} className="flex items-center gap-1">
-          <motion.span initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.18 * i, duration: 0.4, ease: EASE }} className={cn("rounded-full px-2.5 py-1 text-2xs font-medium", i === steps.length - 1 ? "bg-ok text-[#052e16]" : "border border-line bg-card text-text-2")}>{s}</motion.span>
-          {i < steps.length - 1 && <motion.span initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ delay: 0.18 * i + 0.1, duration: 0.3 }} className="h-px w-3 origin-left bg-line-strong" />}
+          <Reveal delay={0.18 * i} y={4} as="span" className={cn("rounded-full px-2.5 py-1 text-2xs font-medium", i === steps.length - 1 ? "bg-ok text-[#052e16]" : "border border-line bg-card text-text-2")}>{s}</Reveal>
+          {i < steps.length - 1 && <span className="h-px w-3 bg-line-strong" />}
         </div>
       ))}
     </div>
@@ -154,7 +158,7 @@ function AdaptArt() {
   const bars = [35, 55, 48, 70, 62, 84, 91];
   return (
     <div className="flex h-full items-end justify-center gap-2 p-5">
-      {bars.map((h, i) => <motion.div key={i} initial={{ height: 0 }} whileInView={{ height: `${h}%` }} viewport={{ once: true }} transition={{ delay: 0.06 * i, duration: 0.5, ease: EASE }} className="w-6 rounded-t-[4px] bg-brand" style={{ opacity: 0.45 + i * 0.08 }} />)}
+      {bars.map((h, i) => <Reveal key={i} delay={0.06 * i} y={12} className="w-6 rounded-t-[4px] bg-brand" style={{ height: `${h}%`, opacity: 0.45 + i * 0.08 }} />)}
     </div>
   );
 }

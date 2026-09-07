@@ -166,6 +166,8 @@ export const pregen = (body: { action: "status" | "deficits" | "submit" | "colle
 export const leaderboardSnapshot = (action: "snapshot" | "daily" = "snapshot") =>
   apiFetch<{ global?: { total: number }; week?: { week: string }; ms?: number; created?: boolean; challenge?: unknown }>("/api/admin/leaderboard-snapshot", { method: "POST", body: { action } });
 export interface FlaggedProblem { id: string; slug: string; title: string; difficulty: Difficulty; status: "draft" | "verified" | "retired"; tags: string[]; flagCount: number; flagReasons: string[]; reports: { id: string; uid: string; reason: string; details: string; createdAt: string | null }[] }
+export interface ReverifyResult { id: string; title: string; results: { language: Language; verdict: string; passed: number; total: number; ok: boolean }[]; action: "kept" | "languages_disabled" | "retired"; disabled: Language[] }
+export const reverifyProblem = (id: string) => apiFetch<ReverifyResult>(`/api/admin/problems/${id}/reverify`, { method: "POST", body: {} });
 export const setProblemStatus = (id: string, status: "verified" | "retired") => apiFetch<{ ok: true; status: string }>(`/api/admin/problems/${id}`, { method: "PATCH", body: { status } });
 
 // ── Contact ─────────────────────────────────────────────────────────────────

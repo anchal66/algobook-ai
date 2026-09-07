@@ -2,7 +2,7 @@
 /** Lazy wrapper for HeroScene: static fallback first paint, device/WebGL gating, reduced-motion respect. */
 import dynamic from "next/dynamic";
 import { Suspense, useEffect, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/components/design/motion";
 import { cn } from "@/lib/utils";
 
 const HeroScene = dynamic(() => import("@/components/design/HeroScene"), { ssr: false, loading: () => null });
@@ -43,7 +43,7 @@ export function HeroFallback({ className }: { className?: string }) {
 }
 
 export function HeroSceneLazy({ className, compact }: { className?: string; compact?: boolean }) {
-  const reduce = useReducedMotion();
+  const reduce = usePrefersReducedMotion();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     // Decide after mount: the fallback is the SSR/first paint; 3D loads behind it.
