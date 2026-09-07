@@ -9,7 +9,8 @@ async function loadProfile(username: string) {
   if (!u) return null;
   const pub = serialize(publicProfile(u));
   return toLegacyProfile({ ...pub, uid: u.id, email: "", usernameChangesLeft: 0, experienceLevel: u.experienceLevel, goalType: u.goalType,
-    practiceState: u.practiceState, calibration: u.calibration, topicSkills: {}, settings: serialize(u.settings), plan: serialize(u.plan), quotas: u.quotas, updatedAt: pub.createdAt });
+    practiceState: u.practiceState, calibration: u.calibration, topicSkills: {}, settings: serialize(u.settings), plan: serialize(u.plan), quotas: u.quotas, updatedAt: pub.createdAt,
+    lastAppliedSubmissionId: null, dailyProjectId: null });
 }
 
 type Props = { params: Promise<{ username: string }> };

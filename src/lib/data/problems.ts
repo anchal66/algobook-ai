@@ -281,6 +281,18 @@ export async function findByTemplateTitle(title: string, opts: { excludeIds?: st
   return snap.docs.filter((d) => !exclude.has(d.id)).slice(0, opts.limit ?? 5).map((d) => stripPrivate(d.id, d.data()));
 }
 
+/** Verified problems generated from a company template: title → problem ids (Module 04 template preference). Equality-only query. */
+export async function verifiedTemplateTitles(company: string, limit = 500): Promise<Map<string, string[]>> {
+  const snap = await adminDb.collection(COL).where("status", "==", "verified").where("templateRef.company", "==", company).select("templateRef").limit(limit).get();
+  const out = new Map<string, string[]>();
+  for (const d of snap.docs) {
+    const title = (d.data().templateRef as { title?: string } | undefined)?.title;
+    if (!title) continue;
+    out.set(title, [...(out.get(title) ?? []), d.id]);
+  }
+  return out;
+}
+
 /** Number of verified, non-retired problems in a topic×difficulty cell (pre-generation deficits). */
 export async function countVerified(topic: string, difficulty: Difficulty): Promise<number> {
   const agg = await adminDb.collection(COL).where("status", "==", "verified").where("difficulty", "==", difficulty).where("tags", "array-contains", topic).count().get();

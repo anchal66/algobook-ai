@@ -7,8 +7,10 @@ import * as problems from "@/lib/data/problems";
 import * as projects from "@/lib/data/projects";
 import * as submissions from "@/lib/data/submissions";
 import * as activity from "@/lib/data/activity";
+import * as daily from "@/lib/data/daily";
 import { consumeQuotaInTx } from "@/lib/auth/quotas";
 import { applySubmissionToStatsInTx } from "@/lib/practice/stats";
+import { getAchievement } from "@/lib/practice/achievements";
 import { LanguageSchema, SubmissionSchema, serialize, todayKey, type Language } from "@/lib/data/schema";
 import { judgeSubmission, redactForClient } from "@/lib/judge/service";
 
@@ -25,6 +27,8 @@ const BodySchema = z.object({
     editorialViewed: z.boolean().default(false),
     timeSpentSec: z.number().int().min(0).max(86_400).default(0),
     runCount: z.number().int().min(0).max(10_000).default(0),
+    /** Local hour 0–23 (night-owl achievement); UTC when omitted. */
+    localHour: z.number().int().min(0).max(23).optional(),
   }).default({ hintsUsed: 0, editorialViewed: false, timeSpentSec: 0, runCount: 0 }),
 });
 
@@ -40,8 +44,9 @@ function appendSample(samples: number[] | undefined, v: number): number[] {
 }
 
 /**
- * Judges hidden + sample tests server-side, then writes submission, activity,
- * project item/progress, problem stats and user counters in one transaction.
+ * Judges hidden + sample tests server-side, then writes submission, activity, project item/progress,
+ * problem stats + rating, user stats (mastery/SRS/rating/xp/streak — Module 04 engine) and
+ * achievements in one transaction.
  */
 export const POST = handler({ evt: "submit", feature: "submit", body: BodySchema }, async ({ user, body }) => {
   const p = await problems.resolve(body.problemId);
@@ -58,28 +63,33 @@ export const POST = handler({ evt: "submit", feature: "submit", body: BodySchema
   );
   const judgeMs = Date.now() - judgeStarted;
 
-  const [priorCount, alreadyAccepted] = await Promise.all([
+  const today = todayKey();
+  const [priorCount, alreadyAccepted, todaysDaily, templateCount] = await Promise.all([
     submissions.countForProblem(user.uid, p.id),
     submissions.hasAccepted(user.uid, p.id),
+    daily.get(today),
+    project?.templateId ? projects.templateItemCount(project.templateId) : Promise.resolve(0),
   ]);
   const accepted = result.verdict === "AC";
   const firstAccept = accepted && !alreadyAccepted;
   const attemptNumber = priorCount + 1;
-  const today = todayKey();
   const lang: Language = body.language;
 
   const subRef = submissions.newRef();
   const problemRef = adminDb.collection("problems").doc(p.id);
   const userRef = adminDb.collection("users").doc(user.uid);
+  const achievementsRef = adminDb.collection("achievements").doc(user.uid);
+  const activityRef = activity.ref(user.uid, today);
   const projectRef = project ? adminDb.collection("projects").doc(project.id) : null;
   const itemRef = projectRef ? projectRef.collection("items").doc(p.id) : null;
 
-  const submission = await adminDb.runTransaction(async (tx) => {
-    const [problemSnap, userSnap, projectSnap, itemSnap] = await Promise.all([
-      tx.get(problemRef), tx.get(userRef), projectRef ? tx.get(projectRef) : null, itemRef ? tx.get(itemRef) : null,
+  const outcome = await adminDb.runTransaction(async (tx) => {
+    const [problemSnap, userSnap, achSnap, actSnap, projectSnap, itemSnap] = await Promise.all([
+      tx.get(problemRef), tx.get(userRef), tx.get(achievementsRef), tx.get(activityRef), projectRef ? tx.get(projectRef) : null, itemRef ? tx.get(itemRef) : null,
     ]);
     if (!userSnap.exists) throw ApiError.unauthenticated();
-    const stats = (problemSnap.data()?.stats ?? {}) as { attempts?: number; accepted?: number; runtimeSamples?: Record<string, number[]>; memorySamples?: Record<string, number[]>; avgRuntimeMs?: Record<string, number> };
+    const problemData = problemSnap.data() ?? {};
+    const stats = (problemData.stats ?? {}) as { attempts?: number; accepted?: number; runtimeSamples?: Record<string, number[]>; memorySamples?: Record<string, number[]>; avgRuntimeMs?: Record<string, number> };
 
     const beatsRuntimePct = accepted ? beats(stats.runtimeSamples?.[lang], result.runtimeMs) : null;
     const beatsMemoryPct = accepted ? beats(stats.memorySamples?.[lang], result.memoryKb) : null;
@@ -107,27 +117,56 @@ export const POST = handler({ evt: "submit", feature: "submit", body: BodySchema
       problemUpdate[`stats.memorySamples.${lang}`] = ms;
       problemUpdate[`stats.avgRuntimeMs.${lang}`] = Math.round(rs.reduce((a, b) => a + b, 0) / rs.length);
     }
-    tx.update(problemRef, problemUpdate);
 
-    // project item + progress
+    // project item + progress (+ pace)
+    let templateCompleted: string | null = null;
     if (projectRef && projectSnap?.exists) {
-      projects.applySubmitInTx(tx, { projectRef, project: projectSnap.data()!, item: itemSnap?.exists ? itemSnap.data()! : null },
+      const applied = projects.applySubmitInTx(tx, { projectRef, project: projectSnap.data()!, item: itemSnap?.exists ? itemSnap.data()! : null },
         { problemId: p.id, accepted, difficulty: p.difficulty, title: p.title, tags: p.tags });
+      if (project?.templateId && accepted && templateCount > 0 && applied.solved >= templateCount) templateCompleted = project.templateId;
     }
 
-    // user counters (stub; Module 04 owns the real engine) + activity + quota
-    const xp = applySubmissionToStatsInTx(tx, userRef, userSnap.data()!, { accepted, firstAccept, difficulty: p.difficulty, tags: p.tags, timeSpentSec: body.meta.timeSpentSec });
+    // daily challenge (awarded once per day, only through an AC)
+    const isDailyChallenge = accepted && !!todaysDaily && todaysDaily.problemId === p.id && !(actSnap.data()?.dailySolved === true);
+    if (isDailyChallenge) daily.recordSolveInTx(tx, today);
+
+    // user stats engine (Module 04): mastery, SRS, rating, xp/level/score, streak+freezes, calibration, achievements
+    const engine = applySubmissionToStatsInTx(tx, {
+      userRef, userData: userSnap.data()!, achievementsRef, achievementsData: achSnap.exists ? achSnap.data()! : null, problemRef,
+    }, {
+      submissionId: subRef.id, problemId: p.id, accepted, firstAccept, alreadyAccepted, attemptNumber,
+      difficulty: p.difficulty, tags: p.tags, language: lang, timeSpentSec: body.meta.timeSpentSec, hintsUsed: body.meta.hintsUsed,
+      runCount: body.meta.runCount, editorialViewed: body.meta.editorialViewed, problemRating: (problemData.rating as number) ?? p.rating,
+      isDailyChallenge, localHour: body.meta.localHour, templateCompleted,
+    });
+    // the engine writes `rating` on the problem; fold the stats update into the same write
+    tx.update(problemRef, problemUpdate);
+
     activity.recordInTx(tx, user.uid, today, {
-      submissions: 1, accepted: accepted ? 1 : 0, timeSpentSec: body.meta.timeSpentSec, xpEarned: xp,
+      submissions: 1, accepted: accepted ? 1 : 0, timeSpentSec: body.meta.timeSpentSec, xpEarned: engine.xpEarned,
       ...(firstAccept ? { problemSolved: p.id } : {}),
+      ...(project ? { projectId: project.id } : {}),
+      ...(isDailyChallenge ? { dailySolved: true } : {}),
     });
     consumeQuotaInTx(tx, userRef, userSnap.data()!, "submit");
-    return { id: subRef.id, ...doc };
+    return { submission: { id: subRef.id, ...doc }, engine, isDailyChallenge };
   });
 
-  console.info(JSON.stringify({ evt: "submit.done", uid: user.uid, problemId: p.id, language: lang, verdict: result.verdict, passed: result.passed, total: result.total, judgeMs, batches: 1 }));
+  const { engine } = outcome;
+  console.info(JSON.stringify({ evt: "submit.done", uid: user.uid, problemId: p.id, language: lang, verdict: result.verdict, passed: result.passed, total: result.total, judgeMs, xp: engine.xpEarned, unlocked: engine.newlyUnlocked, rating: engine.rating?.user ?? null }));
 
   const redacted = redactForClient(result, p.sampleTests.length);
-  const { code: _code, ...rest } = submission;
-  return { submission: serialize({ ...rest, failedCase: redacted.failedCase, xpEarned: 0 }), judge: { runtimeMs: result.runtimeMs, memoryKb: result.memoryKb } };
+  const { code: _code, ...rest } = outcome.submission;
+  return {
+    submission: serialize({ ...rest, failedCase: redacted.failedCase, xpEarned: engine.xpEarned }),
+    judge: { runtimeMs: result.runtimeMs, memoryKb: result.memoryKb },
+    xpEarned: engine.xpEarned,
+    newlyUnlocked: engine.newlyUnlocked.map((id) => ({ id, ...(getAchievement(id) ? { name: getAchievement(id)!.name, description: getAchievement(id)!.description, icon: getAchievement(id)!.icon } : {}) })),
+    rating: engine.rating ? { before: engine.rating.before, after: engine.rating.user, delta: engine.rating.delta, problem: engine.rating.problem } : null,
+    streakFreezeUsed: engine.streakFreezeUsed,
+    stats: { xp: engine.stats.xp, level: engine.stats.level, currentStreak: engine.stats.currentStreak, longestStreak: engine.stats.longestStreak, streakFreezes: engine.stats.streakFreezes, rating: engine.stats.rating, score: engine.stats.score, totalSolved: engine.stats.totalSolved },
+    practiceState: engine.practiceState,
+    calibration: engine.calibration,
+    daily: { solved: outcome.isDailyChallenge },
+  };
 });

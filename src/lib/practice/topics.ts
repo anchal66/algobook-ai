@@ -64,6 +64,103 @@ export function topicsInText(text: string, max = 3): CoreTopic[] {
   return out;
 }
 
+// ── Module 04 §3.1: prerequisite DAG + display metadata ──────────────────────
+
+/**
+ * topic → prerequisites that should be learned first. v1 map plus
+ * `heap: [array]`, `matrix: [array]`, `bit manipulation: [math]` (spec §3.1).
+ * Only strong pedagogical dependencies; shallow (max depth 4) so redirect chains stay short.
+ */
+export const PREREQUISITES: Readonly<Partial<Record<CoreTopic, readonly CoreTopic[]>>> = {
+  "dynamic programming": ["recursion", "array"],
+  "graph": ["array"],
+  "bfs": ["graph", "queue"],
+  "dfs": ["graph", "stack", "recursion"],
+  "trie": ["string", "tree"],
+  "bst": ["binary tree", "sorting"],
+  "binary tree": ["tree"],
+  "tree": ["recursion"],
+  "binary search": ["array", "sorting"],
+  "backtracking": ["recursion"],
+  "heap": ["array"],
+  "sliding window": ["array", "two pointers"],
+  "linked list": ["array"],
+  "two pointers": ["array"],
+  "stack": ["array"],
+  "queue": ["array"],
+  "matrix": ["array"],
+  "bit manipulation": ["math"],
+};
+
+export interface TopicMeta { name: string; icon: string; description: string }
+
+/** Display names, lucide icon names and one-liners for the skill tree (Module 05 renders them). */
+export const TOPIC_META: Readonly<Record<CoreTopic, TopicMeta>> = {
+  "array": { name: "Arrays", icon: "Brackets", description: "Indexing, prefix sums, in-place tricks — the foundation of everything else." },
+  "string": { name: "Strings", icon: "Type", description: "Parsing, palindromes, anagrams and character counting." },
+  "hash map": { name: "Hash Maps", icon: "Hash", description: "O(1) lookups: frequency counting, grouping and de-duplication." },
+  "two pointers": { name: "Two Pointers", icon: "MoveHorizontal", description: "Converging or fast/slow pointers over sorted or linear data." },
+  "sliding window": { name: "Sliding Window", icon: "PanelLeftOpen", description: "Best subarray or substring under a constraint in one pass." },
+  "stack": { name: "Stacks", icon: "Layers", description: "LIFO processing: parentheses, monotonic stacks, expression evaluation." },
+  "queue": { name: "Queues", icon: "ListOrdered", description: "FIFO processing, deques and level-by-level traversal." },
+  "linked list": { name: "Linked Lists", icon: "Link", description: "Pointer manipulation, reversal, cycle detection and merging." },
+  "binary search": { name: "Binary Search", icon: "Search", description: "Halving the search space on sorted data or on the answer itself." },
+  "sorting": { name: "Sorting", icon: "ArrowDownWideNarrow", description: "Comparison sorts, custom comparators, intervals and sweep lines." },
+  "recursion": { name: "Recursion", icon: "Repeat", description: "Self-similar decomposition, divide and conquer, base cases." },
+  "tree": { name: "Trees", icon: "Network", description: "Hierarchical data: traversal orders, depth, ancestors and paths." },
+  "binary tree": { name: "Binary Trees", icon: "GitBranch", description: "Recursive structure, BFS/DFS on nodes, serialization." },
+  "bst": { name: "Binary Search Trees", icon: "GitFork", description: "Ordered trees: in-order traversal, validation, kth element." },
+  "graph": { name: "Graphs", icon: "Share2", description: "Adjacency lists, components, union-find and topological order." },
+  "bfs": { name: "BFS", icon: "Waves", description: "Shortest paths in unweighted graphs and grids, multi-source BFS." },
+  "dfs": { name: "DFS", icon: "CornerDownRight", description: "Explore-and-backtrack over graphs and grids, cycle detection." },
+  "dynamic programming": { name: "Dynamic Programming", icon: "Grid3x3", description: "Overlapping subproblems: memoization, tabulation, state design." },
+  "greedy": { name: "Greedy", icon: "Zap", description: "Locally optimal choices that stay globally optimal." },
+  "backtracking": { name: "Backtracking", icon: "Undo2", description: "Permutations, combinations, subsets and constraint search." },
+  "heap": { name: "Heaps", icon: "Mountain", description: "Priority queues: top-k, k-way merge, running medians." },
+  "trie": { name: "Tries", icon: "TextCursorInput", description: "Prefix trees for word search, autocomplete and XOR tricks." },
+  "bit manipulation": { name: "Bit Manipulation", icon: "Binary", description: "Masks, XOR properties, counting bits and subsets by bitmask." },
+  "math": { name: "Math", icon: "Sigma", description: "Number theory, modular arithmetic, geometry and combinatorics." },
+  "matrix": { name: "Matrices", icon: "Table", description: "2D grids: traversal, rotation, spiral order and grid DP." },
+};
+
+export function getPrerequisites(topic: string): CoreTopic[] {
+  const key = topic.toLowerCase() as CoreTopic;
+  return [...(PREREQUISITES[key] ?? [])];
+}
+
+/** Depth in the prerequisite DAG (0 = no prerequisites). Cycle-safe. */
+export function getTopicDepth(topic: string, visited: Set<string> = new Set()): number {
+  const key = topic.toLowerCase();
+  const prereqs = PREREQUISITES[key as CoreTopic];
+  if (!prereqs?.length) return 0;
+  if (visited.has(key)) return 0;
+  visited.add(key);
+  let max = 0;
+  for (const p of prereqs) max = Math.max(max, getTopicDepth(p, visited) + 1);
+  return max;
+}
+
+/** Every core topic, prerequisites first (stable within a depth level). */
+export function getTopologicalOrder(): CoreTopic[] {
+  return [...CORE_TOPICS].sort((a, b) => getTopicDepth(a) - getTopicDepth(b) || CORE_TOPICS.indexOf(a) - CORE_TOPICS.indexOf(b));
+}
+
+/** Throws when the prerequisite map contains a cycle or an unknown topic (guarded by a unit test). */
+export function assertPrerequisitesAcyclic(): void {
+  const WHITE = 0, GREY = 1, BLACK = 2;
+  const color = new Map<string, number>();
+  const visit = (t: string, path: string[]) => {
+    if (!CORE_SET.has(t)) throw new Error(`PREREQUISITES references unknown topic "${t}"`);
+    const c = color.get(t) ?? WHITE;
+    if (c === GREY) throw new Error(`PREREQUISITES cycle: ${[...path, t].join(" → ")}`);
+    if (c === BLACK) return;
+    color.set(t, GREY);
+    for (const p of PREREQUISITES[t as CoreTopic] ?? []) visit(p, [...path, t]);
+    color.set(t, BLACK);
+  };
+  for (const t of CORE_TOPICS) visit(t, []);
+}
+
 /** "easy" / "medium" / "hard" mentioned in free text, if any. */
 export function difficultyInText(text: string): "Easy" | "Medium" | "Hard" | null {
   const t = text.toLowerCase();

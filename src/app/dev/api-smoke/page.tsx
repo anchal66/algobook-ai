@@ -109,6 +109,12 @@ export default function ApiSmokePage() {
   const [chatInput, setChatInput] = useState("why does my loop fail?");
   const [chatLog, setChatLog] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [langStatus, setLangStatus] = useState<Record<string, string>>({});
+  // ── Module 04 ──
+  const [m4Out, setM4Out] = useState<string>("");
+  const [skills, setSkills] = useState<{ state: string; stateProgress: string; rating: number; band: string; level: number; xp: number; score: number; streak: { current: number; longest: number; freezes: number }; counts: { mastered: number; weak: number; due: number }; topics: { topic: string; name: string; status: string; mastery: number; solved: number; attempts: number; srs: { interval: number; ease: number; nextReview: string | null; reps: number } | null; suggestedDifficulty: string }[] } | null>(null);
+  const [simCount, setSimCount] = useState(10);
+  const [simSeed, setSimSeed] = useState(1);
+  const [interviewId, setInterviewId] = useState("");
 
   const loadMe = useCallback(async () => {
     try { setMe(await apiFetch<Me>("/api/me")); setError(null); } catch (e) { setError(errText(e)); }
@@ -258,6 +264,36 @@ export default function ApiSmokePage() {
     } catch (e) { setAiOut(errText(e)); } finally { setBusy(null); }
   };
 
+  // ── Module 04 actions ──
+  const loadSkills = async () => {
+    setBusy("skills");
+    try { const res = await apiFetch<NonNullable<typeof skills>>("/api/me/skills"); setSkills(res); setRaw(JSON.stringify(res, null, 2)); }
+    catch (e) { setM4Out(errText(e)); } finally { setBusy(null); }
+  };
+  const simulate = async (reset: boolean) => {
+    setBusy("simulate"); setM4Out("");
+    try {
+      const res = await apiFetch<{ steps: Record<string, unknown>[]; stats: Record<string, unknown> }>("/api/admin/simulate", { method: "POST", body: { count: simCount, seed: simSeed, reset, daysBack: simCount } });
+      const lines = res.steps.map((s) => {
+        const m = s.mastery as Record<string, { mastery: number; srs: { interval: number; nextReview: string | null } }>;
+        const r = s.rating as { before: number; after: number; delta: number } | null;
+        return `${s.date} ${s.accepted ? "AC " : "WA "} ${String(s.difficulty).padEnd(6)} attempt ${s.attemptNumber} ${(s.topics as string[]).join("+").padEnd(28)} xp +${s.xp}  rating ${r ? `${Math.round(r.before)}→${Math.round(r.after)} (${r.delta > 0 ? "+" : ""}${r.delta})` : "—"}  streak ${s.streak} (freezes ${s.freezes})  lvl ${s.level}  score ${s.score}  ${Object.entries(m).map(([t, v]) => `${t}: mastery ${v.mastery} srs ${v.srs.interval}d→${v.srs.nextReview}`).join("; ")}${(s.unlocked as string[]).length ? `  🏆 ${(s.unlocked as string[]).join(",")}` : ""}`;
+      });
+      setM4Out(`${reset ? "RESET + " : ""}${res.steps.length} synthetic submissions through the engine:\n\n${lines.join("\n")}\n\nstats after: ${JSON.stringify(res.stats)}`);
+      await loadSkills(); loadMe();
+    } catch (e) { setM4Out(errText(e)); } finally { setBusy(null); }
+  };
+  const m4probe = async (path: string, init?: { method: string; body?: unknown }) => {
+    setBusy("m4");
+    try { const res = await apiFetch(path, init as never); setM4Out(`${init?.method ?? "GET"} ${path}\n${JSON.stringify(res, null, 2).slice(0, 4000)}`); setRaw(JSON.stringify(res, null, 2)); return res as Record<string, unknown>; }
+    catch (e) { setM4Out(`${init?.method ?? "GET"} ${path}\n${errText(e)}`); return null; } finally { setBusy(null); }
+  };
+  const startInterview = async () => {
+    const res = await m4probe("/api/interview/start", { method: "POST", body: { durationMin: 30, difficulty: "mixed" } });
+    const id = (res?.interview as { id?: string } | undefined)?.id;
+    if (id) setInterviewId(id);
+  };
+
   if (loading) return <div className="p-8 font-mono text-sm">Loading auth…</div>;
   if (!user) return <div className="p-8 font-mono text-sm">Sign in first (<Link className="underline" href="/login">/login</Link>).</div>;
   if (me && !me.isAdmin) return <div className="p-8 font-mono text-sm">Admin only. Add your uid ({me.user.uid}) to ADMIN_UIDS.</div>;
@@ -267,7 +303,7 @@ export default function ApiSmokePage() {
   return (
     <div className="mx-auto max-w-6xl p-6 font-mono text-sm space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <h1 className="text-lg font-bold">/dev/api-smoke — Modules 01 + 02</h1>
+        <h1 className="text-lg font-bold">/dev/api-smoke — Modules 01 + 02 + 04</h1>
         {me && (
           <div className="text-xs text-muted-foreground">
             uid <b>{me.user.uid}</b> · @{me.user.username} · plan <b>{me.plan.tier}</b> ({me.plan.status}) · quotas {me.quotas.date}: run {me.quotas.used.run ?? 0}/{me.quotas.limits.run}, submit {me.quotas.used.submit ?? 0}/{me.quotas.limits.submit}
@@ -395,6 +431,50 @@ export default function ApiSmokePage() {
             {chatLog.map((m, i) => <div key={i} className={m.role === "user" ? "text-indigo-300" : ""}><b>{m.role}:</b> <span className="whitespace-pre-wrap">{m.content}</span></div>)}
           </div>
         )}
+      </section>
+
+      <section className="space-y-3 border-t border-border pt-4" data-testid="module-04">
+        <div className="font-bold">Module 04 — practice intelligence</div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1">Submissions
+            <input type="number" min={1} max={50} className="w-20 rounded border border-border bg-background px-2 py-1" value={simCount} onChange={(e) => setSimCount(Number(e.target.value) || 10)} />
+          </label>
+          <label className="grid gap-1">Seed
+            <input type="number" className="w-20 rounded border border-border bg-background px-2 py-1" value={simSeed} onChange={(e) => setSimSeed(Number(e.target.value) || 1)} />
+          </label>
+          <button className="rounded bg-indigo-600 px-3 py-1.5 text-white disabled:opacity-50" disabled={busy !== null} onClick={() => simulate(false)}>{busy === "simulate" ? "Simulating…" : `Simulate ${simCount} submissions (engine only)`}</button>
+          <button className="rounded border border-red-500/50 px-3 py-1.5 text-red-300 hover:bg-red-500/10 disabled:opacity-50" disabled={busy !== null} onClick={() => simulate(true)}>Reset my stats + simulate</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={busy !== null} onClick={loadSkills}>GET /api/me/skills</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/me/achievements")}>GET /api/me/achievements</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/activity")}>GET /api/activity</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/leaderboard?scope=global")}>Leaderboard global</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/leaderboard?scope=week")}>week</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/leaderboard?scope=template&company=google")}>template google</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/admin/leaderboard-snapshot", { method: "POST", body: { action: "snapshot" } })}>POST snapshot</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={() => m4probe("/api/daily")}>GET /api/daily</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted" onClick={startInterview}>POST interview/start</button>
+          <input className="w-56 rounded border border-border bg-background px-2 py-1" placeholder="interview id" value={interviewId} onChange={(e) => setInterviewId(e.target.value)} />
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!interviewId} onClick={() => m4probe(`/api/interview/${interviewId}`)}>GET</button>
+          <button className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!interviewId} onClick={() => m4probe(`/api/interview/${interviewId}/finish`, { method: "POST" })}>finish (AI)</button>
+        </div>
+        {skills && (
+          <div className="space-y-2 text-xs">
+            <div>state <b>{skills.state}</b> — {skills.stateProgress} · rating <b>{Math.round(skills.rating)}</b> → {skills.band} · level {skills.level} · xp {skills.xp} · score {skills.score} · streak {skills.streak.current} (best {skills.streak.longest}, freezes {skills.streak.freezes}) · mastered {skills.counts.mastered} · weak {skills.counts.weak} · due {skills.counts.due}</div>
+            <table className="w-full">
+              <thead><tr className="text-left text-muted-foreground"><th>topic</th><th>status</th><th>mastery</th><th>solved/attempts</th><th>srs interval</th><th>next review</th><th>suggested</th></tr></thead>
+              <tbody>
+                {skills.topics.filter((t) => t.attempts > 0 || t.status === "locked").map((t) => (
+                  <tr key={t.topic} className="border-t border-border">
+                    <td>{t.name}</td>
+                    <td className={t.status === "mastered" ? "text-emerald-400" : t.status === "weak" ? "text-red-300" : t.status === "locked" ? "text-muted-foreground" : ""}>{t.status}</td>
+                    <td>{t.mastery}</td><td>{t.solved}/{t.attempts}</td><td>{t.srs ? `${t.srs.interval}d (ease ${t.srs.ease}, reps ${t.srs.reps})` : "—"}</td><td>{t.srs?.nextReview ?? "—"}</td><td>{t.suggestedDifficulty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {m4Out && <pre className="max-h-96 overflow-auto rounded border border-border p-2 text-xs whitespace-pre-wrap">{m4Out}</pre>}
       </section>
 
       <section className="space-y-2 border-t border-border pt-4">

@@ -93,6 +93,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Module 04: mock interviews (owner read; written by the API only)
+    match /interviews/{interviewId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
     // subscriptions, reports, aiUsage and anything else: no client access.
     match /{document=**} {
       allow read, write: if false;

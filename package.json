@@ -22,7 +22,9 @@
     "ai:eval": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai-eval.ts",
     "db:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/check-firestore-status.ts",
     "judge0:quota": "NODE_OPTIONS=--conditions=react-server tsx scripts/judge0-quota.ts",
-    "qa:screenshots": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-screenshots.ts"
+    "qa:screenshots": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-screenshots.ts",
+    "db:migrate:stats": "NODE_OPTIONS=--conditions=react-server tsx scripts/migrate-stats.ts",
+    "load:leaderboard": "NODE_OPTIONS=--conditions=react-server tsx scripts/load-test-leaderboard.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

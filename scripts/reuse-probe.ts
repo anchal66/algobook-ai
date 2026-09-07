@@ -12,7 +12,7 @@ async function main() {
   const user = (await users.getUser(uid))!;
   const project = (await projects.get(projectId))!;
   const items = await projects.getItems(projectId);
-  const rec = await recommend({ user, project, existingItems: items, userPrompt });
+  const rec = await recommend({ uid, user, project, existingItems: items, userPrompt });
   const seen = await getSeenProblemIds(uid);
   console.log("recommendation", JSON.stringify({ difficulty: rec.difficulty, topics: rec.topics, avoid: rec.avoidTopics, reason: rec.reason.short }));
   console.log("seen", seen);
