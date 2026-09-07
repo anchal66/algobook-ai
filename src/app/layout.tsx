@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   description,
   applicationName: "AlgoBook",
   keywords: ["AI coding practice", "LeetCode alternative", "coding interview", "DSA practice", "data structures and algorithms", "technical interview prep", "Java", "Python", "C++", "JavaScript"],
-  alternates: { canonical: "/" },
   openGraph: { title: "AlgoBook — AI coding interview practice", description, url: siteUrl, siteName: "AlgoBook", locale: "en_US", type: "website" },
   twitter: { card: "summary_large_image", title: "AlgoBook — AI coding interview practice", description },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-video-preview": -1, "max-image-preview": "large", "max-snippet": -1 } },
@@ -35,6 +34,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth" className={`${inter.variable} ${jetbrains.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+        <link rel="preconnect" href="https://securetoken.googleapis.com" />
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+      </head>
       <body className="min-h-dvh font-sans">
         <Suspense fallback={null}>
           <GoogleAnalytics />

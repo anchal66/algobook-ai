@@ -50,7 +50,7 @@ export default function DailyPage() {
             <div className="relative">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand"><CalendarCheck className="size-3.5" /> {fmtDate(daily.data?.date ? daily.data.date + "T00:00:00Z" : undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</span>
-                <span className="tabular text-xs text-text-3" title="Resets at 00:00 UTC">Resets in {fmtClock(left)}</span>
+                <span className="tabular text-xs text-text-2" title="Resets at 00:00 UTC">Resets in {fmtClock(left)}</span>
               </div>
               {daily.loading ? <Skeleton className="mt-4 h-24" /> : c ? (
                 <>

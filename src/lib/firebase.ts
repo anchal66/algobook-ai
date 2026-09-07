@@ -1,6 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration from the .env.local file
 const firebaseConfig = {
@@ -18,7 +17,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Get Firebase services
 const auth = getAuth(app);
-const firestore = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-export { app, auth, firestore, googleProvider };
+// Client Firestore is intentionally not initialised: every read/write goes through /api/* (Module 05 dropped it from the bundle).
+export { app, auth, googleProvider };

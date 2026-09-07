@@ -89,7 +89,7 @@ export default function LeaderboardPage() {
                     <Link href={`/${e.username}`} className="mt-4 max-w-full truncate text-sm font-semibold text-text-1 hover:underline">{e.displayName || e.username}</Link>
                     <span className="truncate text-xs text-text-2">@{e.username}</span>
                     <span className="mt-2 text-lg font-semibold tabular text-text-1">{primaryValue(e)}</span>
-                    <span className="text-2xs uppercase tracking-wider text-text-3">{primaryLabel(scope)}</span>
+                    <span className="text-2xs uppercase tracking-wider text-text-2">{primaryLabel(scope)}</span>
                   </li>
                 ) : <li key={i} />)}
               </ol>
@@ -107,7 +107,7 @@ export default function LeaderboardPage() {
                   {rows.map((e) => (
                     <tr key={e.uid} className={cn("border-t border-line/70 transition-colors hover:bg-surface-2", e.uid === meUid && "bg-brand-soft/50")}>
                       <td className="px-4 py-2.5 tabular font-semibold text-text-1">{e.rank <= 3 ? <span className={cn("inline-flex size-6 items-center justify-center rounded-full text-xs font-bold text-[#0f0f10]", e.rank === 1 ? "bg-[#f5b301]" : e.rank === 2 ? "bg-[#c3ccd6]" : "bg-[#e0955a]")}>{e.rank}</span> : e.rank}</td>
-                      <td className="px-4 py-2.5"><Link href={`/${e.username}`} className="flex items-center gap-2.5"><UserAvatar src={e.photoURL} name={e.displayName} size={28} /><span className="min-w-0"><span className="block truncate font-medium text-text-1">{e.displayName || e.username}{e.uid === meUid && <Badge variant="brand" size="sm" className="ml-2">You</Badge>}</span><span className="block truncate text-xs text-text-3">@{e.username}</span></span></Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/${e.username}`} className="flex items-center gap-2.5"><UserAvatar src={e.photoURL} name={e.displayName} size={28} /><span className="min-w-0"><span className="block truncate font-medium text-text-1">{e.displayName || e.username}{e.uid === meUid && <Badge variant="solid" size="sm" className="ml-2">You</Badge>}</span><span className="block truncate text-xs text-text-3">@{e.username}</span></span></Link></td>
                       {cells(scope, e).map((c, i) => <td key={i} className="px-4 py-2.5 text-right tabular text-text-2">{c}</td>)}
                     </tr>
                   ))}

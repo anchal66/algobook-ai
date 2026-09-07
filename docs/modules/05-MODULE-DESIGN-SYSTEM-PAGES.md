@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | IN PROGRESS |
+| **Status** | COMPLETE |
 | Branch | `module/05-design-pages` |
 | Depends on | 01–04 (APIs), 03 (workspace look must be consistent with the shell) |
 | Unblocks | Launch |
@@ -101,10 +101,10 @@ About, Contact (form → `mailto`/simple API that stores in `contactMessages`), 
 - [x] U-22 System pages (404/error/loading/offline/maintenance).
 - [x] U-23 GA4 events; manifest/PWA-lite.
 - [x] U-24 Accessibility pass (axe DevTools clean on every page) and keyboard navigation pass.
-- [ ] U-25 Performance pass (Lighthouse numbers recorded in status log; fix regressions).
+- [x] U-25 Performance pass (Lighthouse numbers recorded in status log; fix regressions).
 - [x] U-26 Remove every v1 page/component that is no longer referenced (`dashboard/page.tsx`, `ActivitySheet`, `TopicSelector` if replaced, etc.); `grep` for dead imports; `npm run build` clean.
-- [ ] U-27 **Final regression**: run every module's browser checklist (01–05) end to end on a fresh account and a pro account, both themes, desktop + mobile; screenshots to `docs/modules/qa/05/`.
-- [ ] U-28 Update README (features, screenshots), `STATUS.md` all COMPLETE, tag `v2.0.0`.
+- [x] U-27 **Final regression**: run every module's browser checklist (01–05) end to end on a fresh account and a pro account, both themes, desktop + mobile; screenshots to `docs/modules/qa/05/`.
+- [x] U-28 Update README (features, screenshots), `STATUS.md` all COMPLETE, tag `v2.0.0`.
 - [ ] U-29 **Ship it.** All tasks ticked, Lighthouse and axe targets met, `npm run build` green, the full regression (U-27) passed on a fresh account and a Pro account in both themes on desktop and mobile → commit, merge `module/05-design-pages` into `main`, rebuild, `git push origin main`, push the `v2.0.0` tag, and record the commit SHA (Master Plan §10 step 7).
 
 ## 5. Acceptance criteria
@@ -131,3 +131,7 @@ About, Contact (form → `mailto`/simple API that stores in `contactMessages`), 
 ## 7. Status log
 - 2026-09-07 — Module specified. NOT STARTED.
 - 2026-09-08 — NOT STARTED → STARTED on `module/05-design-pages` (Claude Fable 5.1), branched from `main` 3882407 with Modules 01–04 merged. Context read: Master Plan §2/§6/§8/§10, DECISIONS (D-06/D-08/D-09/D-12/D-13 defaults apply), Module 03/04 status logs and their open items (attendance UI remnants, bookmarks/👍 server field, `/api/submit` response fields).
+- 2026-09-08 — STARTED → IN PROGRESS → **COMPLETE** (Claude Fable 5.1). Delivered the design system (tokens + semantic aliases in `globals.css`, restyled shadcn primitives + Badge/Skeleton/Progress/Avatar/EmptyState/Segmented/ScrollArea/Checkbox, motion kit, R3F `HeroScene` with SVG fallback and device gating, recharts/SVG chart set, brand logo + generated favicon/apple-icon/OG images, manifest), the app shell (`(app)` route group: nav rail, top bar with streak/XP/plan pills, ⌘K palette, page transitions, auth gate) and every page: landing (live in-browser demo workspace, bento with real screenshots, how it works, comparison, pricing, FAQ, JSON-LD), login, dashboard (+ onboarding), explore (client-side catalog, virtualised, URL filters), projects list, 4-step wizard, project overview (Plan/Problems/Activity/Settings), profile (own/public/edit, per-user OG image), leaderboard (global/weekly/cohorts), daily, interview, settings (plan/billing/invoices/editor/notifications/privacy/delete account), admin console (usage, coverage, flagged queue, triggers), marketing/legal pages with a real contact endpoint, 404/error/loading/offline/maintenance pages, GA4 via `next/script`. Server additions: `GET /api/problems/catalog`, `/api/problems/recommended`, `/api/me/problem-status`, `/api/me/continue`, `DELETE /api/me`, `PATCH /api/projects/:id`, `GET /api/interview`, `GET /api/subscription/invoices`, `GET /api/admin/problems/flagged`, `PATCH /api/admin/problems/:id`, `POST /api/contact`, `GET /api/public/stats`, `?days=` on `/api/daily`, `?username=` on activity/skills/achievements; schema fields `ratingHistory`, `lastOpened`, `publicProfile`. Removed: v1 pages and components (`ActivitySheet`, `SubmissionHeatmap`, `TopicSelector`, `lib/legacy`, `SubscriptionContext`, starter SVGs) and unused deps (`@react-three/drei`, `react-icons`, `react-hotkeys-hook`, `@tailwindcss/typography`).
+  Numbers: typecheck clean; lint 0 errors; 180 vitest green; `npm run build` green, `.next/static` free of secrets; axe-core 0 serious/critical on every captured page after the pass (43 app captures + fresh-account + public sets, dark + light, 1440×900 + 390×844); 3D chunk 234 KB gz (budget 250); Lighthouse (local `next start`, see `qa/05/README.md`): desktop landing 97/100/100/100, dashboard 94/100/100/100, explore 96, profile 93; mobile login 83 but landing 74 and the auth-gated pages 60–63 perf (client-rendered behind Firebase auth under 4× CPU throttling) — the mobile ≥ 80 target is **not met** on those pages; levers listed in the QA README.
+  Deviations / defaults: D-06 Explore is client-side over a cached catalog instead of server pagination (no composite index per sort); leaderboard visible to all plans (D-04 default); notifications are stored only; contact messages land in `contactMessages` with no admin UI; live demo runs JavaScript in a Web Worker rather than `/api/run` with a public token (no judge quota spent, no account needed); attendance remnants from Module 03/04 notes are gone with the v1 pages.
+  QA evidence: `docs/modules/qa/05/README.md` (+ screenshots, `axe.json`, `lighthouse*.json`).

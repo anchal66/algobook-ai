@@ -21,26 +21,26 @@ export function Hero() {
       <div className="bg-grid mask-fade-b absolute inset-0 opacity-60" aria-hidden />
       <div className="relative mx-auto grid max-w-[1200px] items-center gap-10 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pb-28 lg:pt-24">
         <div>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="inline-flex items-center gap-2 rounded-full border border-line bg-card/70 px-3 py-1 text-xs font-medium text-text-2 backdrop-blur">
+          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card/70 px-3 py-1 text-xs font-medium text-text-2 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-500">
             <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-ok" /></span>
             Every problem verified on the judge before you see it
-          </motion.div>
-          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE, delay: 0.05 }} className="mt-5 text-3xl font-semibold tracking-tight text-text-1 sm:text-display">
+          </div>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-text-1 sm:text-display animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both delay-75">
             Practice like it&rsquo;s the <span className="text-gradient">real interview.</span>
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE, delay: 0.12 }} className="mt-5 max-w-xl text-md text-text-2 sm:text-lg">
+          </h1>
+          <p className="mt-5 max-w-xl text-md text-text-2 sm:text-lg animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both delay-150">
             AI-generated, judge-verified problems in Java, Python, C++ and JavaScript. A LeetCode-parity editor, an AI tutor that won&rsquo;t spoil the answer, spaced repetition, a rating and a daily challenge — planned around your goal.
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE, delay: 0.2 }} className="mt-8 flex flex-wrap items-center gap-3">
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-600 fill-mode-both delay-200">
             <Magnetic><Button asChild variant="brand" size="xl"><Link href="/login">Start free <ArrowRight className="size-4" /></Link></Button></Magnetic>
             <Button asChild variant="outline" size="xl"><a href="#demo">See a problem</a></Button>
             <span className="text-sm text-text-3">No credit card. Google sign-in.</span>
-          </motion.div>
-          <motion.dl initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.35 }} className="mt-10 grid max-w-lg grid-cols-3 gap-4">
+          </div>
+          <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 animate-in fade-in duration-600 fill-mode-both delay-300">
             {[["Problems verified", stats.data?.problemsVerified ?? 0], ["Solves today", stats.data?.solvesToday ?? 0], ["Languages", stats.data?.languages ?? 4]].map(([k, v]) => (
               <div key={String(k)}><dt className="text-xs text-text-3">{k}</dt><dd className="text-xl font-semibold text-text-1"><AnimatedNumber value={Number(v)} /></dd></div>
             ))}
-          </motion.dl>
+          </dl>
         </div>
         <div className="relative mx-auto aspect-square w-full max-w-[520px]">
           <HeroSceneLazy className="absolute inset-0" />
@@ -143,7 +143,7 @@ function VerifyArt() {
     <div className="flex h-full items-center justify-center gap-1 p-4">
       {steps.map((s, i) => (
         <div key={s} className="flex items-center gap-1">
-          <motion.span initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.18 * i, duration: 0.4, ease: EASE }} className={cn("rounded-full px-2.5 py-1 text-2xs font-medium", i === steps.length - 1 ? "bg-ok text-white" : "border border-line bg-card text-text-2")}>{s}</motion.span>
+          <motion.span initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.18 * i, duration: 0.4, ease: EASE }} className={cn("rounded-full px-2.5 py-1 text-2xs font-medium", i === steps.length - 1 ? "bg-ok text-[#052e16]" : "border border-line bg-card text-text-2")}>{s}</motion.span>
           {i < steps.length - 1 && <motion.span initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ delay: 0.18 * i + 0.1, duration: 0.3 }} className="h-px w-3 origin-left bg-line-strong" />}
         </div>
       ))}

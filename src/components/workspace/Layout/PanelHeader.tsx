@@ -60,8 +60,8 @@ export function PanelHeader({ tabs, activeTab, onTabChange, extra, actions, maxi
             </div>
           );
         })}
-        {extra}
       </div>
+      {extra && <div className="flex shrink-0 items-center">{extra}</div>}
       <div className="flex shrink-0 items-center gap-0.5 pl-1">
         {actions}
         <button

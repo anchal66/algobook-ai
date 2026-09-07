@@ -234,7 +234,7 @@
   --ws-page: #1a1a1a;
   --ws-panel: #262626;
   --ws-bar: rgba(255, 255, 255, 0.06);
-  --ws-chip: rgba(255, 255, 255, 0.1);
+  --ws-chip: rgba(255, 255, 255, 0.08);
   --ws-hover: rgba(255, 255, 255, 0.08);
 
   --brand: #818cf8; /* indigo-400 for text/icons on dark */

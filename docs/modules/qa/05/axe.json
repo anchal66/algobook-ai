@@ -1,0 +1,92 @@
+[
+  {
+    "url": "http://localhost:3000/leaderboard",
+    "viewport": "desktop",
+    "violations": []
+  },
+  {
+    "url": "http://localhost:3000/leaderboard",
+    "viewport": "mobile",
+    "violations": []
+  },
+  {
+    "url": "http://localhost:3000/daily",
+    "viewport": "desktop",
+    "violations": []
+  },
+  {
+    "url": "http://localhost:3000/daily",
+    "viewport": "mobile",
+    "violations": []
+  },
+  {
+    "url": "http://localhost:3000/problems/two-sum",
+    "viewport": "desktop",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 11,
+        "targets": [
+          ".text-easy",
+          ".bg-ws-chip.h-6.px-2\\.5:nth-child(2)",
+          ".bg-ws-chip.h-6.px-2\\.5:nth-child(3)"
+        ]
+      },
+      {
+        "id": "landmark-banner-is-top-level",
+        "impact": "moderate",
+        "help": "Banner landmark should not be contained in another landmark",
+        "nodes": 1,
+        "targets": [
+          ".h-12"
+        ]
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1,
+        "targets": [
+          "main > section[aria-label=\"Notifications alt+T\"][aria-relevant=\"additions text\"][aria-atomic=\"false\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "url": "http://localhost:3000/problems/two-sum",
+    "viewport": "mobile",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": 5,
+        "targets": [
+          ".text-easy",
+          ".h-6.bg-ws-chip.rounded-full:nth-child(2)",
+          ".h-6.bg-ws-chip.rounded-full:nth-child(3)"
+        ]
+      },
+      {
+        "id": "landmark-banner-is-top-level",
+        "impact": "moderate",
+        "help": "Banner landmark should not be contained in another landmark",
+        "nodes": 1,
+        "targets": [
+          ".h-12"
+        ]
+      },
+      {
+        "id": "landmark-unique",
+        "impact": "moderate",
+        "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+        "nodes": 1,
+        "targets": [
+          "main > section[aria-label=\"Notifications alt+T\"][aria-live=\"polite\"][aria-relevant=\"additions text\"]"
+        ]
+      }
+    ]
+  }
+]

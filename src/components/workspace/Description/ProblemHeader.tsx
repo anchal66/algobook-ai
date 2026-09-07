@@ -17,7 +17,7 @@ export interface ProblemHeaderProps {
 }
 
 const pill = (active: boolean) => cn(
-  "flex h-6 items-center gap-1 rounded-full bg-ws-chip px-2.5 text-xs text-fg-2 transition-colors duration-150 hover:bg-ws-hover hover:text-fg-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60",
+  "flex h-6 items-center gap-1 rounded-full bg-ws-chip px-2.5 text-xs text-fg-1 transition-colors duration-150 hover:bg-ws-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60",
   active && "text-fg-1",
 );
 
@@ -27,7 +27,7 @@ export function ProblemHeader({ problem, showTopics, showCompanies, showHints, o
     <header className="mb-4">
       <h1 className="text-2xl font-semibold leading-7 text-fg-1">{title}</h1>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className={cn("flex h-6 items-center rounded-full bg-ws-chip px-2.5 text-xs", DIFFICULTY_TEXT[problem.difficulty])}>{problem.difficulty}</span>
+        <span className={cn("flex h-6 items-center rounded-full bg-ws-page px-2.5 text-xs font-medium", DIFFICULTY_TEXT[problem.difficulty])}>{problem.difficulty}</span>
         <button type="button" onClick={onToggleTopics} aria-expanded={showTopics} className={pill(showTopics)}>
           <Tag className="size-3.5" /> Topics
         </button>

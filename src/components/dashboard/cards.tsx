@@ -18,7 +18,7 @@ function CardShell({ title, icon, children, className, action }: { title: string
   return (
     <Card variant="glow" className={cn("flex h-full flex-col p-5", className)}>
       <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-text-2">{icon}{title}</h3>
+        <h2 className="flex items-center gap-2 text-sm font-medium text-text-2">{icon}{title}</h2>
         {action}
       </div>
       <div className="mt-3 flex flex-1 flex-col">{children}</div>
