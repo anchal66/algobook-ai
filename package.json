@@ -17,7 +17,8 @@
     "db:grant-plan": "NODE_OPTIONS=--conditions=react-server tsx scripts/grant-plan.ts",
     "db:find-uid": "NODE_OPTIONS=--conditions=react-server tsx scripts/find-uid.ts",
     "dev:token": "NODE_OPTIONS=--conditions=react-server tsx scripts/dev-token.ts",
-    "api:smoke": "NODE_OPTIONS=--conditions=react-server tsx scripts/api-smoke.ts"
+    "api:smoke": "NODE_OPTIONS=--conditions=react-server tsx scripts/api-smoke.ts",
+    "db:status": "NODE_OPTIONS=--conditions=react-server tsx scripts/db-status.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

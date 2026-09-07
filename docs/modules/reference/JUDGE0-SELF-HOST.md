@@ -1,5 +1,19 @@
 # Judge0 CE — self-hosting reference (D-05)
 
+> **Why this matters sooner than expected:** the RapidAPI free tier allows only
+> **50 batched submissions per day** (`x-ratelimit-batched-submissions-limit: 50`),
+> and one Run or one Submit is one batch. That is ~50 code executions per day for
+> the entire deployment, shared by every user, and it is spent quickly by seeding
+> and testing alone. Check the current window with:
+>
+> ```bash
+> curl -s -D - -o /dev/null -H "X-RapidAPI-Key: $RAPIDAPI_KEY" \
+>   -H "X-RapidAPI-Host: judge0-ce.p.rapidapi.com" \
+>   https://judge0-ce.p.rapidapi.com/about | grep -i ratelimit
+> ```
+>
+> Self-hosting (below) or a paid RapidAPI plan is required before real traffic.
+
 Module 01 talks to Judge0 through `src/lib/judge/judge0.ts`, which reads three
 environment variables. Switching from RapidAPI to a self-hosted instance is a
 configuration change only.
