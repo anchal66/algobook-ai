@@ -79,9 +79,9 @@ export function BadgesGrid({ data, compact }: { data: AchievementsResponse | und
             <li key={b.id}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div tabIndex={0} className={cn("flex aspect-square flex-col items-center justify-center rounded-card border text-center outline-none focus-visible:ring-[3px] focus-visible:ring-brand/40", b.unlocked ? "border-brand/30 bg-brand-soft text-brand" : "border-line bg-surface-1 text-text-3 opacity-60")}>
-                    <span className="relative"><Icon className="size-6" />{!b.unlocked && <Lock className="absolute -bottom-1 -right-1.5 size-3 rounded-full bg-card p-px" />}</span>
-                    <span className="mt-1.5 line-clamp-2 px-1 text-2xs leading-tight text-text-2">{b.name}</span>
+                  <div tabIndex={0} className={cn("flex aspect-square flex-col items-center justify-center rounded-card border text-center outline-none focus-visible:ring-[3px] focus-visible:ring-brand/40", b.unlocked ? "border-brand/30 bg-brand-soft text-brand" : "border-line bg-surface-1 text-text-3")}>
+                    <span className={cn("relative", !b.unlocked && "opacity-60")}><Icon className="size-6" />{!b.unlocked && <Lock className="absolute -bottom-1 -right-1.5 size-3 rounded-full bg-card p-px" />}</span>
+                    <span className={cn("mt-1.5 line-clamp-2 px-1 text-2xs leading-tight", b.unlocked ? "text-text-2" : "text-text-3")}>{b.name}</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs"><p className="font-medium">{b.name}</p><p className="text-xs opacity-80">{b.description}</p>{b.at && <p className="mt-1 text-xs opacity-70">Unlocked {fmtDate(b.at)}</p>}</TooltipContent>

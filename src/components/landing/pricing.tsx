@@ -30,7 +30,7 @@ export function Compare() {
   return (
     <section id="compare" className="mx-auto max-w-[1000px] px-5 py-20 sm:px-8">
       <Reveal><p className="text-xs font-semibold uppercase tracking-wider text-brand">Compared</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-text-1 sm:text-3xl">AlgoBook vs LeetCode</h2><p className="mt-2 max-w-2xl text-base text-text-2">LeetCode is the benchmark — our editor deliberately matches it. Where we differ is everything around the problem.</p></Reveal>
-      <Reveal className="mt-8 overflow-x-auto rounded-card border border-line bg-card">
+      <Reveal className="mt-8 overflow-x-auto rounded-card border border-line bg-card" tabIndex={0} aria-label="Comparison table">
         <table className="w-full min-w-[560px] text-left text-sm">
           <thead><tr className="border-b border-line text-xs uppercase tracking-wider text-text-3"><th className="px-5 py-3 font-medium">Feature</th><th className="px-5 py-3 font-semibold text-brand">AlgoBook</th><th className="px-5 py-3 font-medium">LeetCode</th></tr></thead>
           <tbody>{COMPARE.map((r) => <tr key={r.feature} className="border-b border-line/70 last:border-0"><td className="px-5 py-3 text-text-1">{r.feature}</td><td className="px-5 py-3"><Cell v={r.algobook} /></td><td className="px-5 py-3"><Cell v={r.leetcode} /></td></tr>)}</tbody>
@@ -79,7 +79,7 @@ export function Pricing() {
             </Reveal>
           ))}
         </div>
-        <Reveal className="mt-8 overflow-x-auto rounded-card border border-line bg-card">
+        <Reveal className="mt-8 overflow-x-auto rounded-card border border-line bg-card" tabIndex={0} aria-label="Daily limits table">
           <table className="w-full min-w-[520px] text-sm">
             <thead><tr className="border-b border-line text-xs uppercase tracking-wider text-text-3"><th className="px-5 py-3 text-left font-medium">Daily limits</th><th className="px-5 py-3 text-left font-medium">Free</th><th className="px-5 py-3 text-left font-semibold text-brand">Pro</th></tr></thead>
             <tbody>{MATRIX.map((r) => <tr key={r.label} className="border-b border-line/70 last:border-0"><td className="px-5 py-2.5 text-text-1">{r.label}</td><td className="px-5 py-2.5 text-text-2">{r.free === "—" ? <Minus className="size-4 text-text-3" /> : r.free}</td><td className="px-5 py-2.5 text-text-1">{r.pro}</td></tr>)}</tbody>

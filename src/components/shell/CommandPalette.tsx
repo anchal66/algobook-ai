@@ -80,7 +80,7 @@ function PaletteDialog() {
           className="fixed left-1/2 top-[12vh] z-50 w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-modal border border-line bg-popover shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200"
         >
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
-          <Command label="Command palette" shouldFilter={!dq || dq.length < 2 ? true : false} className="flex max-h-[70vh] flex-col">
+          <Command label="Command palette" className="flex max-h-[70vh] flex-col">
             <div className="flex items-center gap-2 border-b border-line px-4">
               <Search className="size-4 shrink-0 text-text-3" />
               <Command.Input
@@ -97,7 +97,7 @@ function PaletteDialog() {
               {problems.data?.items?.length ? (
                 <Command.Group heading="Problems" className={groupCls}>
                   {problems.data.items.map((p: ExploreItem) => (
-                    <Command.Item key={p.id} value={`problem-${p.id}`} onSelect={() => go(`/problems/${p.slug}`)} className={itemCls}>
+                    <Command.Item key={p.id} value={`problem ${p.number ?? ""} ${p.title} ${p.slug}`} onSelect={() => go(`/problems/${p.slug}`)} className={itemCls}>
                       <span className="w-10 shrink-0 text-xs tabular text-text-3">{p.number ? `#${p.number}` : ""}</span>
                       <span className="flex-1 truncate">{p.title}</span>
                       <DifficultyBadge difficulty={p.difficulty} size="sm" />

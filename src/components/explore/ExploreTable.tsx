@@ -22,7 +22,7 @@ export function ExploreTable({ rows, statuses, sort, dir, onSort, height = 640 }
   const v = useVirtualizer({ count: rows.length, getScrollElement: () => parentRef.current, estimateSize: () => ROW_H, overscan: 12 });
 
   const Th = ({ k, children, className }: { k?: SortKey; children: React.ReactNode; className?: string }) => (
-    <div role="columnheader" aria-sort={k && sort === k ? (dir === "asc" ? "ascending" : "descending") : undefined} className={cn("flex items-center px-3 text-xs font-medium uppercase tracking-wider text-text-3", className)}>
+    <div role="columnheader" aria-sort={k && sort === k ? (dir === "asc" ? "ascending" : "descending") : undefined} className={cn("flex items-center px-3 text-xs font-medium text-text-3", className)}>
       {k ? (
         <button type="button" onClick={() => onSort(k)} className="flex items-center gap-1 hover:text-text-1">
           {children}

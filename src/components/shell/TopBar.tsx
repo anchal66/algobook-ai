@@ -29,7 +29,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       <button type="button" onClick={onMenu} aria-label="Open navigation" className="flex size-9 items-center justify-center rounded-[8px] text-text-2 hover:bg-surface-2 lg:hidden">
         <Menu className="size-5" />
       </button>
-      <h1 className="hidden text-md font-semibold tracking-tight text-text-1 md:block">{current?.label ?? "AlgoBook"}</h1>
+      <p className="hidden text-md font-semibold tracking-tight text-text-1 md:block" aria-hidden>{current?.label ?? "AlgoBook"}</p>
 
       <button
         type="button"
@@ -39,7 +39,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       >
         <Search className="size-4" />
         <span className="hidden flex-1 text-left sm:inline">Search…</span>
-        <kbd className="hidden rounded-[5px] border border-line bg-surface-2 px-1.5 py-0.5 font-sans text-2xs text-text-3 sm:inline">{isMac ? "⌘" : "Ctrl"} K</kbd>
+        <kbd className="hidden rounded-[5px] border border-line bg-surface-2 px-1.5 py-0.5 font-sans text-2xs text-text-2 sm:inline">{isMac ? "⌘" : "Ctrl"} K</kbd>
       </button>
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">

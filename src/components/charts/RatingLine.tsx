@@ -7,7 +7,7 @@ import { fmtDate } from "@/lib/app/format";
 export interface RatingPoint { date: string; rating: number }
 
 export function RatingLine({ points, height = 180, mini = false, className }: { points: RatingPoint[]; height?: number; mini?: boolean; className?: string }) {
-  if (points.length < 2) return <ChartEmpty className={className}>{points.length === 1 ? `Rating ${Math.round(points[0].rating)} — solve rated problems to see a trend.` : "Rating history appears after your first rated solve."}</ChartEmpty>;
+  if (points.length < 2) return <ChartEmpty className={className}>{points.length === 1 ? `Rating ${Math.round(points[0].rating)} — solve rated problems to see a trend.` : "No rating history yet — a point is recorded after each rated solve from now on."}</ChartEmpty>;
   const data = points.map((p) => ({ ...p, r: Math.round(p.rating) }));
   const last = data[data.length - 1];
   const min = Math.min(...data.map((d) => d.r)), max = Math.max(...data.map((d) => d.r));

@@ -34,7 +34,7 @@ export function MarketingNav() {
         <Link href="/" aria-label="AlgoBook home" className="shrink-0"><Logo size={28} /></Link>
         <ul className="hidden items-center gap-1 md:flex">
           {LINKS.map((l) => (
-            <li key={l.href}><Link href={l.href} className="rounded-[8px] px-3 py-2 text-sm font-medium text-text-2 transition-colors hover:bg-surface-2 hover:text-text-1">{l.label}</Link></li>
+            <li key={l.href}><Link href={l.href} className="rounded-[8px] px-3 py-2 text-sm font-medium text-text-1/90 transition-colors hover:bg-surface-2 hover:text-text-1">{l.label}</Link></li>
           ))}
         </ul>
         <div className="hidden items-center gap-2 md:flex">
@@ -43,7 +43,7 @@ export function MarketingNav() {
             <Button asChild variant="brand" size="sm"><Link href="/dashboard">Open dashboard</Link></Button>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
+              <Button asChild variant="ghost" size="sm" className="text-text-1"><Link href="/login">Sign in</Link></Button>
               <Button asChild variant="brand" size="sm"><Link href="/login">Start free</Link></Button>
             </>
           )}

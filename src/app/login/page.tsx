@@ -63,14 +63,14 @@ function LoginInner() {
           </div>
           <ul className="relative z-10 grid gap-4">
             {PROPS.map((p, i) => (
-              <Reveal key={p.title} delay={0.1 + i * 0.08}>
-                <li className="glass flex gap-3 rounded-card p-4">
+              <Reveal key={p.title} delay={0.1 + i * 0.08} as="li" className="glass flex gap-3 rounded-card p-4">
+                <>
                   <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-brand-soft text-brand"><p.icon className="size-4" /></span>
                   <div>
                     <p className="text-sm font-semibold text-text-1">{p.title}</p>
                     <p className="mt-0.5 text-sm text-text-2">{p.text}</p>
                   </div>
-                </li>
+                </>
               </Reveal>
             ))}
           </ul>

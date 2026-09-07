@@ -79,8 +79,8 @@ async function main() {
           await page.reload({ waitUntil: "networkidle2" });
           await new Promise((r) => setTimeout(r, wait));
           // Trigger in-view reveals by scrolling through the page, then return to the top.
-          await page.evaluate(async () => { const h = document.body.scrollHeight; for (let y = 0; y < h; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } window.scrollTo(0, 0); });
-          await new Promise((r) => setTimeout(r, 500));
+          await page.evaluate(async () => { const h = document.body.scrollHeight; for (let y = 0; y < h; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 220)); } window.scrollTo(0, 0); });
+          await new Promise((r) => setTimeout(r, 900));
           const file = path.join(out, `${name}-${vpKey}-${theme}.${format}`);
           await page.screenshot({ path: file as `${string}.png` | `${string}.webp`, type: format, fullPage: !!a.full, ...(format === "webp" ? { quality: 82 } : {}) });
           const hasHScroll = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);

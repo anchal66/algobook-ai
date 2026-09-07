@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/ui/segmented";
 import { NewProjectTile, ProjectCard, isSystemProject } from "@/components/dashboard/ProjectCard";
 
 export default function ProjectsPage() {
@@ -43,7 +43,7 @@ export default function ProjectsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-3" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects" className="pl-9" aria-label="Search projects" />
         </div>
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} variant="pill"><TabsList><TabsTrigger value="active">Active</TabsTrigger><TabsTrigger value="done">Completed</TabsTrigger><TabsTrigger value="all">All</TabsTrigger></TabsList></Tabs>
+        <Segmented label="Project filter" value={filter} onChange={setFilter} options={[{ value: "active", label: "Active" }, { value: "done", label: "Completed" }, { value: "all", label: "All" }]} />
       </div>
       {projects.loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>

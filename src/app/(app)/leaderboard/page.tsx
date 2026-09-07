@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -57,7 +57,7 @@ export default function LeaderboardPage() {
         description={q.data?.scope === "week" ? <>Accepted submissions this ISO week ({fmtDate(q.data.range.from)} – {fmtDate(q.data.range.to)}).</> : q.data?.scope === "template" ? <>People working through the {q.data.label} list, ranked by progress.</> : <>Score = solved (weighted by difficulty) · streaks · mastery · rating. Snapshots refresh hourly.</>}
         actions={
           <div className="flex items-center gap-2">
-            <Tabs value={scope} onValueChange={(v) => changeScope(v as Scope)} variant="pill"><TabsList><TabsTrigger value="global">Global</TabsTrigger><TabsTrigger value="week">Weekly</TabsTrigger><TabsTrigger value="template">Cohorts</TabsTrigger></TabsList></Tabs>
+            <Segmented label="Leaderboard scope" value={scope} onChange={changeScope} options={[{ value: "global", label: "Global" }, { value: "week", label: "Weekly" }, { value: "template", label: "Cohorts" }]} />
             {scope === "template" && (
               <Select value={company} onValueChange={(v) => { setCompany(v); setPages([]); setCursor(null); }}>
                 <SelectTrigger className="w-[140px]" aria-label="Company cohort"><SelectValue /></SelectTrigger>
@@ -84,10 +84,10 @@ export default function LeaderboardPage() {
                   <li key={e.uid} className={cn("flex flex-col items-center rounded-card border border-line bg-surface-1 p-4 text-center", i === 1 && "bg-brand-soft/60 border-brand/30 pb-6")}>
                     <div className="relative">
                       <UserAvatar src={e.photoURL} name={e.displayName} size={i === 1 ? 64 : 48} />
-                      <span className={cn("absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full px-2 py-0.5 text-2xs font-bold text-white", e.rank === 1 ? "bg-[#f5b301]" : e.rank === 2 ? "bg-[#9aa5b1]" : "bg-[#b87333]")}>{e.rank === 1 && <Crown className="size-3" />}{ordinal(e.rank)}</span>
+                      <span className={cn("absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full px-2 py-0.5 text-2xs font-bold text-[#0f0f10]", e.rank === 1 ? "bg-[#f5b301]" : e.rank === 2 ? "bg-[#c3ccd6]" : "bg-[#e0955a]")}>{e.rank === 1 && <Crown className="size-3" />}{ordinal(e.rank)}</span>
                     </div>
                     <Link href={`/${e.username}`} className="mt-4 max-w-full truncate text-sm font-semibold text-text-1 hover:underline">{e.displayName || e.username}</Link>
-                    <span className="truncate text-xs text-text-3">@{e.username}</span>
+                    <span className="truncate text-xs text-text-2">@{e.username}</span>
                     <span className="mt-2 text-lg font-semibold tabular text-text-1">{primaryValue(e)}</span>
                     <span className="text-2xs uppercase tracking-wider text-text-3">{primaryLabel(scope)}</span>
                   </li>
@@ -106,7 +106,7 @@ export default function LeaderboardPage() {
                 <tbody>
                   {rows.map((e) => (
                     <tr key={e.uid} className={cn("border-t border-line/70 transition-colors hover:bg-surface-2", e.uid === meUid && "bg-brand-soft/50")}>
-                      <td className="px-4 py-2.5 tabular font-semibold text-text-1">{e.rank <= 3 ? <span className={cn("inline-flex size-6 items-center justify-center rounded-full text-xs text-white", e.rank === 1 ? "bg-[#f5b301]" : e.rank === 2 ? "bg-[#9aa5b1]" : "bg-[#b87333]")}>{e.rank}</span> : e.rank}</td>
+                      <td className="px-4 py-2.5 tabular font-semibold text-text-1">{e.rank <= 3 ? <span className={cn("inline-flex size-6 items-center justify-center rounded-full text-xs font-bold text-[#0f0f10]", e.rank === 1 ? "bg-[#f5b301]" : e.rank === 2 ? "bg-[#c3ccd6]" : "bg-[#e0955a]")}>{e.rank}</span> : e.rank}</td>
                       <td className="px-4 py-2.5"><Link href={`/${e.username}`} className="flex items-center gap-2.5"><UserAvatar src={e.photoURL} name={e.displayName} size={28} /><span className="min-w-0"><span className="block truncate font-medium text-text-1">{e.displayName || e.username}{e.uid === meUid && <Badge variant="brand" size="sm" className="ml-2">You</Badge>}</span><span className="block truncate text-xs text-text-3">@{e.username}</span></span></Link></td>
                       {cells(scope, e).map((c, i) => <td key={i} className="px-4 py-2.5 text-right tabular text-text-2">{c}</td>)}
                     </tr>

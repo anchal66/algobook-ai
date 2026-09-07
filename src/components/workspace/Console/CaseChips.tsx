@@ -18,7 +18,7 @@ export function CaseChips({ chips, active, onSelect, onRemove, onAdd, canAdd }: 
   return (
     <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Test cases">
       {chips.map((c, i) => (
-        <div key={c.id} className="group/chip relative">
+        <div key={c.id} role="presentation" className="group/chip relative">
           <button
             type="button"
             role="tab"

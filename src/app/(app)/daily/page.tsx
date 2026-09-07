@@ -45,8 +45,8 @@ export default function DailyPage() {
       <PageHeader title="Daily challenge" description="One verified problem every day for everyone. Solve it for +20 XP; it counts towards your streak and the daily_10 badge." />
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Reveal>
-          <Card className="relative overflow-hidden p-6">
-            <div className="aurora opacity-50" aria-hidden><i /><i /><i /></div>
+          <Card className="relative overflow-hidden border-brand/30 p-6">
+            <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-brand/15 blur-3xl" aria-hidden />
             <div className="relative">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand"><CalendarCheck className="size-3.5" /> {fmtDate(daily.data?.date ? daily.data.date + "T00:00:00Z" : undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</span>

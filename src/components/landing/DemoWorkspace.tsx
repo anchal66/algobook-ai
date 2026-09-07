@@ -84,7 +84,7 @@ export function DemoWorkspace() {
         {/* Description */}
         <section className="flex min-h-[260px] flex-col overflow-hidden rounded-[8px] bg-[#262626]">
           <header className="flex h-9 items-center gap-2 border-b border-white/6 px-3 text-sm"><FileText className="size-4 text-[#1a90ff]" /><span className="font-medium">Description</span></header>
-          <div className="ws-scroll flex-1 overflow-y-auto p-4 text-sm leading-6" style={{ maxHeight: 480 }}>
+          <div className="ws-scroll flex-1 overflow-y-auto p-4 text-sm leading-6" style={{ maxHeight: 480 }} tabIndex={0} aria-label="Problem description">
             <h3 className="text-lg font-semibold">{DEMO_PROBLEM.number}. {DEMO_PROBLEM.title}</h3>
             <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
               <span className="rounded-full bg-easy/15 px-2 py-0.5 text-easy">{DEMO_PROBLEM.difficulty}</span>
