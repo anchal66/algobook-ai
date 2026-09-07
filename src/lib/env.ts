@@ -21,8 +21,15 @@ const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
+/**
+ * Canonical production origin. Used only when NEXT_PUBLIC_APP_URL is unset, so a
+ * deploy that forgets the variable still serves API routes (payment redirects go
+ * to the real site instead of v1's localhost bug) instead of failing every request.
+ */
+const DEFAULT_APP_URL = "https://algobook.ai";
+
 const clientSchema = z.object({
-  NEXT_PUBLIC_APP_URL: z.url(),
+  NEXT_PUBLIC_APP_URL: z.url().default(DEFAULT_APP_URL),
   NEXT_PUBLIC_FIREBASE_API_KEY: z.string().min(1),
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: z.string().min(1),
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: z.string().min(1),
@@ -54,6 +61,10 @@ function load() {
   }
   if (!s.JUDGE0_HOST_HEADER && !s.JUDGE0_AUTH_TOKEN) {
     console.warn("[env] Judge0 self-host mode without JUDGE0_AUTH_TOKEN — requests will be unauthenticated.");
+  }
+
+  if (!process.env.NEXT_PUBLIC_APP_URL) {
+    console.warn(`[env] NEXT_PUBLIC_APP_URL is not set — falling back to ${DEFAULT_APP_URL} for payment redirects.`);
   }
 
   const adminUids = s.ADMIN_UIDS.split(",").map((x) => x.trim()).filter(Boolean);
