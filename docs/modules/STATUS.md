@@ -8,7 +8,7 @@ Update this table **and** the header of the module file whenever a status change
 
 | # | Module | Status | Branch | Started | Completed | Owner / assistant | Notes |
 |---|---|---|---|---|---|---|---|
-| 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | IN PROGRESS (merged) | `module/01-foundation` | 2026-09-07 | — | Claude (Opus 5) + Avinash | Merged into `main` and pushed. Rules v2 + indexes deployed 2026-09-07. api-smoke 32/33 (the last failure was Judge0's free-tier rate limit, not code). Not COMPLETE until the D-02 wipe runs — the classifier refuses that command. |
+| 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | COMPLETE | `module/01-foundation` | 2026-09-07 | 2026-09-08 | Claude (Opus 5) + Avinash | Merged and pushed; rules v2 + 13 indexes live; D-02 wipe run by the owner and the fixtures restored. Acceptance suite green on real Judge0 (AC 13/13 in all four languages, WA/TLE/CE, rules and ownership checks). Open risk: Judge0's free tier allows ~50 executions/day (D-05). |
 | 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | COMPLETE | `module/02-ai-engine` | 2026-09-07 | 2026-09-08 | Claude (Fable 5.1) | api-smoke 59/59, browser checklist passed on `/dev/api-smoke`, 55 unit tests; verified with the new `JUDGE_BACKEND=local` because Judge0's free tier was exhausted. Open: large-sample eval (≥ 85 % first pass), pregen job never executed, D-03 reasoning effort. |
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | NOT STARTED | `module/03-workspace` | — | — | — | Blocked by 01, 02. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | NOT STARTED | `module/04-intelligence` | — | — | — | Blocked by 01, 02. Can run in parallel with 03. |
@@ -18,7 +18,7 @@ Update this table **and** the header of the module file whenever a status change
 
 | Module | Total tasks | Done | Deferred | Pushed to `main` (SHA) |
 |---|---|---|---|---|
-| 01 | 27 | 26 | 0 | `1afb319` (only F-07, the D-02 wipe, is outstanding — the classifier refuses it) |
+| 01 | 27 | 27 | 0 | `1afb319` (module ship), docs through `bd3fb73` |
 | 02 | 23 | 23 | 0 | `fbf0b60` (merge of `module/02-ai-engine`, pushed 2026-09-08) |
 | 03 | 35 | 0 | 0 | — |
 | 04 | 25 | 0 | 0 | — |
@@ -38,3 +38,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-07 | 01 | Rules v2 confirmed live (ruleset created 17:44 UTC, matches `firebase/firestore.rules`); indexes CREATING; wipe not yet run | Claude |
 | 2026-09-07 | 02 | NOT STARTED → STARTED on `module/02-ai-engine`; context read; OpenAI Responses API + zod v4 structured outputs probed OK on `gpt-5.6-luna` | Claude |
 | 2026-09-08 | 02 | IN PROGRESS → COMPLETE; merged into `main` and pushed as `fbf0b60` | Claude |
+| 2026-09-08 | 01 | D-02 wipe run by the owner; fixtures restored; acceptance suite re-run on real Judge0 against the post-wipe data → Module 01 **COMPLETE** | Claude (Opus 5) |

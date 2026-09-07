@@ -28,3 +28,16 @@ Judge0 CE via RapidAPI, dark theme, desktop Browser pane at 1440×900.
 Screenshots in this folder were captured with headless Chrome for the public pages
 (`landing-*`, `login-*`) at 1440×900 and 390×844. Authenticated pages were verified live in the
 Browser pane; capture them after signing in with Google once the rules/indexes are deployed.
+
+## Final verification (2026-09-08, after the D-02 wipe)
+
+Post-wipe database, real Judge0, `npm run api:smoke`:
+
+| Check | Result |
+|---|---|
+| Submit, four languages | AC 13/13 each — Java 103 ms, Python 23 ms, C++ 8 ms, JavaScript 25 ms, Beats % present |
+| Run, 3 samples + 1 custom | 4 results, all AC, custom output `[1,2]` (Java and Python re-checked after a rate-limit retry) |
+| Wrong / infinite loop / syntax error | WA with failed case, TLE, CE with javac text |
+| Rules v2 from a client token | public problem doc 200, `private/tests` 403 |
+| Ownership, quotas, activity, project progress, Pro plan | all pass |
+| First sign-in after the wipe | `users/{uid}` recreated with a fresh username |
