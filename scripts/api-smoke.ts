@@ -123,6 +123,11 @@ async function main() {
   r = await call(base, "/api/me", A.idToken);
   check("quotas.used.run / submit counted", r.body.quotas.used.run >= languages.length && r.body.quotas.used.submit >= languages.length + 3, `run=${r.body.quotas.used.run} submit=${r.body.quotas.used.submit} limits=${JSON.stringify(r.body.quotas.limits)}`);
 
+  // 8b. plan resolution for a user with an active subscription
+  r = await call(base, "/api/me", B.idToken);
+  check("user B with an active subscription → plan pro", r.status === 200 && r.body.plan?.tier === "pro" && r.body.quotas?.limits?.editorial === -1,
+    `tier=${r.body.plan?.tier} status=${r.body.plan?.status} end=${r.body.plan?.endDate}`);
+
   // 9. Firestore rules: private tests unreadable with a real ID token (REST = client SDK semantics)
   const fs = await fetch(`https://firestore.googleapis.com/v1/projects/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/databases/(default)/documents/problems/two-sum/private/tests`, { headers: { Authorization: `Bearer ${A.idToken}` } });
   check("client read of problems/two-sum/private/tests → denied", fs.status === 403, `status=${fs.status}`);

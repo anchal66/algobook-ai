@@ -1,5 +1,6 @@
 import "server-only";
 import { adminDb } from "@/lib/firebase-admin";
+import { FALLBACK_SCAN_LIMIT, isMissingIndexError, onMissingIndex } from "@/lib/data/_firestore";
 import { SubmissionSchema, type Submission, type WithId } from "@/lib/data/schema";
 
 const COL = "submissions";
@@ -20,24 +21,56 @@ export async function get(id: string, uid: string): Promise<WithId<Submission> |
 
 export interface ListOptions { problemId?: string; projectId?: string; limit?: number; cursor?: string }
 
-/** Cursor-paginated (createdAt desc). Code is omitted from list rows. */
-export async function list(uid: string, opts: ListOptions = {}) {
-  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
+type Row = Omit<WithId<Submission>, "code">;
+
+const stripCode = (s: WithId<Submission>): Row => {
+  const { code: _code, ...rest } = s;
+  return rest;
+};
+
+function baseQuery(uid: string, opts: ListOptions): FirebaseFirestore.Query {
   let q: FirebaseFirestore.Query = adminDb.collection(COL).where("uid", "==", uid);
   if (opts.problemId) q = q.where("problemId", "==", opts.problemId);
   if (opts.projectId) q = q.where("projectId", "==", opts.projectId);
-  q = q.orderBy("createdAt", "desc");
+  return q;
+}
+
+/**
+ * Equality-only scan sorted in memory. Used when `submissions(uid, createdAt desc)`
+ * has not been deployed yet; correct but reads the user's whole history.
+ */
+async function listWithoutIndex(uid: string, opts: ListOptions, limit: number) {
+  onMissingIndex("submissions(uid, createdAt desc)");
+  const snap = await baseQuery(uid, opts).limit(FALLBACK_SCAN_LIMIT).get();
+  const all = snap.docs
+    .map((d) => parse(d)!)
+    .filter(Boolean)
+    .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  const start = opts.cursor ? all.findIndex((s) => s.id === opts.cursor) + 1 : 0;
+  const page = all.slice(start, start + limit);
+  const hasMore = all.length > start + limit;
+  return { items: page.map(stripCode), nextCursor: hasMore && page.length ? page[page.length - 1].id : null };
+}
+
+/** Cursor-paginated (createdAt desc). Code is omitted from list rows. */
+export async function list(uid: string, opts: ListOptions = {}): Promise<{ items: Row[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
+  let q = baseQuery(uid, opts).orderBy("createdAt", "desc");
   if (opts.cursor) {
     const cur = await adminDb.collection(COL).doc(opts.cursor).get();
     if (cur.exists && cur.data()?.uid === uid) q = q.startAfter(cur);
   }
-  const snap = await q.limit(limit + 1).get();
-  const docs = snap.docs.slice(0, limit);
-  const items = docs.map((d) => {
-    const { code: _code, ...rest } = parse(d)!;
-    return rest;
-  });
-  return { items, nextCursor: snap.docs.length > limit ? docs[docs.length - 1].id : null };
+  try {
+    const snap = await q.limit(limit + 1).get();
+    const docs = snap.docs.slice(0, limit);
+    return {
+      items: docs.map((d) => stripCode(parse(d)!)),
+      nextCursor: snap.docs.length > limit ? docs[docs.length - 1].id : null,
+    };
+  } catch (e) {
+    if (!isMissingIndexError(e)) throw e;
+    return listWithoutIndex(uid, opts, limit);
+  }
 }
 
 export async function countForProblem(uid: string, problemId: string): Promise<number> {

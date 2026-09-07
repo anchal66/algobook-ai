@@ -26,7 +26,8 @@ Required services:
 
 1. **Firebase** — a project with Google sign-in enabled; put the service-account
    JSON under `firebase/` (git-ignored) and point `FIREBASE_SERVICE_ACCOUNT_PATH` at it.
-   Deploy rules and indexes once: `firebase deploy --only firestore:rules,firestore:indexes`.
+   Deploy rules and indexes once: `npm run db:deploy` (or `firebase deploy --only firestore:rules,firestore:indexes`).
+   Until they are deployed, list endpoints fall back to in-memory ordering and log `firestore.missing_index`.
 2. **Judge0** — a RapidAPI key for `judge0-ce.p.rapidapi.com`, or a self-hosted
    instance (see `docs/modules/reference/JUDGE0-SELF-HOST.md`).
 3. **OpenAI** — `OPENAI_API_KEY` (Module 02).
@@ -41,6 +42,7 @@ Required services:
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint` | ESLint 10 flat config (`eslint-config-next`) |
 | `npm test` | vitest unit tests (checkers, quotas, stdin encoding, assembler, template parser) |
+| `npm run db:deploy` | Publishes `firebase/firestore.rules` + `firestore.indexes.json` with the service account (same as `firebase deploy --only firestore:rules,firestore:indexes`, no CLI login needed) |
 | `npm run db:seed:templates` | Seeds `templates/{company}` from `templates/*.md` |
 | `npm run db:seed:sample` | Seeds the verified "Two Sum" problem (Java, Python, C++, JavaScript) after running each reference solution on Judge0 |
 | `npm run db:grant-plan -- --uid <uid> --plan pro-yearly --days 365` | Grants a Pro plan manually |

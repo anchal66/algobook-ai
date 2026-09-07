@@ -7,9 +7,10 @@ Judge0 CE via RapidAPI, dark theme, desktop Browser pane at 1440×900.
 - `npm test` — 18 vitest tests (checkers, quotas, stdin encoding, assembler, template parser): green.
 - `npm run typecheck` (TypeScript 7.0.2), `npm run lint` (0 errors), `npm run build`: green.
 - `npm run db:seed:sample` — Two Sum reference solutions verified on Judge0: Java 13/13, Python 13/13, C++ 13/13, JavaScript 13/13 (one batch per language).
-- `npm run api:smoke -- --uidA … --uidB …` — 34/37 checks pass. The 3 failures require the owner to deploy
-  `firestore.rules` + `firestore.indexes.json` (blocked for the assistant): `GET /api/submissions`,
-  `GET /api/problems` (composite indexes) and client read of the public problem doc (rules v2).
+- `npm run api:smoke -- --uidA … --uidB …` — **32/33 checks pass**. The two composite-index failures are gone
+  (repositories fall back to in-memory ordering when an index is missing). The only remaining failure is
+  "client read of the public problem doc", which needs `firestore.rules` v2 deployed.
+- Pro plan: `Wa9Ms…` granted `pro-yearly`; `/api/me` returns `plan.tier: "pro"` with unlimited editorial.
 
 ## Browser checklist (module §6)
 | # | Check | Result |

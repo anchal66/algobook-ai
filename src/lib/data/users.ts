@@ -177,7 +177,9 @@ export async function updateUsername(uid: string, newUsername: string): Promise<
 export async function getByUsername(username: string): Promise<WithId<User> | null> {
   const lock = await adminDb.collection(USERNAMES).doc(username.toLowerCase()).get();
   if (!lock.exists) return null;
-  return getUser(lock.data()!.uid as string);
+  // `userId` is the v1 field name; tolerate it until the wipe (D-02) has run.
+  const uid = (lock.data()!.uid ?? lock.data()!.userId) as string | undefined;
+  return uid ? getUser(uid) : null;
 }
 
 /** Fields safe to show on a public profile page. */

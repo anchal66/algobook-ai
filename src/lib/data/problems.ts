@@ -1,6 +1,7 @@
 import "server-only";
-import { FieldValue, Timestamp, FieldPath } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
+import { FALLBACK_SCAN_LIMIT, isMissingIndexError, onMissingIndex } from "@/lib/data/_firestore";
 import {
   ProblemSchema, ProblemPrivateTestsSchema, ProblemPrivateDriversSchema,
   type Difficulty, type Language, type Problem, type ProblemPrivateDrivers, type ProblemPrivateTests, type ProblemStatus, type WithId,
@@ -110,29 +111,50 @@ export function toSummary(p: ProblemPublic): ProblemSummary {
 /** Cursor-paginated search over verified problems. Uses one `array-contains` tag (Firestore limit) and filters the rest in memory. */
 export async function search(opts: SearchOptions = {}): Promise<{ items: ProblemSummary[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
-  let q: FirebaseFirestore.Query = adminDb.collection(COL).where("status", "==", opts.status ?? "verified");
-  if (opts.difficulty) q = q.where("difficulty", "==", opts.difficulty);
   const tags = (opts.tags ?? []).map((t) => t.toLowerCase());
-  if (tags.length) q = q.where("tags", "array-contains", tags[0]);
-  q = q.orderBy("createdAt", "desc").orderBy(FieldPath.documentId());
-  if (opts.cursor) {
-    const cur = await adminDb.collection(COL).doc(opts.cursor).get();
-    if (cur.exists) q = q.startAfter(cur);
-  }
   const exclude = new Set(opts.excludeIds ?? []);
-  const items: ProblemSummary[] = [];
-  let nextCursor: string | null = null;
-  // Over-fetch to absorb in-memory filtering.
-  const snap = await q.limit(limit * 2 + exclude.size).get();
-  for (const d of snap.docs) {
-    if (items.length >= limit) { nextCursor = items[items.length - 1].id; break; }
-    if (exclude.has(d.id)) continue;
-    const p = stripPrivate(d.id, d.data());
-    if (tags.length > 1 && !tags.every((t) => p.tags.includes(t))) continue;
-    items.push(toSummary(p));
+
+  const filtered = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) => {
+    const out: ProblemSummary[] = [];
+    for (const d of docs) {
+      if (exclude.has(d.id)) continue;
+      const p = stripPrivate(d.id, d.data());
+      if (tags.length > 1 && !tags.every((t) => p.tags.includes(t))) continue;
+      out.push(toSummary(p));
+    }
+    return out;
+  };
+
+  const base = () => {
+    let q: FirebaseFirestore.Query = adminDb.collection(COL).where("status", "==", opts.status ?? "verified");
+    if (opts.difficulty) q = q.where("difficulty", "==", opts.difficulty);
+    if (tags.length) q = q.where("tags", "array-contains", tags[0]);
+    return q;
+  };
+
+  try {
+    let q = base().orderBy("createdAt", "desc");
+    if (opts.cursor) {
+      const cur = await adminDb.collection(COL).doc(opts.cursor).get();
+      if (cur.exists) q = q.startAfter(cur);
+    }
+    // Over-fetch to absorb in-memory filtering.
+    const snap = await q.limit(limit * 2 + exclude.size + 1).get();
+    const items = filtered(snap.docs).slice(0, limit);
+    const more = snap.size > items.length + exclude.size;
+    return { items, nextCursor: more && items.length ? items[items.length - 1].id : null };
+  } catch (e) {
+    if (!isMissingIndexError(e)) throw e;
+    // No composite index yet: equality-only scan, ordered in memory.
+    onMissingIndex("problems(status, difficulty, tags, createdAt desc)");
+    const snap = await base().limit(FALLBACK_SCAN_LIMIT).get();
+    const sorted = [...snap.docs].sort((a, b) => (b.data().createdAt?.toMillis?.() ?? 0) - (a.data().createdAt?.toMillis?.() ?? 0));
+    const all = filtered(sorted);
+    const start = opts.cursor ? all.findIndex((p) => p.id === opts.cursor) + 1 : 0;
+    const items = all.slice(start, start + limit);
+    const more = all.length > start + limit;
+    return { items, nextCursor: more && items.length ? items[items.length - 1].id : null };
   }
-  if (!nextCursor && snap.size >= limit * 2 + exclude.size && items.length) nextCursor = items[items.length - 1].id;
-  return { items, nextCursor };
 }
 
 /** Firestore vector search (requires the `embedding` vector index — see firestore.indexes.json). */
