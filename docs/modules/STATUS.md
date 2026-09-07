@@ -22,7 +22,7 @@ Update this table **and** the header of the module file whenever a status change
 | 02 | 23 | 23 | 0 | `fbf0b60` (merge of `module/02-ai-engine`, pushed 2026-09-08) |
 | 03 | 35 | 35 | 0 | `8b8dbc5` (merge of `module/03-workspace`, pushed 2026-09-08) |
 | 04 | 25 | 25 | 0 | `1979fab` (merge of `module/04-intelligence`, pushed 2026-09-08) |
-| 05 | 29 | 29 | 0 | `MERGE_SHA_PLACEHOLDER` (merge of `module/05-design-pages`, pushed 2026-09-08) · tag `v2.0.0` |
+| 05 | 29 | 29 | 0 | `4f527dc` (merge of `module/05-design-pages`, pushed 2026-09-08) · tag `v2.0.0` |
 
 The last task of every module is "Ship it": commit, merge the module branch into `main`, rebuild, push, and record the SHA above. A module is not `COMPLETE` until it is pushed.
 
@@ -45,4 +45,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-08 | 04 | STARTED → IN PROGRESS → COMPLETE on `module/04-intelligence`: engine + jobs + routes shipped, 152 vitest / api-smoke 80/80 / acceptance green, rules v2.1 released, `db:migrate:stats` applied; merged into `main` (SHA recorded in the next docs commit) | Claude (Fable 5.1) |
 | 2026-09-08 | 04 | Merged into `main` after Module 03 (conflicts in `STATUS.md` / `package.json` resolved); merged tree: build green, 175 vitest, no secrets in `.next/static`; pushed as `1979fab` | Claude (Fable 5.1) |
 | 2026-09-08 | 05 | NOT STARTED → STARTED on `module/05-design-pages` from `main` 3882407; context read (Master Plan §2/§6/§8/§10, DECISIONS D-06/08/09/12/13 defaults, Module 03/04 status logs) | Claude (Fable 5.1) |
-| 2026-09-08 | 05 | STARTED → IN PROGRESS → COMPLETE; design system, shell and all pages; merged into `main` and pushed as `MERGE_SHA_PLACEHOLDER`, tagged `v2.0.0` | Claude (Fable 5.1) |
+| 2026-09-08 | 05 | STARTED → IN PROGRESS → COMPLETE; design system, shell and all pages; merged into `main` and pushed as `4f527dc`, tagged `v2.0.0` | Claude (Fable 5.1) |
