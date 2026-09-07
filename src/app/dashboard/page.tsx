@@ -383,7 +383,7 @@ export default function DashboardPage() {
                     <div className="h-1.5 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
-                        <Link href={`/project/${project.id}/editor`} className="flex-1 min-w-0">
+                        <Link href={`/project/${project.id}`} className="flex-1 min-w-0">
                           <CardTitle className="text-lg group-hover:text-primary transition-colors cursor-pointer">
                             {project.title}
                           </CardTitle>
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/project/${project.id}/editor`} className="gap-2">
+                              <Link href={`/project/${project.id}`} className="gap-2">
                                 <ExternalLink className="h-4 w-4" /> Open Project
                               </Link>
                             </DropdownMenuItem>
@@ -434,7 +434,7 @@ export default function DashboardPage() {
                         )}
                       </p>
                     </CardHeader>
-                    <Link href={`/project/${project.id}/editor`} className="cursor-pointer flex-grow">
+                    <Link href={`/project/${project.id}`} className="cursor-pointer flex-grow">
                       <CardContent className="pt-0 pb-4 flex flex-col h-full">
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                           {project.description}

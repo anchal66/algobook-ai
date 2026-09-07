@@ -30,12 +30,24 @@ export function getAdminApp(): App {
   return _app;
 }
 
+/** Survives dev-server hot reloads: `getFirestore()` returns the same instance, and `settings()` may only run once. */
+const globalCache = globalThis as unknown as { __algobookAdminDb?: Firestore };
+
 export function getAdminDb(): Firestore {
-  if (!_db) {
-    _db = getFirestore(getAdminApp());
-    _db.settings({ ignoreUndefinedProperties: true });
+  if (_db) return _db;
+  if (globalCache.__algobookAdminDb) {
+    _db = globalCache.__algobookAdminDb;
+    return _db;
   }
-  return _db;
+  const db = getFirestore(getAdminApp());
+  try {
+    db.settings({ ignoreUndefinedProperties: true });
+  } catch {
+    // Already configured by a previous evaluation of this module (HMR); keep using the instance.
+  }
+  _db = db;
+  globalCache.__algobookAdminDb = db;
+  return db;
 }
 
 export function getAdminAuth(): Auth {
