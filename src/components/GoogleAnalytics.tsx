@@ -1,57 +1,26 @@
-"use client"
+"use client";
+/** GA4 loader (Module 05 U-23): next/script, env-configurable id, SPA page views with the correct `?` separator. */
+import { useEffect } from "react";
+import Script from "next/script";
+import { usePathname, useSearchParams } from "next/navigation";
 
-import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect } from "react"
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "G-GS6D8GSWC8";
 
-// Your Google Analytics Measurement ID
-const GA_MEASUREMENT_ID = "G-GS6D8GSWC8"
+declare global { interface Window { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void } }
 
-// To let TypeScript know about the gtag function on the window object
-declare global {
-  interface Window {
-    gtag: (command: string, targetId: string, params: { [key: string]: string | number | boolean }) => void;
-  }
-}
-
-// Utility function to send pageview events
-export const gtagPageview = (url: string) => {
-  if (typeof window.gtag !== "function") {
-    return
-  }
-  window.gtag("config", GA_MEASUREMENT_ID, {
-    page_path: url,
-  })
-}
-
-export const GoogleAnalytics = () => {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
+export function GoogleAnalytics() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   useEffect(() => {
-    // Send a pageview event when the pathname or search params change
-    const url = pathname + searchParams.toString()
-    gtagPageview(url)
-  }, [pathname, searchParams])
-
+    if (!window.gtag) return;
+    const qs = searchParams.toString();
+    window.gtag("event", "page_view", { page_path: qs ? `${pathname}?${qs}` : pathname, page_location: window.location.href, page_title: document.title });
+  }, [pathname, searchParams]);
+  if (!GA_ID || process.env.NODE_ENV !== "production") return null;
   return (
     <>
-      <script
-        async
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-      ></script>
-      <script
-        id="google-analytics"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GA_MEASUREMENT_ID}', {
-              page_path: window.location.pathname,
-            });
-          `,
-        }}
-      ></script>
+      <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+      <Script id="ga4-init" strategy="afterInteractive">{`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}',{send_page_view:false});`}</Script>
     </>
-  )
+  );
 }

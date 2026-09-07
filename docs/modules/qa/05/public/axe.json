@@ -1,0 +1,12 @@
+[
+  {
+    "url": "http://localhost:3000/?home=1",
+    "viewport": "desktop",
+    "violations": []
+  },
+  {
+    "url": "http://localhost:3000/?home=1",
+    "viewport": "mobile",
+    "violations": []
+  }
+]

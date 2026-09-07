@@ -169,6 +169,12 @@ export const UserSchema = z.object({
   lastAppliedSubmissionId: z.string().nullable().default(null),
   /** Module 04: the auto-created system "Daily" project used by the daily challenge. */
   dailyProjectId: z.string().nullable().default(null),
+  /** Module 05: rating after each rated solve, one point per UTC day (last 180 days) — drives the profile rating chart. */
+  ratingHistory: z.array(z.object({ d: DateKeySchema, r: z.number() })).default([]),
+  /** Module 05: last problem the user typed in (autosave) — the dashboard "Continue" card. */
+  lastOpened: z.object({ problemId: z.string(), language: LanguageSchema, at: timestamp }).nullable().default(null),
+  /** Module 05: public profile page + leaderboard visibility (Settings → Privacy). */
+  publicProfile: z.boolean().default(true),
   createdAt: timestamp,
   updatedAt: timestamp,
 });

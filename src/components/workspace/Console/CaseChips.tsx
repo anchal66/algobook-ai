@@ -16,9 +16,10 @@ export interface CaseChipsProps {
 
 export function CaseChips({ chips, active, onSelect, onRemove, onAdd, canAdd }: CaseChipsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Test cases">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Test cases">
       {chips.map((c, i) => (
-        <div key={c.id} className="group/chip relative">
+        <div key={c.id} role="presentation" className="group/chip relative">
           <button
             type="button"
             role="tab"
@@ -44,6 +45,7 @@ export function CaseChips({ chips, active, onSelect, onRemove, onAdd, canAdd }: 
           )}
         </div>
       ))}
+      </div>
       {onAdd && (
         <button type="button" onClick={onAdd} disabled={!canAdd} aria-label="Add a custom test case" className="flex size-7 items-center justify-center rounded-[6px] text-fg-2 transition-colors hover:bg-ws-hover hover:text-fg-1 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60">
           <Plus className="size-4" />

@@ -12,7 +12,7 @@ Update this table **and** the header of the module file whenever a status change
 | 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | COMPLETE | `module/02-ai-engine` | 2026-09-07 | 2026-09-08 | Claude (Fable 5.1) | api-smoke 59/59, browser checklist passed on `/dev/api-smoke`, 55 unit tests; verified with the new `JUDGE_BACKEND=local` because Judge0's free tier was exhausted. Open: large-sample eval (≥ 85 % first pass), pregen job never executed, D-03 reasoning effort. |
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | COMPLETE | `module/03-workspace` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | 14/14 browser checklist on `dev-local`, 78 tests, build green, QA captures in `qa/03`. Bundled Monaco (no CDN). Fixed Module 01 draft persistence + HMR Firestore singleton. Open: re-run once on real Judge0. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | COMPLETE | `module/04-intelligence` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | Built in parallel with 03 in its own worktree from `main` 75c61f7. 152 vitest (97 engine), api-smoke 80/80, acceptance script green (template reuse, calibration, freeze), rules v2.1 released, stats migration applied. Merged after Module 03 (`8b8dbc5`) as `1979fab`; merged tree build/tsc/175 tests green. Open: leaderboard p95 413–473 ms on the dev server from this machine vs the 300 ms target (auth baseline alone 325–400 ms; O(page) reads hold — expect < 300 ms in-region). |
-| 05 | Design System & Pages — tokens, motion/3D, landing, dashboard, explore, wizard, profile, leaderboard, settings, admin, final QA | NOT STARTED | `module/05-design-pages` | — | — | — | Blocked by 01–04. |
+| 05 | Design System & Pages — tokens, motion/3D, landing, dashboard, explore, wizard, profile, leaderboard, settings, admin, final QA | COMPLETE | `module/05-design-pages` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | All pages + design system shipped; 180 tests, lint 0 errors, build green, axe 0 serious/critical on every page, Lighthouse desktop ≥ 92 perf / 100 bp; mobile perf on auth pages below the 80 target (client-rendered behind auth). QA in `qa/05`. Open: real-Judge0 pass of the whole app, notification emails, contact admin UI. |
 
 ## Task roll-up (update counts when you tick tasks)
 
@@ -22,7 +22,7 @@ Update this table **and** the header of the module file whenever a status change
 | 02 | 23 | 23 | 0 | `fbf0b60` (merge of `module/02-ai-engine`, pushed 2026-09-08) |
 | 03 | 35 | 35 | 0 | `8b8dbc5` (merge of `module/03-workspace`, pushed 2026-09-08) |
 | 04 | 25 | 25 | 0 | `1979fab` (merge of `module/04-intelligence`, pushed 2026-09-08) |
-| 05 | 29 | 0 | 0 | — |
+| 05 | 29 | 29 | 0 | `MERGE_SHA_PLACEHOLDER` (merge of `module/05-design-pages`, pushed 2026-09-08) · tag `v2.0.0` |
 
 The last task of every module is "Ship it": commit, merge the module branch into `main`, rebuild, push, and record the SHA above. A module is not `COMPLETE` until it is pushed.
 
@@ -44,3 +44,5 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-08 | 04 | NOT STARTED → STARTED on `module/04-intelligence` (own worktree from `main` 75c61f7, in parallel with 03 per owner); context read | Claude (Fable 5.1) |
 | 2026-09-08 | 04 | STARTED → IN PROGRESS → COMPLETE on `module/04-intelligence`: engine + jobs + routes shipped, 152 vitest / api-smoke 80/80 / acceptance green, rules v2.1 released, `db:migrate:stats` applied; merged into `main` (SHA recorded in the next docs commit) | Claude (Fable 5.1) |
 | 2026-09-08 | 04 | Merged into `main` after Module 03 (conflicts in `STATUS.md` / `package.json` resolved); merged tree: build green, 175 vitest, no secrets in `.next/static`; pushed as `1979fab` | Claude (Fable 5.1) |
+| 2026-09-08 | 05 | NOT STARTED → STARTED on `module/05-design-pages` from `main` 3882407; context read (Master Plan §2/§6/§8/§10, DECISIONS D-06/08/09/12/13 defaults, Module 03/04 status logs) | Claude (Fable 5.1) |
+| 2026-09-08 | 05 | STARTED → IN PROGRESS → COMPLETE; design system, shell and all pages; merged into `main` and pushed as `MERGE_SHA_PLACEHOLDER`, tagged `v2.0.0` | Claude (Fable 5.1) |

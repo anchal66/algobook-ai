@@ -157,6 +157,57 @@ export async function search(opts: SearchOptions = {}): Promise<{ items: Problem
   }
 }
 
+// ── Module 05: Explore catalog ───────────────────────────────────────────────
+
+export interface CatalogRow {
+  id: string; slug: string; number: number | null; title: string; difficulty: Difficulty; tags: string[]; companies: string[];
+  acceptanceRate: number; attempts: number; rating: number; languages: Language[]; source: Problem["source"]; createdAt: string;
+}
+const CATALOG_TTL_MS = 60_000;
+let catalogCache: { at: number; items: CatalogRow[] } | null = null;
+let catalogInflight: Promise<CatalogRow[]> | null = null;
+
+/** Every verified problem as a compact row (no embedding, no statement). Cached per instance for 60 s. */
+export async function catalog(): Promise<{ items: CatalogRow[]; total: number; cachedAt: string }> {
+  if (catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) return { items: catalogCache.items, total: catalogCache.items.length, cachedAt: new Date(catalogCache.at).toISOString() };
+  if (!catalogInflight) {
+    catalogInflight = adminDb.collection(COL).where("status", "==", "verified")
+      .select("slug", "number", "title", "difficulty", "tags", "companies", "stats.acceptanceRate", "stats.attempts", "rating", "languages", "source", "createdAt")
+      .get()
+      .then((snap) => {
+        const items = snap.docs.map((d) => {
+          const x = d.data();
+          return {
+            id: d.id, slug: String(x.slug ?? d.id), number: typeof x.number === "number" ? x.number : null, title: String(x.title ?? ""), difficulty: (x.difficulty ?? "Medium") as Difficulty,
+            tags: (x.tags ?? []) as string[], companies: (x.companies ?? []) as string[], acceptanceRate: Number(x.stats?.acceptanceRate ?? 0), attempts: Number(x.stats?.attempts ?? 0),
+            rating: Number(x.rating ?? 1200), languages: (x.languages ?? []) as Language[], source: (x.source ?? "generated") as Problem["source"],
+            createdAt: x.createdAt?.toDate?.().toISOString?.() ?? "",
+          } satisfies CatalogRow;
+        }).sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
+        catalogCache = { at: Date.now(), items };
+        return items;
+      })
+      .finally(() => { catalogInflight = null; });
+  }
+  const items = await catalogInflight;
+  return { items, total: items.length, cachedAt: new Date(catalogCache?.at ?? Date.now()).toISOString() };
+}
+
+/** Admin moderation: status change + cache bust. */
+export async function setStatus(id: string, status: ProblemStatus): Promise<void> {
+  await adminDb.collection(COL).doc(id).update({ status });
+  catalogCache = null;
+}
+
+/** Problems with at least one flag, most-flagged first (single-field range query on `flagged.count`). */
+export async function listFlagged(limit = 100): Promise<(ProblemPublic & { flagCount: number; flagReasons: string[] })[]> {
+  const snap = await adminDb.collection(COL).where("flagged.count", ">", 0).orderBy("flagged.count", "desc").limit(limit).get();
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { ...stripPrivate(d.id, data), flagCount: Number(data.flagged?.count ?? 0), flagReasons: (data.flagged?.reasons ?? []) as string[] };
+  });
+}
+
 /** Firestore vector search (requires the `embedding` vector index — see firestore.indexes.json). */
 export async function findNearest(embedding: number[], k = 5, opts: { status?: ProblemStatus; maxDistance?: number } = {}) {
   let base: FirebaseFirestore.Query = adminDb.collection(COL);

@@ -5,7 +5,7 @@ export default [
   ...coreWebVitals,
   ...typescript,
   {
-    ignores: [".next/**", "node_modules/**", "backups/**", "out/**"],
+    ignores: [".next/**", "node_modules/**", "backups/**", "out/**", ".claude/**", "**/.next/**", "**/node_modules/**"],
   },
   {
     rules: {

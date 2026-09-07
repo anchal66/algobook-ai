@@ -1,0 +1,10 @@
+/** FAQ copy shared by the client accordion and the server-rendered FAQPage JSON-LD (Module 05 U-10). */
+export const FAQ = [
+  { q: "How do I know a generated problem actually works?", a: "Every problem ships with a reference solution that is executed against all hidden test cases on the judge before it is saved. If the solution fails, the problem is repaired or discarded — it never reaches your editor. You can also flag a problem; two flags retire it automatically." },
+  { q: "Which languages are supported?", a: "Java, Python 3, C++ and JavaScript, on the free and the Pro plan. The Java driver is verified at generation time; the other three are verified on first request or ahead of time for pool problems, so a rarely used language may show “Preparing…” for about ten seconds." },
+  { q: "Is the free plan usable or a trial?", a: "It is a real plan: unlimited problems from the shared verified pool, 3 AI generations and 30 runs a day, hints up to level 2, the daily challenge, streaks and the leaderboard. Pro adds editorials, the AI tutor, inline completion, code review, mock interviews and much higher limits." },
+  { q: "Does Pro auto-renew?", a: "No. You pay for 30 or 365 days; when it ends you decide whether to renew. There is never an automatic charge." },
+  { q: "Will the AI just give me the answer?", a: "The tutor is scoped to the problem and refuses to hand over a full solution before you have an accepted submission. Hints escalate in three levels; the level-3 hint reads your code. Viewing the editorial is allowed but lowers the mastery gain for that solve." },
+  { q: "How is my rating calculated?", a: "An Elo-style update after each first-attempt outcome against the problem's own rating (K = 32 for your first 30 rated solves, then 16). Problems have ratings too, so an Easy accepted late in your journey moves you less than a Hard one." },
+  { q: "Can I use my own IDE shortcuts?", a: "Yes — standard, Vim and Emacs key bindings, configurable shortcuts, font, ligatures, tab size and themes. Settings sync across devices." },
+] as const;

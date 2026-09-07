@@ -7,13 +7,25 @@ import { prerequisiteGap, topicRatingOffset } from "@/lib/practice/recommend";
 import { difficultyForRating } from "@/lib/practice/rating";
 import { computePracticeState, getStateGuidance, getStateProgress } from "@/lib/practice/state";
 import { streakStatus } from "@/lib/practice/stats";
+import { z } from "zod";
+import { ApiError } from "@/lib/api/errors";
+import { getByUsername } from "@/lib/data/users";
+import type { AuthedUser } from "@/lib/auth/types";
 
 export type SkillStatus = "locked" | "available" | "learning" | "weak" | "mastered";
 
 /** Skill tree data (Module 04 §3.14): every core topic with mastery, SRS, prerequisites and a status. */
-export const GET = handler({ evt: "me.skills" }, async ({ user }) => {
+export const GET = handler<unknown, { username?: string }, AuthedUser | null>({ evt: "me.skills", auth: "optional", query: z.object({ username: z.string().max(20).optional() }) }, async ({ user: caller, query }) => {
   const today = todayKey();
-  const u = user.doc;
+  let u: AuthedUser["doc"];
+  if (query.username) {
+    const found = await getByUsername(query.username);
+    if (!found || (!found.publicProfile && found.id !== caller?.uid)) throw ApiError.notFound("User not found");
+    u = found;
+  } else {
+    if (!caller) throw ApiError.unauthenticated();
+    u = caller.doc;
+  }
   const due = new Map(getDueTopics(u.topicSkills, today).map((d) => [d.topic, d]));
   const topics = CORE_TOPICS.map((topic) => {
     const s = u.topicSkills[topic];

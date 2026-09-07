@@ -162,7 +162,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className={cn("ws-root flex h-dvh w-full flex-col overflow-hidden bg-ws-page text-fg-1", fullscreen && "fixed inset-0 z-40")}>
+      <main className={cn("ws-root flex h-dvh w-full flex-col overflow-hidden bg-ws-page text-fg-1", fullscreen && "fixed inset-0 z-40")}>
         {!fullscreen && <TopBar nav={nav} onRun={() => void run()} onSubmit={() => void submit()} onFullscreen={toggleFullscreen} />}
         <div className={cn("min-h-0 flex-1", fullscreen ? "p-2" : "px-2.5 pb-2.5 lg:px-[10px] lg:pb-[10px]")}>
           {isMobile ? (
@@ -174,7 +174,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
         <ProblemListDrawer />
         <SettingsDialog />
         <Toaster position="bottom-right" theme={themePref === "system" ? "system" : themePref} closeButton toastOptions={{ className: "!bg-ws-panel !text-fg-1 !border-line" }} />
-      </div>
+      </main>
     </TooltipProvider>
   );
 }

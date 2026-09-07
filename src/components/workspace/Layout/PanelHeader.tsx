@@ -32,7 +32,7 @@ export function PanelHeader({ tabs, activeTab, onTabChange, extra, actions, maxi
         {tabs.map((t, i) => {
           const active = t.id === activeTab;
           return (
-            <div key={t.id} className="flex items-center">
+            <div key={t.id} role="presentation" className="flex items-center">
               {i > 0 && <span aria-hidden className="mx-0.5 h-3.5 w-px bg-line/70" />}
               <button
                 type="button"
@@ -60,8 +60,8 @@ export function PanelHeader({ tabs, activeTab, onTabChange, extra, actions, maxi
             </div>
           );
         })}
-        {extra}
       </div>
+      {extra && <div className="flex shrink-0 items-center">{extra}</div>}
       <div className="flex shrink-0 items-center gap-0.5 pl-1">
         {actions}
         <button

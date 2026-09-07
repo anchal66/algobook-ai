@@ -17,7 +17,8 @@ const NOUNS = ["ninja", "hawk", "wolf", "fox", "coder", "wizard", "knight", "sag
 export const RESERVED_USERNAMES = new Set([
   "dashboard", "login", "project", "projects", "profile", "privacy", "terms", "contact", "about", "settings", "api", "admin", "app",
   "auth", "signup", "register", "explore", "search", "help", "support", "new", "edit", "delete", "public", "static", "assets", "images",
-  "problems", "leaderboard", "dev", "me", "users", "u",
+  "problems", "leaderboard", "dev", "me", "users", "u", "daily", "interview", "interviews", "pricing", "blog", "docs", "status",
+  "icon", "apple-icon", "opengraph-image", "manifest.webmanifest", "robots.txt", "sitemap.xml", "favicon.ico", "_next",
 ]);
 
 function randomUsername(): string {
@@ -106,7 +107,7 @@ export async function ensureUser(uid: string, identity: { email?: string; displa
   }
 }
 
-const PROFILE_FIELDS = ["displayName", "bio", "company", "college", "location", "githubUrl", "linkedinUrl", "skills", "experienceLevel", "goalType"] as const;
+const PROFILE_FIELDS = ["displayName", "bio", "company", "college", "location", "githubUrl", "linkedinUrl", "skills", "experienceLevel", "goalType", "publicProfile"] as const;
 export type ProfileField = (typeof PROFILE_FIELDS)[number];
 
 export async function updateProfileFields(uid: string, fields: Partial<Pick<User, ProfileField>>): Promise<void> {
@@ -184,8 +185,10 @@ export async function getByUsername(username: string): Promise<WithId<User> | nu
 
 /** Fields safe to show on a public profile page. */
 export function publicProfile(u: WithId<User>) {
-  const { id, username, displayName, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills, stats, createdAt } = u;
-  return { id, username, displayName, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills, stats, createdAt };
+  const { id, username, displayName, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills, stats, createdAt, ratingHistory, topicSkills, practiceState } = u;
+  // Topic mastery only (no SRS/attempt internals) so public pages can draw the skill radar.
+  const mastery = Object.fromEntries(Object.entries(topicSkills).map(([t, s]) => [t, { mastery: s.mastery, solved: s.solved }]));
+  return { id, username, displayName, photoURL, bio, company, college, location, githubUrl, linkedinUrl, skills, stats, createdAt, ratingHistory, mastery, practiceState };
 }
 
 /** Fields the owner sees via /api/me (never quotas internals other than counts, never plan cache raw). */

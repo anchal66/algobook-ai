@@ -40,7 +40,7 @@ export function TopBar({ nav, onRun, onSubmit, onFullscreen }: TopBarProps) {
           <span className="bg-brand flex size-6 items-center justify-center rounded-[6px]"><Code2 className="size-3.5 text-white" /></span>
         </Link>
         <span className="h-4 w-px bg-line/70" />
-        <button type="button" onClick={() => setUi({ drawerOpen: true })} className="ml-1 flex h-8 items-center gap-1.5 rounded-[6px] px-2 text-sm font-medium text-fg-1 hover:bg-ws-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60">
+        <button type="button" aria-label="Problem List" onClick={() => setUi({ drawerOpen: true })} className="ml-1 flex h-8 items-center gap-1.5 rounded-[6px] px-2 text-sm font-medium text-fg-1 hover:bg-ws-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60">
           <ListOrdered className="size-4" />
           <span className="hidden sm:inline">Problem List</span>
         </button>
@@ -64,10 +64,10 @@ export function TopBar({ nav, onRun, onSubmit, onFullscreen }: TopBarProps) {
         {placement === "toolbar" && <RunSubmitCluster onRun={onRun} onSubmit={onSubmit} className="hidden lg:flex" />}
         <div className="flex items-center rounded-[8px] bg-ws-panel p-0.5">
           <Tooltip><TooltipTrigger asChild>
-            <button type="button" onClick={() => toggleSide("notes")} aria-pressed={sidePanel === "notes"} className={pillBtn(sidePanel === "notes")}><NotebookPen className="size-4" /><span className="hidden xl:inline">Notes</span></button>
+            <button type="button" aria-label="Notes" onClick={() => toggleSide("notes")} aria-pressed={sidePanel === "notes"} className={pillBtn(sidePanel === "notes")}><NotebookPen className="size-4" /><span className="hidden xl:inline">Notes</span></button>
           </TooltipTrigger><TooltipContent side="bottom">Notes</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild>
-            <button type="button" onClick={() => toggleSide("tutor")} aria-pressed={sidePanel === "tutor"} className={pillBtn(sidePanel === "tutor")}><Sparkles className="size-4" /><span className="hidden xl:inline">AI</span></button>
+            <button type="button" aria-label="AI tutor" onClick={() => toggleSide("tutor")} aria-pressed={sidePanel === "tutor"} className={pillBtn(sidePanel === "tutor")}><Sparkles className="size-4" /><span className="hidden xl:inline">AI</span></button>
           </TooltipTrigger><TooltipContent side="bottom">AI tutor</TooltipContent></Tooltip>
         </div>
       </div>
