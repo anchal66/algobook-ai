@@ -62,11 +62,14 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
   // stops waiting on a running generation; the server still finishes and links the problem to the project.
   useEffect(() => () => { nav.cancelGeneration(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // "/solve/next": nothing queued → stream the next problem.
+  // "/solve/next": nothing queued → stream the next problem. Wait until the loader has put the project into the store
+  // (auth may still be resolving on the first render); depending on the route prop alone fired once, too early, and never retried.
+  const storeProjectId = useWorkspace((s) => s.projectId);
+  const storeLoading = useWorkspace((s) => s.loading);
   useEffect(() => {
-    if (!problemId && projectId && !generation.active && !generation.error && generation.stages.length === 0) void nav.generate();
+    if (!problemId && projectId && storeProjectId === projectId && !storeLoading && !generation.active && !generation.error && generation.stages.length === 0) void nav.generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problemId, projectId]);
+  }, [problemId, projectId, storeProjectId, storeLoading]);
 
   const toggleFullscreen = useCallback(() => {
     const next = !useWorkspace.getState().fullscreen;

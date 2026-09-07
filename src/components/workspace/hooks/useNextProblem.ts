@@ -47,14 +47,16 @@ export function useNextProblem(): NextProblemApi {
   }, [projectId, router]);
 
   const generate = useCallback(async (userPrompt?: string) => {
-    if (!projectId || useWorkspace.getState().generation.active) return;
+    // Read the project id from the store at call time: the first-render closure can still be null.
+    const pid = useWorkspace.getState().projectId ?? projectId;
+    if (!pid || useWorkspace.getState().generation.active) return;
     controller?.abort();
     controller = new AbortController();
     const ws = useWorkspace.getState();
     ws.setGeneration({ active: true, stages: [], error: null, prompt: userPrompt ?? null, startedAt: Date.now() });
     const language: Language = useSettings.getState().editor.language;
     try {
-      const result = await nextProblemStream(projectId, { userPrompt, language }, (s) => {
+      const result = await nextProblemStream(pid, { userPrompt, language }, (s) => {
         const { stage, ...info } = s;
         useWorkspace.getState().pushStage({ stage, at: Date.now(), info });
       }, controller.signal);
@@ -63,7 +65,7 @@ export function useNextProblem(): NextProblemApi {
       track("next_problem", { source: result.source, latencyMs: result.latencyMs });
       useWorkspace.getState().setContext({ items: [...useWorkspace.getState().items.filter((i) => i.problemId !== result.item.problemId), result.item] });
       useWorkspace.getState().setGeneration({ active: false });
-      if (!controller?.signal.aborted && useWorkspace.getState().projectId === projectId) router.replace(`/project/${projectId}/solve/${result.problem.id}`);
+      if (!controller?.signal.aborted && useWorkspace.getState().projectId === pid) router.replace(`/project/${pid}/solve/${result.problem.id}`);
     } catch (e) {
       if ((e as Error)?.name === "AbortError") { useWorkspace.getState().setGeneration({ active: false }); return; }
       const msg = e instanceof ApiError
