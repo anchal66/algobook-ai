@@ -253,13 +253,24 @@ async function checkDuplicate(spec: ProblemSpec): Promise<{ duplicateOf: string 
   }
 }
 
-function genInput(ctx: GenerationContext, avoidTitles: string[]): GenInputContext {
+function genInput(ctx: GenerationContext, avoidTitles: string[], compact = false): GenInputContext {
   const r = ctx.recommendation;
   return {
     difficulty: r.difficulty, topics: r.topics, avoidTopics: r.avoidTopics, experienceLevel: ctx.experienceLevel, goalType: ctx.goalType,
     profileSummary: ctx.profileSummary, recentTitles: ctx.recentTitles, templateEntry: r.templateEntry ?? null, isCalibration: r.isCalibration,
-    projectDescription: ctx.projectDescription, userPrompt: ctx.userPrompt, avoidTitles,
+    projectDescription: ctx.projectDescription, userPrompt: ctx.userPrompt, avoidTitles, compact,
   };
+}
+
+/** One generate call; a truncated output (huge tests) is retried once with the COMPACT directive. */
+async function generateOnce(ctx: GenerationContext, avoidTitles: string[]) {
+  try {
+    return await aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles)), uid: ctx.uid ?? undefined });
+  } catch (e) {
+    if (!(e instanceof AiError) || e.kind !== "incomplete") throw e;
+    console.warn(JSON.stringify({ evt: "generate.compact_retry", reason: e.message.slice(0, 120) }));
+    return aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles, true)), uid: ctx.uid ?? undefined });
+  }
 }
 
 export interface VerifyRepairResult {
@@ -349,7 +360,7 @@ export async function generateSpec(ctx: GenerationContext): Promise<SpecResult> 
   for (let dupTry = 0; dupTry < 2 && !spec; dupTry++) {
     stage("generating", { attempt: attempts + 1 });
     attempts++;
-    const res = await aiCall({ purpose: "generate", schema: ProblemSpecSchema, schemaName: "problem_spec", instructions: GEN_INSTRUCTIONS, input: buildGenInput(genInput(ctx, avoidTitles)), uid: ctx.uid ?? undefined });
+    const res = await generateOnce(ctx, avoidTitles);
     costUsd += res.costUsd; model = res.model;
     stage("validating");
     const dup = await checkDuplicate(res.data);
@@ -432,7 +443,7 @@ export async function generateVerifiedProblem(ctx: GenerationContext): Promise<G
   try {
     result = await generateSpec(ctx);
   } catch (e) {
-    if (e instanceof AiError) throw new GenerationFailed(e.message, 1, 0, [e.kind]);
+    if (e instanceof AiError) throw new GenerationFailed(e.message, 1, 0, [e.kind, ...(e.detail && typeof (e.detail as { text?: string }).text === "string" ? [(e.detail as { text: string }).text.slice(0, 300)] : [])]);
     throw e;
   }
   stage("persisting");

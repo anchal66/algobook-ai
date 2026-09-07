@@ -28,7 +28,7 @@ HARNESS CONTRACT (violations are rejected by an automated judge)
 - starter.java: \`class Solution { public <returnType> <functionName>(<params>) { } }\` with the body empty except a comment. Imports java.util.* allowed. If ListNode/TreeNode is used, add the LeetCode class definition as a comment above the class.
 - driver.java: \`public class Main\` with \`main\` that reads stdin EXACTLY in the encoding above using a fast reader (BufferedReader + StringTokenizer), builds arguments, calls \`new Solution().<functionName>(...)\`, prints the result in the expectedOutput encoding, then exits. It must not print anything else. If ListNode/TreeNode is used, driver.java must define the class (\`class ListNode { int val; ListNode next; ListNode(int val) { this.val = val; } }\` / \`class TreeNode { int val; TreeNode left, right; TreeNode(int val) { this.val = val; } }\`) plus the build/print helpers. Never declare any other class \`public\`.
 - reference.java: a correct, optimal \`class Solution\` (same signature as starter). It will be compiled with driver.java and executed against every test; every test must pass within the time limit.
-- hiddenTests: 8–14 cases: minimum-size edge, negatives/duplicates/empty where valid, worst-case size at the constraint limit (2 cases), and typical cases. Compute expectedOutput by mentally executing reference.java — double-check arithmetic. When exactly one answer must exist (e.g. "exactly one solution"), every test must satisfy that guarantee.
+- hiddenTests: 8–14 cases: minimum-size edge, negatives/duplicates/empty where valid, two stress cases, and typical cases. Keep every test compact: a single test input must stay under 1,500 characters (stress cases use a few hundred elements with values near the limits — never write out 10^4+ elements; the constraints may still state the real limits). Compute expectedOutput by mentally executing reference.java — double-check arithmetic. When exactly one answer must exist (e.g. "exactly one solution"), every test must satisfy that guarantee.
 - sampleTests: 2–3 cases that correspond to the examples, in the same encoding. hiddenTests must be different inputs from every sampleTest and from each other (duplicates are discarded).
 - timeLimitSec: 1–5 (2 is typical); worst-case tests must run well within it in Java.
 - hints: three progressive hints — [1] pattern recognition (no algorithm names), [2] algorithm/data structure and why, [3] the implementation trap/edge case. 2–3 sentences each. Labels: "Pattern Recognition", "Algorithm Choice", "Implementation Trap".
@@ -82,6 +82,8 @@ export interface GenInputContext {
   userPrompt?: string;
   /** Titles rejected as duplicates in a previous attempt. */
   avoidTitles?: string[];
+  /** Set after an output-budget truncation: ask for a compact spec. */
+  compact?: boolean;
 }
 
 /** Dynamic (user-role) part of the generation prompt. Everything user-controlled is sanitized and bounded. */
@@ -103,6 +105,7 @@ export function buildGenInput(ctx: GenInputContext): string {
   }
   if (ctx.isCalibration) lines.push("CALIBRATION: yes — a straightforward, representative problem to assess the user's current level.");
   if (ctx.projectDescription) lines.push(`PROJECT: "${clip(ctx.projectDescription, 200)}"`);
+  if (ctx.compact) lines.push("COMPACT: your previous attempt exceeded the output budget and was discarded. Keep the statement under 180 words, every test input under 600 characters (stress cases: at most ~150 elements), at most 10 hidden tests, and no commentary inside code.");
   const up = sanitizeUserPrompt(ctx.userPrompt, 300);
   if (up) {
     lines.push(`USER_REQUEST: "${up}"`);

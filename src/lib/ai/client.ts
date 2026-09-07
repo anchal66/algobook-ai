@@ -176,6 +176,7 @@ export async function aiCall<T = string>(o: AiCallOptions<T>): Promise<AiResult<
     const refusal = refusalOf(res);
     if (refusal) { finish(false, `refusal: ${refusal.slice(0, 200)}`); throw new AiError(`Model refused: ${refusal}`, "refusal"); }
     if (res.status === "incomplete" && res.incomplete_details?.reason === "max_output_tokens") {
+      console.warn(JSON.stringify({ evt: "ai.truncated", purpose: o.purpose, outputTokens: u.outputTokens, reasoningTokens: u.reasoningTokens, head: text.slice(0, 400), tail: text.slice(-200) }));
       finish(false, "incomplete: max_output_tokens");
       throw new AiError("Model output was cut off (max_output_tokens); raise maxOutputTokens or reduce verbosity", "incomplete", { text: text.slice(0, 500) });
     }

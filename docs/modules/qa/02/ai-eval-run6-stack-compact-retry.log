@@ -1,0 +1,49 @@
+Evaluating 2 generations (E0/M2/H0) with JUDGE_BACKEND=local
+  [1/2] generating
+{"evt":"ai.truncated","purpose":"generate","outputTokens":16000,"reasoningTokens":1552,"head":"{\"title\":\"Undoable Text Buffer\",\"slug\":\"undoable-text-buffer\",\"difficulty\":\"Medium\",\"tags\":[\"stack\",\"string\"],\"statementMd\":\"You are given a string `ops` describing edits to an initially empty text buffer. Each lowercase English letter appends itself to the end of the buffer.\\n\\nThe character `<` acts as a backspace. If the buffer is non-empty, it removes the last character and remembers that char","tail":"<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a<a"}
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1588,"cachedTokens":1585,"outputTokens":16000,"reasoningTokens":1552,"costUsd":0.019232,"latencyMs":84900,"ok":false,"error":"incomplete: max_output_tokens"}
+{"evt":"generate.compact_retry","reason":"Model output was cut off (max_output_tokens); raise maxOutputTokens or reduce verbosity"}
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1641,"cachedTokens":1457,"outputTokens":2712,"reasoningTokens":1552,"costUsd":0.00332,"latencyMs":25073,"ok":true}
+  [1/2] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":74,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000001,"latencyMs":901,"ok":true}
+  [1/2] verifying r0
+{"evt":"judge.local_toolchain_verified"}
+  ✓ Mirror-Case Parentheses (Medium/stack) firstPass=true adopted=0 repairs=0 cost=$0.0033 111396 ms tests=3+11
+  [2/2] generating
+{"evt":"ai.truncated","purpose":"generate","outputTokens":16000,"reasoningTokens":1391,"head":"{\"title\":\"Parentheses Salvage\",\"slug\":\"parentheses-salvage\",\"difficulty\":\"Medium\",\"tags\":[\"stack\",\"string\"],\"statementMd\":\"You are given a string `s` containing only the characters `(` and `)`.\\n\\nA parentheses string is properly nested when every opening parenthesis has a matching closing parenthesis, pairs close in the reverse order in which they open, and no prefix contains more closing parenth","tail":"()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()()"}
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1591,"cachedTokens":1457,"outputTokens":16000,"reasoningTokens":1391,"costUsd":0.019256,"latencyMs":82868,"ok":false,"error":"incomplete: max_output_tokens"}
+{"evt":"generate.compact_retry","reason":"Model output was cut off (max_output_tokens); raise maxOutputTokens or reduce verbosity"}
+{"evt":"ai.call","purpose":"generate","model":"gpt-5.6-luna","inputTokens":1644,"cachedTokens":1457,"outputTokens":2799,"reasoningTokens":1552,"costUsd":0.003425,"latencyMs":25268,"ok":true}
+  [2/2] validating
+{"evt":"ai.call","purpose":"embed","model":"text-embedding-3-small","inputTokens":95,"cachedTokens":0,"outputTokens":0,"reasoningTokens":0,"costUsd":0.000002,"latencyMs":632,"ok":true}
+  [2/2] verifying r0
+  ✓ Bracket Deletion Budget (Medium/stack) firstPass=true adopted=0 repairs=0 cost=$0.0034 109121 ms tests=3+10
+
+SUMMARY {
+  "generations": 2,
+  "firstPassRate": "100.0%",
+  "verifiedWithoutRepair": "100.0% (first pass + adopted reference outputs)",
+  "afterRepairRate": "100.0%",
+  "repairSuccessRate": "n/a",
+  "meanCostUsd": "0.0034",
+  "p50Ms": 111396,
+  "p95Ms": 111396,
+  "byDifficulty": {
+    "Easy": {
+      "n": 0,
+      "ok": 0,
+      "firstPass": 0
+    },
+    "Medium": {
+      "n": 2,
+      "ok": 2,
+      "firstPass": 2
+    },
+    "Hard": {
+      "n": 0,
+      "ok": 0,
+      "firstPass": 0
+    }
+  }
+}
+exit=0
