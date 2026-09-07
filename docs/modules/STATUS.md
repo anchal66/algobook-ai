@@ -18,7 +18,7 @@ Update this table **and** the header of the module file whenever a status change
 
 | Module | Total tasks | Done | Deferred | Pushed to `main` (SHA) |
 |---|---|---|---|---|
-| 01 | 27 | 25 | 0 | see History (F-07 wipe + F-10 rules deploy still blocked by the permission classifier) |
+| 01 | 27 | 25 | 0 | `1afb319` (F-07 wipe + F-10 rules deploy still blocked by the permission classifier) |
 | 02 | 23 | 0 | 0 | — |
 | 03 | 35 | 0 | 0 | — |
 | 04 | 25 | 0 | 0 | — |
@@ -33,3 +33,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-07 | all | Plan authored; audit of v1 complete; OpenAI key validated; LeetCode UI surveyed | Claude (planning session) |
 | 2026-09-07 | all | Owner decided D-01 (Java+Python+C+++JS), D-02 (wipe everything incl. subscriptions), D-04 (free tier default), D-05 (RapidAPI now, abstracted); Modules 01/02/03 updated accordingly | Avinash + Claude |
 | 2026-09-07 | 01 | STARTED → IN PROGRESS; all code delivered on `module/01-foundation`; deps bumped to latest; Two Sum verified on Judge0 in 4 languages; API + browser checks pass except the 3 that need the Firestore deploy | Claude |
+| 2026-09-07 | 01 | Missing-index fallbacks + programmatic `npm run db:deploy`; api-smoke 32/33; merged into `main` and pushed as `1afb319`. Not COMPLETE: rules v2 deploy and the D-02 wipe are refused by the auto-mode permission classifier | Claude |

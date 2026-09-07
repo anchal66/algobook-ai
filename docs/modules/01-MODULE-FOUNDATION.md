@@ -181,7 +181,7 @@ Rewrite `README.md` to describe v2 (setup, env, scripts, architecture pointer to
 - [x] F-24 `/dev/api-smoke` admin page (§3.11).
 - [x] F-25 README rewrite; `docs/modules/qa/01/` screenshots.
 - [x] F-26 Structured logging (`console.info(JSON.stringify({evt, uid, ms, …}))`) on every route; no secrets in logs.
-- [x] F-27 **Ship it.** Merged into `main` and pushed 2026-09-07 (SHA recorded in `STATUS.md`). Two follow-ups remain outside the code and are blocked by the permission classifier: deploy rules v2 (`npm run db:deploy`) and run the D-02 wipe. All tasks ticked, `npm run build` + `vitest` green, browser checklist (§6) passed, `STATUS.md` and this file's status log updated → commit, merge `module/01-foundation` into `main`, rebuild, `git push origin main`, and record the commit SHA in the status log (Master Plan §10 step 7).
+- [x] F-27 **Ship it.** Merged into `main` and pushed 2026-09-07 as `1afb319`. Two follow-ups remain outside the code and are blocked by the permission classifier: deploy rules v2 (`npm run db:deploy`) and run the D-02 wipe. All tasks ticked, `npm run build` + `vitest` green, browser checklist (§6) passed, `STATUS.md` and this file's status log updated → commit, merge `module/01-foundation` into `main`, rebuild, `git push origin main`, and record the commit SHA in the status log (Master Plan §10 step 7).
 
 ## 5. Acceptance criteria
 - Calling any `/api/*` route without a token → 401 envelope. With a token for user A, requesting user B's project → 404 (not 403, to avoid enumeration).
