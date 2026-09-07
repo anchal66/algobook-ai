@@ -9,6 +9,7 @@
  * repo's automation) can ship rules and indexes.
  *
  *   npm run db:deploy                 # rules + indexes, waits for indexes to build
+ *   npm run db:deploy -- --print-gcloud   # print the equivalent gcloud commands
  *   npm run db:deploy -- --rules-only
  *   npm run db:deploy -- --indexes-only
  *   npm run db:deploy -- --no-wait
@@ -82,7 +83,8 @@ async function listIndexes(jwt: JWT, projectId: string) {
   const out: (IndexDef & { name: string; state: string })[] = [];
   let pageToken = "";
   do {
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${encodeURIComponent(DATABASE)}/collectionGroups/-/indexes?pageSize=100${pageToken ? `&pageToken=${pageToken}` : ""}`;
+    // The wildcard collection-group listing rejects an explicit pageSize ("Only 0 is supported").
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${encodeURIComponent(DATABASE)}/collectionGroups/-/indexes${pageToken ? `?pageToken=${pageToken}` : ""}`;
     const res = await api(jwt, "GET", url);
     if (res.status >= 300) throw new Error(`list indexes failed: ${res.status} ${JSON.stringify(res.data)}`);
     for (const idx of ((res.data.indexes as Record<string, unknown>[]) ?? [])) {
@@ -100,23 +102,53 @@ async function listIndexes(jwt: JWT, projectId: string) {
   return out;
 }
 
+/**
+ * The equivalent `gcloud` invocation. Printed when the service account lacks
+ * `datastore.indexes.create` (the Firebase Admin SDK service agent does by
+ * default), so the indexes can be created with owner credentials instead.
+ * Note the vector syntax differs from every other field config.
+ */
+export function gcloudCommand(projectId: string, idx: IndexDef): string {
+  const fields = idx.fields
+    .filter((f) => f.fieldPath !== "__name__")
+    .map((f) =>
+      f.vectorConfig
+        ? `--field-config=vector-config='{"dimension":"${f.vectorConfig.dimension}","flat":"{}"}',field-path=${f.fieldPath}`
+        : f.arrayConfig
+          ? `--field-config=field-path=${f.fieldPath},array-config=contains`
+          : `--field-config=field-path=${f.fieldPath},order=${(f.order ?? "ASCENDING").toLowerCase()}`,
+    );
+  return `gcloud firestore indexes composite create --project=${projectId} --collection-group=${idx.collectionGroup} --query-scope=${idx.queryScope} ${fields.join(" ")} --async`;
+}
+
 async function deployIndexes(jwt: JWT, projectId: string, wait: boolean) {
   const wanted: IndexDef[] = JSON.parse(fs.readFileSync(INDEXES_FILE, "utf8")).indexes;
   const existing = await listIndexes(jwt, projectId);
   const have = new Set(existing.map((i) => indexKey(i.collectionGroup, i.fields)));
 
   let created = 0;
+  const denied: IndexDef[] = [];
   for (const idx of wanted) {
     const key = indexKey(idx.collectionGroup, idx.fields);
     if (have.has(key)) { console.log(`  exists  ${key}`); continue; }
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${encodeURIComponent(DATABASE)}/collectionGroups/${idx.collectionGroup}/indexes`;
     const res = await api(jwt, "POST", url, { queryScope: idx.queryScope, fields: idx.fields.filter((f) => f.fieldPath !== "__name__") });
-    if (res.status === 409 || (res.data?.error as { status?: string })?.status === "ALREADY_EXISTS") { console.log(`  exists  ${key}`); continue; }
+    const status = (res.data?.error as { status?: string })?.status;
+    if (res.status === 409 || status === "ALREADY_EXISTS") { console.log(`  exists  ${key}`); continue; }
+    if (res.status === 403 || status === "PERMISSION_DENIED") { console.log(`  denied  ${key}`); denied.push(idx); continue; }
     if (res.status >= 300) throw new Error(`create index ${key} failed: ${res.status} ${JSON.stringify(res.data)}`);
     created++;
     console.log(`  created ${key}`);
   }
-  console.log(`  ${created} new index(es), ${wanted.length - created} already present`);
+  console.log(`  ${created} new index(es), ${wanted.length - created - denied.length} already present`);
+
+  if (denied.length) {
+    console.log(`\n  The service account cannot create indexes (needs roles/datastore.indexAdmin).`);
+    console.log(`  Run these with owner credentials (gcloud auth login), or grant the role once:\n`);
+    for (const idx of denied) console.log(`  ${gcloudCommand(projectId, idx)}`);
+    console.log("");
+    return;
+  }
 
   if (!wait || !created) return;
   const started = Date.now();
@@ -136,6 +168,11 @@ async function deployIndexes(jwt: JWT, projectId: string, wait: boolean) {
 async function main() {
   const a = args();
   const projectId = projectIdFromCredential();
+  if (a["print-gcloud"]) {
+    const wanted: IndexDef[] = JSON.parse(fs.readFileSync(INDEXES_FILE, "utf8")).indexes;
+    for (const idx of wanted) console.log(gcloudCommand(projectId, idx));
+    return;
+  }
   const jwt = await client();
   console.log(`Deploying Firestore config to ${projectId}`);
   if (!a["indexes-only"]) { console.log("Rules:"); await deployRules(jwt, projectId); }

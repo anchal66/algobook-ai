@@ -11,6 +11,8 @@ Judge0 CE via RapidAPI, dark theme, desktop Browser pane at 1440×900.
   (repositories fall back to in-memory ordering when an index is missing). The only remaining failure is
   "client read of the public problem doc", which needs `firestore.rules` v2 deployed.
 - Pro plan: `Wa9Ms…` granted `pro-yearly`; `/api/me` returns `plan.tier: "pro"` with unlimited editorial.
+- Rules v2 released 2026-09-07 and verified from a client ID token: `problems/two-sum` → 200, `problems/two-sum/private/tests` → 403.
+- Judge0's RapidAPI free tier rate-limits after a few dozen consecutive submissions; `/api/submit` then returns `502 UPSTREAM` with a readable message.
 
 ## Browser checklist (module §6)
 | # | Check | Result |

@@ -8,7 +8,7 @@ Update this table **and** the header of the module file whenever a status change
 
 | # | Module | Status | Branch | Started | Completed | Owner / assistant | Notes |
 |---|---|---|---|---|---|---|---|
-| 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | IN PROGRESS (merged) | `module/01-foundation` | 2026-09-07 | — | Claude (Opus 5) + Avinash | Merged into `main` and pushed. api-smoke 32/33, browser checklist passed. Not marked COMPLETE until rules v2 are deployed (`npm run db:deploy`) and the D-02 wipe runs — both refused by the auto-mode permission classifier. |
+| 01 | Foundation — auth, schema v2, wipe, Judge service, run/submit, rules, quotas | IN PROGRESS (merged) | `module/01-foundation` | 2026-09-07 | — | Claude (Opus 5) + Avinash | Merged into `main` and pushed. Rules v2 + indexes deployed 2026-09-07. api-smoke 32/33 (the last failure was Judge0's free-tier rate limit, not code). Not COMPLETE until the D-02 wipe runs — the classifier refuses that command. |
 | 02 | AI Engine — model policy, verified generation, hints/editorial/review/chat/completion, pre-gen, cost telemetry | NOT STARTED | `module/02-ai-engine` | — | — | — | Blocked by 01. |
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | NOT STARTED | `module/03-workspace` | — | — | — | Blocked by 01, 02. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | NOT STARTED | `module/04-intelligence` | — | — | — | Blocked by 01, 02. Can run in parallel with 03. |
@@ -18,7 +18,7 @@ Update this table **and** the header of the module file whenever a status change
 
 | Module | Total tasks | Done | Deferred | Pushed to `main` (SHA) |
 |---|---|---|---|---|
-| 01 | 27 | 25 | 0 | `1afb319` (F-07 wipe + F-10 rules deploy still blocked by the permission classifier) |
+| 01 | 27 | 26 | 0 | `1afb319` (only F-07, the D-02 wipe, is outstanding — the classifier refuses it) |
 | 02 | 23 | 0 | 0 | — |
 | 03 | 35 | 0 | 0 | — |
 | 04 | 25 | 0 | 0 | — |
@@ -33,4 +33,5 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-07 | all | Plan authored; audit of v1 complete; OpenAI key validated; LeetCode UI surveyed | Claude (planning session) |
 | 2026-09-07 | all | Owner decided D-01 (Java+Python+C+++JS), D-02 (wipe everything incl. subscriptions), D-04 (free tier default), D-05 (RapidAPI now, abstracted); Modules 01/02/03 updated accordingly | Avinash + Claude |
 | 2026-09-07 | 01 | STARTED → IN PROGRESS; all code delivered on `module/01-foundation`; deps bumped to latest; Two Sum verified on Judge0 in 4 languages; API + browser checks pass except the 3 that need the Firestore deploy | Claude |
-| 2026-09-07 | 01 | Missing-index fallbacks + programmatic `npm run db:deploy`; api-smoke 32/33; merged into `main` and pushed as `1afb319`. Not COMPLETE: rules v2 deploy and the D-02 wipe are refused by the auto-mode permission classifier | Claude |
+| 2026-09-07 | 01 | Missing-index fallbacks + programmatic `npm run db:deploy`; api-smoke 32/33; merged into `main` and pushed as `1afb319` | Claude |
+| 2026-09-07 | 01 | Firestore rules v2 released and all 13 indexes issued; rules verified from a client token. Only the D-02 wipe remains | Claude |
