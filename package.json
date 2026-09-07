@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:deploy": "NODE_OPTIONS=--conditions=react-server tsx scripts/deploy-firestore.ts",
     "db:wipe": "NODE_OPTIONS=--conditions=react-server tsx scripts/firestore-wipe.ts",
     "db:seed:templates": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed-templates.ts",
     "db:seed:sample": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed-sample-problem.ts",
