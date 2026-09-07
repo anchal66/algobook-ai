@@ -45,14 +45,49 @@ describe("validateSpec", () => {
     };
     const { errors } = validateSpec(bad);
     expect(errors.some((e) => e.includes("sampleTests[0] input does not match"))).toBe(true);
-    expect(errors.some((e) => e.includes("duplicates hiddenTests[0]"))).toBe(true);
+    expect(errors.some((e) => e.includes("only 7 distinct hidden tests"))).toBe(true);
     expect(errors.some((e) => e.includes("driver.java must declare `public class Main`"))).toBe(true);
     expect(errors.some((e) => e.includes("reference.java must declare `class Solution`"))).toBe(true);
     expect(errors.some((e) => e.includes("must not define Main"))).toBe(true);
   });
 
+  it("silently drops hidden tests that repeat a sample when enough remain", () => {
+    const spec = { ...good, hiddenTests: [...good.hiddenTests, { ...good.sampleTests[0] }, { ...good.hiddenTests[2] }] };
+    const { spec: out, errors } = validateSpec(spec);
+    expect(errors).toEqual([]);
+    expect(out.hiddenTests.length).toBe(8);
+  });
+
   it("adds the default eps for float checkers and strips it otherwise", () => {
     expect(validateSpec({ ...good, checker: { type: "float", eps: null } }).spec.checker).toEqual({ type: "float", eps: 1e-5 });
     expect(validateSpec({ ...good, checker: { type: "exact", eps: 0.1 } }).spec.checker).toEqual({ type: "exact", eps: null });
+  });
+});
+
+import { adoptReferenceOutputs } from "./generate";
+import type { JudgeResult } from "@/lib/judge/types";
+
+function judgeWith(spec: ProblemSpec, failing: { index: number; status: "WA" | "RE"; actual: string }[]): JudgeResult {
+  const total = spec.sampleTests.length + spec.hiddenTests.length;
+  const cases = Array.from({ length: total }, (_, index) => {
+    const f = failing.find((x) => x.index === index);
+    return { index, status: f ? f.status : "AC", passed: !f, input: "", expected: "", actual: f?.actual ?? "", stderr: "", compileOutput: null, timeMs: 1, memoryKb: 0 } as JudgeResult["cases"][number];
+  });
+  const failed = cases.find((c) => !c.passed) ?? null;
+  return { verdict: failed ? (failed.status === "RE" ? "RE" : "WA") : "AC", passed: total - failing.length, total, failedCase: failed, runtimeMs: 1, memoryKb: 0, compileOutput: null, cases, language: "java" };
+}
+
+describe("adoptReferenceOutputs", () => {
+  it("replaces a few wrong hidden expectations with the reference output", () => {
+    const r = adoptReferenceOutputs(good, judgeWith(good, [{ index: 3, status: "WA", actual: "[1,2]\n" }]));
+    expect(r?.adopted).toBe(1);
+    expect(r?.spec.hiddenTests[1].expectedOutput).toBe("[1,2]");
+    expect(good.hiddenTests[1].expectedOutput).toBe("[0,1]");
+  });
+  it("refuses when a sample test fails, on runtime errors, or when too many hidden tests disagree", () => {
+    expect(adoptReferenceOutputs(good, judgeWith(good, [{ index: 0, status: "WA", actual: "x" }]))).toBeNull();
+    expect(adoptReferenceOutputs(good, judgeWith(good, [{ index: 3, status: "RE", actual: "" }]))).toBeNull();
+    expect(adoptReferenceOutputs(good, judgeWith(good, [2, 3, 4, 5].map((index) => ({ index, status: "WA" as const, actual: "1" }))))).toBeNull();
+    expect(adoptReferenceOutputs(good, judgeWith(good, [{ index: 3, status: "WA", actual: "  \n" }]))).toBeNull();
   });
 });

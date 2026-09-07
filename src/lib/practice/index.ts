@@ -12,7 +12,7 @@ import "server-only";
 import type { Difficulty, Project, ProjectItem, RecommendationReason, TemplatePoolEntry, User, WithId } from "@/lib/data/schema";
 import * as projects from "@/lib/data/projects";
 import * as submissions from "@/lib/data/submissions";
-import { CORE_TOPICS, INTERVIEW_PATTERNS, normalizeTags, type CoreTopic } from "@/lib/practice/topics";
+import { CORE_TOPICS, INTERVIEW_PATTERNS, difficultyInText, normalizeTags, topicsInText, type CoreTopic } from "@/lib/practice/topics";
 
 export { CORE_TOPICS, INTERVIEW_PATTERNS, normalizeTags };
 export type { CoreTopic };
@@ -117,7 +117,8 @@ export async function recommend(input: RecommendInput): Promise<Recommendation> 
     }
   }
 
-  const promptTopics = input.userPrompt ? normalizeTags(input.userPrompt.toLowerCase().split(/[,;/]|\band\b|\bwith\b/).map((s) => s.trim())) : [];
+  const promptTopics = input.userPrompt ? topicsInText(input.userPrompt) : [];
+  const promptDifficulty = input.userPrompt ? difficultyInText(input.userPrompt) : null;
   const preferred = normalizeTags(project.selectedTopics);
   const base: readonly string[] = promptTopics.length ? promptTopics : preferred.length ? preferred : project.goalType === "interview-prep" ? INTERVIEW_PATTERNS : CORE_TOPICS;
   const fresh = base.filter((t) => !recentTags.includes(t));
@@ -125,15 +126,16 @@ export async function recommend(input: RecommendInput): Promise<Recommendation> 
   const topics = pick(fresh.length ? fresh : base, promptTopics.length ? Math.min(2, promptTopics.length) : 2, seed);
   const isCalibration = user.stats.totalSolved + user.stats.totalFailed === 0 && existingItems.length === 0;
 
+  const finalDifficulty = promptDifficulty ?? difficulty;
   return {
-    difficulty,
+    difficulty: finalDifficulty,
     topics,
     avoidTopics: recentTags.filter((t) => !topics.includes(t)).slice(0, 5),
-    reason: promptTopics.length
-      ? { short: `Your request: ${topics.join(", ")}`, detail: `You asked for ${topics.join(" and ")} at ${difficulty} level.` }
+    reason: promptTopics.length || promptDifficulty
+      ? { short: `Your request: ${topics.join(", ")}`, detail: `You asked for ${topics.join(" and ")} at ${finalDifficulty} level.` }
       : isCalibration
-        ? { short: "Calibration", detail: `A representative ${difficulty} problem on ${topics[0]} to gauge your current level.` }
-        : { short: `Practice: ${topics[0]}`, detail: `A ${difficulty} problem on ${topics.join(" and ")} — chosen from your project's focus areas, avoiding what you just practiced.` },
+        ? { short: "Calibration", detail: `A representative ${finalDifficulty} problem on ${topics[0]} to gauge your current level.` }
+        : { short: `Practice: ${topics[0]}`, detail: `A ${finalDifficulty} problem on ${topics.join(" and ")} — chosen from your project's focus areas, avoiding what you just practiced.` },
     isCalibration,
     templateEntry: null,
   };

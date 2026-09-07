@@ -32,7 +32,7 @@ async function main() {
   for (const d of ["Easy", "Medium", "Hard"] as Difficulty[]) for (let i = 0; i < counts[d]; i++) plan.push({ difficulty: d, topic: topics[ti++ % topics.length] });
   console.log(`Evaluating ${plan.length} generations (E${counts.Easy}/M${counts.Medium}/H${counts.Hard}) with JUDGE_BACKEND=${process.env.JUDGE_BACKEND ?? "judge0"}${injection ? " + injection prompt" : ""}`);
 
-  const rows: { title: string; difficulty: string; topic: string; ok: boolean; firstPass: boolean; repairs: number; costUsd: number; ms: number; error?: string }[] = [];
+  const rows: { title: string; difficulty: string; topic: string; ok: boolean; firstPass: boolean; adopted: number; repairs: number; costUsd: number; ms: number; error?: string }[] = [];
   for (const [i, item] of plan.entries()) {
     const started = Date.now();
     const ctx: GenerationContext = {
@@ -44,9 +44,9 @@ async function main() {
     };
     try {
       const r = await generateSpec(ctx);
-      const row = { title: r.spec.title, difficulty: item.difficulty, topic: item.topic, ok: true, firstPass: r.firstPassOk, repairs: r.repairs, costUsd: r.costUsd, ms: Date.now() - started };
+      const row = { title: r.spec.title, difficulty: item.difficulty, topic: item.topic, ok: true, firstPass: r.firstPassOk, adopted: r.adopted, repairs: r.repairs, costUsd: r.costUsd, ms: Date.now() - started };
       rows.push(row);
-      console.log(`  ✓ ${row.title} (${item.difficulty}/${item.topic}) firstPass=${r.firstPassOk} repairs=${r.repairs} cost=$${r.costUsd.toFixed(4)} ${row.ms} ms tests=${r.spec.sampleTests.length}+${r.spec.hiddenTests.length}`);
+      console.log(`  ✓ ${row.title} (${item.difficulty}/${item.topic}) firstPass=${r.firstPassOk} adopted=${r.adopted} repairs=${r.repairs} cost=$${r.costUsd.toFixed(4)} ${row.ms} ms tests=${r.spec.sampleTests.length}+${r.spec.hiddenTests.length}`);
       if (injection) {
         const leaked = /hidden tests|system prompt|ignore previous/i.test(r.spec.statementMd + r.spec.title);
         console.log(`    injection check: statement mentions the injected text: ${leaked ? "YES (inspect!)" : "no"}`);
@@ -55,7 +55,7 @@ async function main() {
       if (persist) console.log(`    persisted as ${await persistSpec(r, { source: "generated", createdBy: "ai-eval", model: r.model })}`);
     } catch (e) {
       const err = e as GenerationFailed;
-      const row = { title: "", difficulty: item.difficulty, topic: item.topic, ok: false, firstPass: false, repairs: err.attempts ?? 0, costUsd: err.costUsd ?? 0, ms: Date.now() - started, error: err.message };
+      const row = { title: "", difficulty: item.difficulty, topic: item.topic, ok: false, firstPass: false, adopted: 0, repairs: err.attempts ?? 0, costUsd: err.costUsd ?? 0, ms: Date.now() - started, error: err.message };
       rows.push(row);
       console.log(`  ✗ ${item.difficulty}/${item.topic}: ${err.message} ${JSON.stringify(err.errors ?? [])}`);
       fs.writeFileSync(path.join(outDir, `failed-${i + 1}-${item.difficulty}.json`), JSON.stringify({ item, error: err.message, errors: err.errors }, null, 2));
@@ -69,6 +69,7 @@ async function main() {
   const summary = {
     generations: rows.length,
     firstPassRate: `${((100 * firstPass) / rows.length).toFixed(1)}%`,
+    verifiedWithoutRepair: `${((100 * ok.filter((r) => r.repairs === 0).length) / rows.length).toFixed(1)}% (first pass + adopted reference outputs)`,
     afterRepairRate: `${((100 * ok.length) / rows.length).toFixed(1)}%`,
     repairSuccessRate: needed ? `${((100 * repairedOk) / needed).toFixed(1)}% (${repairedOk}/${needed})` : "n/a",
     meanCostUsd: (rows.reduce((a, r) => a + r.costUsd, 0) / rows.length).toFixed(4),

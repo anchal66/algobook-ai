@@ -180,7 +180,7 @@ export async function collectPregenJob(job: WithId<PregenJob>, chunk = COLLECT_C
       results.costUsd += vr.costUsd;
       if (!vr.ok) { results.failed++; console.warn(JSON.stringify({ evt: "pregen.unverified", customId: parsed.custom_id, errors: vr.errors })); continue; }
       if (vr.repairs) results.repaired++;
-      const problemId = await persistSpec({ spec: vr.spec, judge: vr.judge!, embedding: null, attempts: 1 + vr.attempts, repairs: vr.repairs, firstPassOk: vr.firstPassOk, costUsd, model: vr.model, latencyMs: 0 }, {
+      const problemId = await persistSpec({ spec: vr.spec, judge: vr.judge!, embedding: null, attempts: 1 + vr.attempts, repairs: vr.repairs, firstPassOk: vr.firstPassOk, adopted: vr.adopted, costUsd, model: vr.model, latencyMs: 0 }, {
         source: meta.kind === "template" ? "template" : "generated", createdBy: "pregen", model: vr.model, templateRef: meta.templateRef, companies: meta.company ? [meta.company] : [],
       });
       results.verified++;

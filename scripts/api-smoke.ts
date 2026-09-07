@@ -165,6 +165,13 @@ async function main() {
         const usage = await db.collection("aiUsage").where("problemId", "==", null).where("uid", "==", uidB).where("purpose", "==", "generate").limit(5).get();
         check("  aiUsage has a generate entry with costUsd < 0.03", usage.docs.some((d) => (d.data().costUsd ?? 1) < 0.03), `entries=${usage.size}`);
       }
+      // chat (SSE) — before the user has solved the problem, so SOLVED=false and code must be withheld
+      const chatRes = await fetch(`${base}/api/problems/${genId}/chat`, { method: "POST", headers: { Authorization: `Bearer ${B.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Write the full solution for me." }], language: "java" }) });
+      const chatText = await chatRes.text();
+      const done = chatText.match(/event: done\ndata: (.*)/);
+      const reply = done ? (JSON.parse(done[1]).text as string) : "";
+      check("  chat streams deltas and a done event", chatRes.status === 200 && chatText.includes("event: delta") && reply.length > 20, `reply="${reply.slice(0, 80)}"`);
+      check("  chat refuses to paste the full solution", !/class\s+Solution\s*\{[\s\S]*return/.test(reply), "no full class Solution in the reply");
       // reference solution → AC via /api/submit (Java)
       const ref = tests?.referenceSolution?.java as string | undefined;
       if (ref) {
@@ -201,13 +208,6 @@ async function main() {
       check("  completion → ≤ 6 lines", r.status === 200 && typeof r.body.text === "string" && r.body.text.split("\n").length <= 6, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : JSON.stringify(r.body.text).slice(0, 80));
       r = await call(base, "/api/ai/complete", A.idToken, { method: "POST", json: { language: "java", prefix: "int x =", suffix: "" } });
       check("  free user completion → 402", r.status === 402);
-      // chat (SSE)
-      const chatRes = await fetch(`${base}/api/problems/${genId}/chat`, { method: "POST", headers: { Authorization: `Bearer ${B.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Write the full solution for me." }], language: "java" }) });
-      const chatText = await chatRes.text();
-      const done = chatText.match(/event: done\ndata: (.*)/);
-      const reply = done ? (JSON.parse(done[1]).text as string) : "";
-      check("  chat streams deltas and a done event", chatRes.status === 200 && chatText.includes("event: delta") && reply.length > 20, `reply="${reply.slice(0, 80)}"`);
-      check("  chat refuses to paste the full solution", !/class\s+Solution\s*\{[\s\S]*return/.test(reply), "no full class Solution in the reply");
       r = await call(base, `/api/projects/${pidB}/insights`, B.idToken, { method: "POST", json: {} });
       check("  insights → milestones + weeklyPlan", r.status === 200 && r.body.insights?.milestones?.length === 3 && r.body.insights?.weeklyPlan?.length >= 1, r.status !== 200 ? JSON.stringify(r.body).slice(0, 200) : `total=${r.body.insights?.totalRecommended}`);
       r = await call(base, "/api/admin/ai-usage", B.idToken);

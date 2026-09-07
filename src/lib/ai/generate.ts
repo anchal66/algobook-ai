@@ -68,6 +68,7 @@ export const REUSE_PROMPT_DISTANCE = 0.25;
 export interface ValidationOutcome { spec: ProblemSpec; errors: string[] }
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const MIN_HIDDEN_TESTS = 8;
 
 /** Normalises tags/title/slug and returns every contract violation the judge would otherwise hit. */
 export function validateSpec(input: ProblemSpec, fallbackTopics: string[] = []): ValidationOutcome {
@@ -94,17 +95,25 @@ export function validateSpec(input: ProblemSpec, fallbackTopics: string[] = []):
   if (spec.checker.type === "float" && !spec.checker.eps) spec.checker = { type: "float", eps: 1e-5 };
   if (spec.checker.type !== "float") spec.checker = { type: spec.checker.type, eps: null };
 
+  // Hidden tests that repeat a sample (or another hidden) input are simply dropped — the model does this
+  // often and it is harmless as long as ≥ MIN_HIDDEN_TESTS remain.
   const seen = new Map<string, string>();
-  const all = [...spec.sampleTests.map((t, i) => ({ t, where: `sampleTests[${i}]` })), ...spec.hiddenTests.map((t, i) => ({ t, where: `hiddenTests[${i}]` }))];
-  for (const { t, where } of all) {
+  const keep: ProblemSpec["hiddenTests"] = [];
+  const all = [...spec.sampleTests.map((t, i) => ({ t, where: `sampleTests[${i}]`, hidden: false })), ...spec.hiddenTests.map((t, i) => ({ t, where: `hiddenTests[${i}]`, hidden: true }))];
+  for (const { t, where, hidden } of all) {
     if (!t.input.endsWith("\n")) t.input += "\n";
+    const key = t.input.trim();
+    if (seen.has(key)) {
+      if (hidden) continue;
+      errors.push(`${where} duplicates ${seen.get(key)} (identical input)`);
+    } else seen.set(key, where);
     const lint = lintInput(spec.params, t.input);
     if (!lint.ok) errors.push(`${where} input does not match the params encoding: ${lint.errors.slice(0, 2).join("; ")}`);
-    const key = t.input.trim();
-    if (seen.has(key)) errors.push(`${where} duplicates ${seen.get(key)} (identical input)`);
-    else seen.set(key, where);
     if (t.expectedOutput.trim() === "" && spec.returnType !== "string") errors.push(`${where} has an empty expectedOutput`);
+    if (hidden) keep.push(t);
   }
+  if (keep.length < MIN_HIDDEN_TESTS) errors.push(`only ${keep.length} distinct hidden tests (need ≥ ${MIN_HIDDEN_TESTS}; ${spec.hiddenTests.length - keep.length} duplicated a sample or another hidden test)`);
+  spec.hiddenTests = keep;
 
   if (!/class\s+Solution\b/.test(spec.starter.java)) errors.push("starter.java must declare `class Solution`");
   if (!spec.starter.java.includes(spec.functionName)) errors.push(`starter.java does not contain the function ${spec.functionName}`);
@@ -139,6 +148,29 @@ export function feedbackFromJudge(result: JudgeResult, staticErrors: string[] = 
   return { staticErrors, verdict: result.verdict, passed: result.passed, total: result.total, failing };
 }
 
+/**
+ * When the reference passes every SAMPLE test (the examples the statement shows) but a few HIDDEN
+ * expectations disagree with it, the hand-computed expectation is almost always the wrong side
+ * (the model "mentally executes" reference.java). Adopt the reference's stdout for those cases
+ * instead of paying for a repair round. Bounded: WA only (no RE/CE/TLE), ≤ `maxFraction` of the
+ * hidden tests, and the reference must be self-consistent on the samples.
+ */
+export const ADOPT_MAX_FRACTION = 0.3;
+export function adoptReferenceOutputs(spec: ProblemSpec, judge: JudgeResult, maxFraction = ADOPT_MAX_FRACTION): { spec: ProblemSpec; adopted: number } | null {
+  if (judge.verdict !== "WA") return null;
+  const sampleCount = spec.sampleTests.length;
+  const failing = judge.cases.filter((c) => !c.passed);
+  if (!failing.length || failing.some((c) => c.status !== "WA" || c.index < sampleCount)) return null;
+  if (failing.length > Math.max(1, Math.floor(spec.hiddenTests.length * maxFraction))) return null;
+  const hidden = spec.hiddenTests.map((t) => ({ ...t }));
+  for (const c of failing) {
+    const out = c.actual.replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").replace(/\n+$/g, "");
+    if (!out.trim()) return null; // empty output means the reference did not really answer
+    hidden[c.index - sampleCount].expectedOutput = out;
+  }
+  return { spec: { ...spec, hiddenTests: hidden }, adopted: failing.length };
+}
+
 export function embeddingText(spec: Pick<ProblemSpec, "title" | "statementMd">): string {
   return `${spec.title}\n${spec.statementMd.slice(0, 400)}`;
 }
@@ -165,7 +197,7 @@ export async function findReusable(ctx: GenerationContext): Promise<{ problem: p
       console.warn(JSON.stringify({ evt: "generate.reuse_embedding_skipped", message: (e as Error).message?.slice(0, 200) }));
     }
   }
-  if (!candidates.length && !ctx.userPrompt) {
+  if (!candidates.length) {
     const tagSets = rec.topics.length > 1 ? [rec.topics, ...rec.topics.map((t) => [t])] : [rec.topics];
     for (const tags of tagSets) {
       const res = await problems.search({ tags, difficulty: rec.difficulty, status: "verified", excludeIds: exclude, limit: 20 });
@@ -197,6 +229,8 @@ export interface SpecResult {
   attempts: number;
   repairs: number;
   firstPassOk: boolean;
+  /** Hidden expectations replaced by the reference's output. */
+  adopted: number;
   costUsd: number;
   model: string;
   latencyMs: number;
@@ -239,13 +273,15 @@ export interface VerifyRepairResult {
   model: string;
   errors: string[];
   titleChanged: boolean;
+  /** Hidden expectations replaced by the reference's output (see adoptReferenceOutputs). */
+  adopted: number;
 }
 
 /**
  * Static validation → Judge verification → repair ladder (Luna xhigh, then Terra medium).
  * Shared by live generation, the pre-generation collector and the evaluation script.
  */
-export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?: string[]; uid?: string; onStage?: StageListener; model?: string }): Promise<VerifyRepairResult> {
+export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?: string[]; uid?: string; onStage?: StageListener; model?: string; adoptReferenceOutputs?: boolean }): Promise<VerifyRepairResult> {
   const stage = o.onStage ?? (() => undefined);
   const errorsSeen: string[] = [];
   let current = validateSpec(initial, o.fallbackTopics ?? []);
@@ -253,19 +289,34 @@ export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?
   let attempts = 0, repairs = 0, costUsd = 0;
   let model: string = o.model ?? modelFor("generate");
   let titleChanged = false;
+  let adopted = 0;
   for (let round = 0; round <= REPAIR_LADDER.length; round++) {
     let feedback: RepairFeedback | null = null;
     if (current.errors.length) {
       feedback = { staticErrors: current.errors, failing: [] };
       errorsSeen.push(...current.errors.slice(0, 4));
+      console.warn(JSON.stringify({ evt: "generate.static_failed", round, title: current.spec.title, errors: current.errors.slice(0, 5) }));
     } else {
       stage("verifying", { round });
       judge = await verifyReference(judgeProblemFor(current.spec), "java", current.spec.reference.java);
       if (judge.verdict === "AC") {
-        return { spec: current.spec, judge, ok: true, attempts, repairs, firstPassOk: round === 0, costUsd, model, errors: errorsSeen, titleChanged };
+        return { spec: current.spec, judge, ok: true, attempts, repairs, firstPassOk: round === 0 && adopted === 0, costUsd, model, errors: errorsSeen, titleChanged, adopted };
+      }
+      const adoption = o.adoptReferenceOutputs === false ? null : adoptReferenceOutputs(current.spec, judge);
+      if (adoption) {
+        adopted += adoption.adopted;
+        console.info(JSON.stringify({ evt: "generate.adopted_reference_outputs", round, title: current.spec.title, adopted: adoption.adopted, of: current.spec.hiddenTests.length }));
+        const recheck = await verifyReference(judgeProblemFor(adoption.spec), "java", adoption.spec.reference.java);
+        if (recheck.verdict === "AC") {
+          return { spec: adoption.spec, judge: recheck, ok: true, attempts, repairs, firstPassOk: false, costUsd, model, errors: errorsSeen, titleChanged, adopted };
+        }
+        judge = recheck;
       }
       feedback = feedbackFromJudge(judge);
-      errorsSeen.push(`${judge.verdict} ${judge.passed}/${judge.total}${judge.failedCase ? ` (case #${judge.failedCase.index}: ${(judge.failedCase.compileOutput || judge.failedCase.stderr || judge.failedCase.actual || "").slice(0, 160)})` : ""}`);
+      const first = judge.failedCase;
+      errorsSeen.push(`${judge.verdict} ${judge.passed}/${judge.total}${first ? ` (case #${first.index}: ${(first.compileOutput || first.stderr || first.actual || "").slice(0, 160)})` : ""}`);
+      console.warn(JSON.stringify({ evt: "generate.verify_failed", round, title: current.spec.title, verdict: judge.verdict, passed: judge.passed, total: judge.total,
+        failedIndex: first?.index, status: first?.status, expected: first?.expected?.slice(0, 120), actual: first?.actual.slice(0, 120), stderr: (first?.compileOutput || first?.stderr || "").slice(0, 300) }));
     }
     if (round === REPAIR_LADDER.length) break;
     const ladder = REPAIR_LADDER[round];
@@ -279,7 +330,7 @@ export async function verifyAndRepair(initial: ProblemSpec, o: { fallbackTopics?
     if (res.data.title !== initial.title) titleChanged = true;
     current = validateSpec(res.data, o.fallbackTopics ?? []);
   }
-  return { spec: current.spec, judge, ok: false, attempts, repairs, firstPassOk: false, costUsd, model, errors: errorsSeen.slice(-4), titleChanged };
+  return { spec: current.spec, judge, ok: false, attempts, repairs, firstPassOk: false, costUsd, model, errors: errorsSeen.slice(-4), titleChanged, adopted };
 }
 
 /** Generates and verifies one spec; throws `GenerationFailed` when it cannot be made to pass. */
@@ -317,7 +368,7 @@ export async function generateSpec(ctx: GenerationContext): Promise<SpecResult> 
   attempts += vr.attempts; costUsd += vr.costUsd;
   if (!vr.ok) throw new GenerationFailed(`Problem could not be verified after ${vr.repairs} repair(s)`, attempts, costUsd, vr.errors);
   if (vr.titleChanged) embedding = null;
-  return { spec: vr.spec, judge: vr.judge!, embedding, attempts, repairs: vr.repairs, firstPassOk: vr.firstPassOk, costUsd, model: vr.model, latencyMs: Date.now() - started };
+  return { spec: vr.spec, judge: vr.judge!, embedding, attempts, repairs: vr.repairs, firstPassOk: vr.firstPassOk, adopted: vr.adopted, costUsd, model: vr.model, latencyMs: Date.now() - started };
 }
 
 // ── Persist ──────────────────────────────────────────────────────────────────
@@ -392,7 +443,7 @@ export async function generateVerifiedProblem(ctx: GenerationContext): Promise<G
     companies: r.templateEntry ? [r.templateEntry.company] : [],
   });
   const problem = (await problems.getPublic(problemId))!;
-  console.info(JSON.stringify({ evt: "generate.done", problemId, title: problem.title, attempts: result.attempts, repairs: result.repairs, firstPassOk: result.firstPassOk, costUsd: result.costUsd, ms: Date.now() - started }));
+  console.info(JSON.stringify({ evt: "generate.done", problemId, title: problem.title, attempts: result.attempts, repairs: result.repairs, firstPassOk: result.firstPassOk, adopted: result.adopted, costUsd: result.costUsd, ms: Date.now() - started }));
   stage("done", { source: "generated", problemId });
   return { problemId, problem, source: "generated", attempts: result.attempts, costUsd: result.costUsd, latencyMs: Date.now() - started };
 }

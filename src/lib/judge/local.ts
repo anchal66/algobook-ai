@@ -13,6 +13,9 @@ import { LANGUAGES } from "@/lib/judge/languages";
  * For development, the evaluation script and CI only — no sandboxing. Never use in production.
  */
 
+const BITS_STDCPP = ["algorithm", "array", "bitset", "cassert", "cctype", "climits", "cmath", "cstdint", "cstdio", "cstdlib", "cstring", "deque", "functional", "iomanip", "iostream", "iterator", "limits", "list", "map", "numeric", "queue", "set", "sstream", "stack", "string", "tuple", "unordered_map", "unordered_set", "utility", "vector"]
+  .map((h) => `#include <${h}>`).join("\n") + "\n";
+
 interface Runner {
   compile?: (dir: string, src: string) => Promise<{ ok: true } | { ok: false; output: string }>;
   run: (dir: string) => { cmd: string; args: string[] };
@@ -28,7 +31,13 @@ const RUNNERS: Record<number, Runner> = {
   [LANGUAGES.python.id]: { file: "main.py", run: (dir) => ({ cmd: "python3", args: [path.join(dir, "main.py")] }) },
   [LANGUAGES.cpp.id]: {
     file: "main.cpp",
-    compile: (dir, src) => exec("g++", ["-O2", "-std=c++17", "-o", path.join(dir, "prog"), src], dir, 60_000).then((r) => (r.code === 0 ? { ok: true } : { ok: false, output: r.stderr || r.stdout })),
+    // Apple clang ships no <bits/stdc++.h>; provide a shim so sources written for Judge0's GCC compile here too.
+    compile: async (dir, src) => {
+      await fs.mkdir(path.join(dir, "inc", "bits"), { recursive: true });
+      await fs.writeFile(path.join(dir, "inc", "bits", "stdc++.h"), BITS_STDCPP, "utf8");
+      const r = await exec("g++", ["-O2", "-std=c++17", "-I", path.join(dir, "inc"), "-o", path.join(dir, "prog"), src], dir, 60_000);
+      return r.code === 0 ? { ok: true } : { ok: false, output: r.stderr || r.stdout };
+    },
     run: (dir) => ({ cmd: path.join(dir, "prog"), args: [] }),
   },
   [LANGUAGES.javascript.id]: { file: "main.js", run: (dir) => ({ cmd: "node", args: [path.join(dir, "main.js")] }) },

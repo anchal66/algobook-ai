@@ -5,7 +5,7 @@ import type { ResponseCreateParamsNonStreaming, ResponseInput, ResponseStreamEve
 import type { ZodType } from "zod";
 import { env } from "@/lib/env";
 import * as aiUsage from "@/lib/data/aiUsage";
-import { MODEL_POLICY, estimateCost, modelFor, type AiPurpose, type ModelId, type ReasoningEffort, type TokenUsage, type Verbosity } from "@/lib/ai/models";
+import { MODEL_POLICY, estimateCost, modelFor, reasoningFor, type AiPurpose, type ModelId, type ReasoningEffort, type TokenUsage, type Verbosity } from "@/lib/ai/models";
 
 /**
  * Single typed entry point for every OpenAI call (Module 02 §3.1).
@@ -116,7 +116,7 @@ function toInput(input: string | ResponseInput): ResponseInput {
 
 function baseParams<T>(o: AiCallOptions<T>, model: ModelId): ResponseCreateParamsNonStreaming {
   const policy = MODEL_POLICY[o.purpose];
-  const effort = o.reasoning ?? policy.reasoning;
+  const effort = o.reasoning ?? reasoningFor(o.purpose);
   const verbosity = o.verbosity ?? policy.verbosity;
   const params: ResponseCreateParamsNonStreaming = {
     model,

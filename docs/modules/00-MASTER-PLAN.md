@@ -209,18 +209,18 @@ Verified against the OpenAI model list on 2026-09-07 and public model cards. Pri
 
 | Purpose | Model | reasoning.effort | max_output_tokens | Notes |
 |---|---|---|---|---|
-| Problem generation (spec + tests + reference solution) | `gpt-5.6-luna` | `high` | 6,000 | Retry #1 on validation failure: `gpt-5.6-luna` `xhigh` with judge feedback; Retry #2: `gpt-5.6-terra` `medium`. Never Astra by default (D-03). |
-| Driver generation for an extra language | `gpt-5.6-luna` | `medium` | 2,500 | Verified against hidden tests before saving. |
+| Problem generation (spec + tests + reference solution) | `gpt-5.6-luna` | `high` | 16,000 (repair 20,000) | Retry #1 on validation failure: `gpt-5.6-luna` `xhigh` with judge feedback; Retry #2: `gpt-5.6-terra` `medium`. Never Astra by default (D-03). |
+| Driver generation for an extra language | `gpt-5.6-luna` | `medium` | 8,000 | Verified against hidden tests before saving. |
 | Hints (all 3 at once, at generation time) | part of generation call | — | — | No separate call. |
-| Level-3 contextual hint / explain-error / code review | `gpt-5.6-luna` | `low` | 600 / 500 / 900 | `verbosity: low`. |
-| Editorial (once per problem, shared) | `gpt-5.6-luna` | `medium` | 4,000 | Cached in `problems/{id}/content/editorial`. |
-| Tutor chat | `gpt-5.6-luna` | `low` | 700 | Streaming; last 8 turns only. |
+| Level-3 contextual hint / explain-error / code review | `gpt-5.6-luna` | `low` | 1,200 / 1,200 / 2,500 | `verbosity: low`. |
+| Editorial (once per problem, shared) | `gpt-5.6-luna` | `medium` | 10,000 | Cached in `problems/{id}/content/editorial`. |
+| Tutor chat | `gpt-5.6-luna` | `low` | 1,500 | Streaming; last 8 turns only. |
 | Inline completion | `gpt-5.6-luna` | `none` | 96 | 600 ms debounce, opt-in setting, cached prefix. |
-| Project insights / plan | `gpt-5.6-luna` | `low` | 700 | |
+| Project insights / plan | `gpt-5.6-luna` | `low` | 2,500 | |
 | Embeddings for dedupe | `text-embedding-3-small` | — | — | 1536 dims, stored on the problem doc. |
-| Nightly pool pre-generation | `gpt-5.6-luna` via **Batch API** | `high` | 6,000 | 50% cheaper; fills topic×difficulty matrix. |
+| Nightly pool pre-generation | `gpt-5.6-luna` via **Batch API** | `high` | 16,000 | 50% cheaper; fills topic×difficulty matrix. |
 
-Rules: Responses API only (`client.responses.create`/`parse`); zod schemas → `text.format` (json_schema, `strict: true`); `store: false`; static instructions first, dynamic context last (prompt cache); `max_output_tokens` always set; no `temperature`; log every call to `aiUsage`. Full prompt texts live in Module 02.
+Rules: Responses API only (`client.responses.create`/`parse`); zod schemas → `text.format` (json_schema, `strict: true`); `store: false`; **`max_output_tokens` includes reasoning tokens** (Module 02 measured 3–8k reasoning tokens per `high` generation, hence the budgets above — only produced tokens are billed); static instructions first, dynamic context last (prompt cache); `max_output_tokens` always set; no `temperature`; log every call to `aiUsage`. Full prompt texts live in Module 02.
 
 Estimated cost per **new verified problem** ≈ $0.006–$0.02 on Luna (vs ~$0.15+ on gpt-5.4 today); hints/editorial amortized to ~$0 per user because they are generated once and shared.
 

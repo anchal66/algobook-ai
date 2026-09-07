@@ -50,3 +50,25 @@ export function normalizeTags(tags: string[]): CoreTopic[] {
 export function isCoreTopic(t: string): t is CoreTopic {
   return CORE_SET.has(t);
 }
+
+/** Topics mentioned anywhere in free text (canonical names and aliases, longest match first). */
+export function topicsInText(text: string, max = 3): CoreTopic[] {
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9+#]+/g, " ")} `;
+  const out: CoreTopic[] = [];
+  const names: [string, CoreTopic][] = [...CORE_TOPICS.map((c) => [c, c] as [string, CoreTopic]), ...Object.entries(TAG_ALIASES)];
+  names.sort((a, b) => b[0].length - a[0].length);
+  for (const [name, canon] of names) {
+    if (out.length >= max) break;
+    if (t.includes(` ${name} `) && !out.includes(canon)) out.push(canon);
+  }
+  return out;
+}
+
+/** "easy" / "medium" / "hard" mentioned in free text, if any. */
+export function difficultyInText(text: string): "Easy" | "Medium" | "Hard" | null {
+  const t = text.toLowerCase();
+  if (/\bhard\b/.test(t)) return "Hard";
+  if (/\bmedium\b/.test(t)) return "Medium";
+  if (/\beasy\b/.test(t)) return "Easy";
+  return null;
+}

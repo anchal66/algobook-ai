@@ -54,6 +54,14 @@ export function isModelId(x: string): x is ModelId {
   return KNOWN.has(x);
 }
 
+const EFFORTS = new Set<string>(["none", "low", "medium", "high", "xhigh", "max"]);
+/** `AI_REASONING_OVERRIDE_<PURPOSE>` (experiments / the eval script). */
+export function reasoningFor(purpose: AiPurpose): ReasoningEffort | undefined {
+  const override = process.env[`AI_REASONING_OVERRIDE_${purpose.toUpperCase()}`];
+  if (override && EFFORTS.has(override)) return override as ReasoningEffort;
+  return MODEL_POLICY[purpose].reasoning;
+}
+
 /** Effective model for a purpose (env override wins when it names a known model). */
 export function modelFor(purpose: AiPurpose): ModelId {
   const override = process.env[`AI_MODEL_OVERRIDE_${purpose.toUpperCase()}`];
