@@ -1,27 +1,9 @@
-import { ReactNode } from 'react';
-import ProjectHeader from './_components/ProjectHeader';
-import AttendanceModal from './_components/AttendanceModal';
+import type { ReactNode } from "react";
 
-// 1. FIX: The 'params' prop type is now a Promise
-export default async function ProjectLayout({
-  children,
-  params,
-}: {
-  children: ReactNode;
-  params: Promise<{ projectId: string }>; // <-- This is the type fix
-}) {
-  
-  // 2. FIX: You must await the promise to get the resolved value
-  const resolvedParams = await params;
-
-  return (
-    <div className="flex flex-col h-screen w-screen">
-      {/* 3. FIX: Use the resolved value here */}
-      <ProjectHeader projectId={resolvedParams.projectId} />
-      <AttendanceModal projectId={resolvedParams.projectId} />
-      <main className="flex-grow overflow-hidden">
-        {children}
-      </main>
-    </div>
-  );
+/**
+ * Project routes render their own chrome: the workspace (`/solve/*`) has the LeetCode-style top bar
+ * and the insights page has its own header. The v1 ProjectHeader and the attendance modal (D-07) are gone.
+ */
+export default function ProjectLayout({ children }: { children: ReactNode }) {
+  return children;
 }

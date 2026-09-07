@@ -169,7 +169,7 @@ export default function ProjectInsightsPage({ params }: { params: Promise<{ proj
             <div className="h-5 w-px bg-border hidden sm:block" />
             <h1 className="text-sm font-medium text-muted-foreground truncate max-w-[300px]">{project.title} — Insights</h1>
           </div>
-          <Link href={`/project/${projectId}/editor`}>
+          <Link href={`/project/${projectId}`}>
             <Button size="sm" className="gap-1.5">
               <Zap className="h-3.5 w-3.5" /> Continue Practicing
             </Button>
