@@ -12,7 +12,7 @@ import { Badge, DifficultyBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHART, ChartTooltip, Legend } from "@/components/charts";
 import { useQuery, invalidate } from "@/lib/app/query";
-import { getAiUsage, getFlagged, leaderboardSnapshot, pregen, reverifyProblem, setProblemStatus, type AiUsageResponse, type UsageBucket } from "@/lib/app/api";
+import { getAiUsage, getFlagged, getJudgeBudget, leaderboardSnapshot, pregen, reverifyProblem, setProblemStatus, type AiUsageResponse, type UsageBucket } from "@/lib/app/api";
 import { Input } from "@/components/ui/input";
 import { ShieldCheck } from "lucide-react";
 import { fmtDate, fmtNumber, titleCase } from "@/lib/app/format";
@@ -66,6 +66,43 @@ function UsageTable({ title, rows, total }: { title: string; rows: [string, Usag
       <p className="text-xs font-semibold uppercase tracking-wider text-text-3">{title}</p>
       <table className="mt-2 w-full text-sm"><tbody>{rows.map(([k, b]) => <tr key={k} className="border-t border-line/70"><td className="py-1.5 text-text-1">{k}</td><td className="py-1.5 text-right tabular text-text-2">{b.calls}</td><td className="py-1.5 text-right tabular text-text-1">{usd(b.costUsd)}</td><td className="w-24 py-1.5 pl-3"><div className="h-1.5 rounded-full bg-surface-3"><div className="h-full rounded-full bg-brand" style={{ width: `${total ? (b.costUsd / total) * 100 : 0}%` }} /></div></td></tr>)}</tbody></table>
     </div>
+  );
+}
+
+export function JudgeBudgetPanel() {
+  const q = useQuery("/api/admin/judge", getJudgeBudget, { staleMs: 30_000 });
+  const b = q.data;
+  const unlimited = !b || b.cap === 0;
+  const pct = b && b.cap > 0 ? Math.min(100, Math.round((b.used / b.cap) * 100)) : 0;
+  const low = !!b && b.cap > 0 && (b.remaining ?? 0) <= b.reserve;
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-md font-semibold text-text-1">Code execution budget</h2>
+          <p className="mt-1 text-sm text-text-2">Judge batches used today (UTC). One Run or Submit is one batch.</p>
+        </div>
+        <Badge variant={unlimited ? "ok" : low ? "err" : "neutral"} size="sm">{unlimited ? "Unlimited" : low ? "Low" : "Capped"}</Badge>
+      </div>
+      {q.loading ? <Skeleton className="mt-4 h-20" /> : !b ? <p className="mt-3 text-sm text-text-3">Unavailable.</p> : unlimited ? (
+        <p className="mt-3 text-sm text-text-2">No daily cap on this judge ({b.selfHosted ? "self-hosted or paid plan" : "cap disabled"}). <span className="tabular">{b.used}</span> batches used today.</p>
+      ) : (
+        <>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-2xl font-semibold tabular text-text-1">{b.remaining}</span>
+            <span className="text-sm text-text-2">of {b.cap} batches left today</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
+            <div className={cn("h-full rounded-full transition-[width] duration-500", low ? "bg-err" : "bg-brand")} style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-text-3">
+            {b.reserve} are reserved for people solving problems: background work (driver fan-out, pre-generation) stops at{" "}
+            <span className="tabular">{b.backgroundRemaining}</span> remaining, so Run and Submit keep working.
+          </p>
+          {low && <p className="mt-2 text-xs text-err">Only the user reserve is left. New problems will arrive with Java ready and other languages prepared on demand.</p>}
+        </>
+      )}
+    </Card>
   );
 }
 

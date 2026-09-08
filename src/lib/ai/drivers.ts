@@ -2,6 +2,7 @@ import "server-only";
 import type { Language } from "@/lib/data/schema";
 import * as problems from "@/lib/data/problems";
 import { verifyReference } from "@/lib/judge/service";
+import { asBackground, hasBackgroundBudget } from "@/lib/judge/budget";
 import { LANGUAGES } from "@/lib/judge/languages";
 import { aiCall, type AiResult } from "@/lib/ai/client";
 import { DriverBundleSchema, type DriverBundle } from "@/lib/ai/schemas";
@@ -105,7 +106,15 @@ export async function ensureLanguage(problemId: string, language: Language, opts
 /** Background fan-out to every non-Java language; never throws (errors are logged per language). */
 export async function fanOutLanguages(problemId: string, languages: Language[] = FAN_OUT_LANGUAGES, uid?: string): Promise<Record<string, EnsureResult>> {
   const out: Record<string, EnsureResult> = {};
-  const settled = await Promise.allSettled(languages.map((l) => ensureLanguage(problemId, l, { uid })));
+  // Eagerly preparing 3 extra languages costs 3 judge batches per problem. On a capped judge that is the
+  // difference between 12 problems/day and people being unable to run code, so it yields to the user reserve;
+  // the language is then produced on demand the first time someone selects it ("Preparing…" for ~10 s).
+  if (!(await hasBackgroundBudget())) {
+    console.info(JSON.stringify({ evt: "drivers.fanout_deferred", problemId, reason: "judge budget reserved for users" }));
+    for (const l of languages) out[l] = { status: "running" };
+    return out;
+  }
+  const settled = await Promise.allSettled(languages.map((l) => asBackground(() => ensureLanguage(problemId, l, { uid }))));
   settled.forEach((s, i) => {
     out[languages[i]] = s.status === "fulfilled" ? s.value : { status: "failed", error: (s.reason as Error)?.message ?? "failed" };
   });

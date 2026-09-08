@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shell/AppShell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShieldCheck } from "lucide-react";
-import { CoveragePanel, FlaggedPanel, TriggersPanel, UsagePanel } from "@/components/admin/panels";
+import { CoveragePanel, FlaggedPanel, JudgeBudgetPanel, TriggersPanel, UsagePanel } from "@/components/admin/panels";
 
 export default function AdminPage() {
   const me = useMe((s) => s.me);
@@ -16,6 +16,7 @@ export default function AdminPage() {
       <PageHeader title="Admin console" description="AI spend, pool coverage, moderation queue and job triggers." />
       <div className="grid gap-4 xl:grid-cols-2">
         <UsagePanel />
+        <JudgeBudgetPanel />
         <CoveragePanel />
         <FlaggedPanel />
         <TriggersPanel />

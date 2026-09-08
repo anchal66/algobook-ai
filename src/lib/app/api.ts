@@ -160,6 +160,8 @@ export const getAiUsage = (from?: string, to?: string) => {
   return apiFetch<AiUsageResponse>(`/api/admin/ai-usage${s ? `?${s}` : ""}`);
 };
 export interface PregenJob { id: string; status: string; batchId?: string | null; requested?: number; processed?: number; createdAt?: string; updatedAt?: string; [k: string]: unknown }
+export interface JudgeBudget { date: string; used: number; cap: number; reserve: number; remaining: number | null; backgroundRemaining: number | null; selfHosted: boolean; backend: string; host: string }
+export const getJudgeBudget = () => apiFetch<JudgeBudget>("/api/admin/judge");
 export const getFlagged = () => apiFetch<{ items: FlaggedProblem[] }>("/api/admin/problems/flagged");
 export const pregen = (body: { action: "status" | "deficits" | "submit" | "collect"; jobId?: string; maxRequests?: number; poolMin?: number; companies?: string[] }) =>
   apiFetch<{ jobs?: PregenJob[]; poolMin?: number; cells?: { topic: string; difficulty: Difficulty; have: number; need: number }[]; totalNeed?: number; job?: PregenJob | null; message?: string; collected?: { id: string; status: string; processed: number; batchStatus: string }[] }>("/api/admin/pregen", { method: "POST", body });

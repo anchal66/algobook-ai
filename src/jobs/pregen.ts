@@ -12,6 +12,7 @@ import { ProblemSpecSchema } from "@/lib/ai/schemas";
 import { GEN_INSTRUCTIONS, buildGenInput } from "@/lib/ai/prompts";
 import { persistSpec, verifyAndRepair } from "@/lib/ai/generate";
 import { PREGEN_REPAIR_LADDER } from "@/lib/ai/models";
+import { asBackground, BudgetSkipped } from "@/lib/judge/budget";
 import { fanOutLanguages } from "@/lib/ai/drivers";
 import { CORE_TOPICS } from "@/lib/practice/topics";
 
@@ -177,7 +178,7 @@ export async function collectPregenJob(job: WithId<PregenJob>, chunk = COLLECT_C
     let spec;
     try { spec = ProblemSpecSchema.parse(JSON.parse(text ?? "")); } catch (e) { results.failed++; console.warn(JSON.stringify({ evt: "pregen.parse_failed", customId: parsed.custom_id, message: (e as Error).message?.slice(0, 200) })); continue; }
     try {
-      const vr = await verifyAndRepair(spec, { fallbackTopics: meta.topics, model, ladder: PREGEN_REPAIR_LADDER });
+      const vr = await asBackground(() => verifyAndRepair(spec, { fallbackTopics: meta.topics, model, ladder: PREGEN_REPAIR_LADDER }));
       results.costUsd += vr.costUsd;
       if (!vr.ok) { results.failed++; console.warn(JSON.stringify({ evt: "pregen.unverified", customId: parsed.custom_id, errors: vr.errors })); continue; }
       if (vr.repairs) results.repaired++;
@@ -189,6 +190,7 @@ export async function collectPregenJob(job: WithId<PregenJob>, chunk = COLLECT_C
       results.costUsd += Object.values(fan).reduce((a, r) => a + (r.costUsd ?? 0), 0);
       console.info(JSON.stringify({ evt: "pregen.verified", customId: parsed.custom_id, problemId, title: vr.spec.title, languages: Object.entries(fan).filter(([, r]) => r.status === "ready").map(([l]) => l) }));
     } catch (e) {
+      if (e instanceof BudgetSkipped) { console.info(JSON.stringify({ evt: "pregen.paused_for_budget", used: e.used, cap: e.cap })); break; }
       results.failed++;
       console.error(JSON.stringify({ evt: "pregen.item_error", customId: parsed.custom_id, message: (e as Error).message?.slice(0, 300) }));
     }
