@@ -25,7 +25,7 @@ Update this table **and** the header of the module file whenever a status change
 | 03 | 35 | 35 | 0 | `8b8dbc5` (merge of `module/03-workspace`, pushed 2026-09-08) |
 | 04 | 25 | 25 | 0 | `1979fab` (merge of `module/04-intelligence`, pushed 2026-09-08) |
 | 05 | 29 | 29 | 0 | `4f527dc` (merge of `module/05-design-pages`, pushed 2026-09-08) · tag `v2.0.0` |
-| 06 | 27 | 27 | 0 | (merge SHA below) |
+| 06 | 27 | 27 | 0 | `8406a62` (merge of `module/06-rooms`, pushed 2026-09-29) |
 | 07 | 21 | 19 | 2 | `bb2614d` (merge of `module/07-visualizer`, pushed 2026-09-29) |
 
 The last task of every module is "Ship it": commit, merge the module branch into `main`, rebuild, push, and record the SHA above. A module is not `COMPLETE` until it is pushed.
