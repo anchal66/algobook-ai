@@ -138,3 +138,18 @@ export const nextProblemStream = (projectId: string, opts: { userPrompt?: string
 export const getMe = () => apiFetch<MeResponse>("/api/me");
 export const patchSettings = (patch: Partial<{ editor: Partial<UserSettings["editor"]>; layout: Record<string, unknown>; timer: Partial<UserSettings["timer"]>; shortcuts: Record<string, string> }>) =>
   apiFetch<{ settings: UserSettings }>("/api/me/settings", { method: "PATCH", body: patch });
+
+// ── Visualizer (Module 07) ──────────────────────────────────────────────────
+export const getDriver = (problemId: string, language: "python" | "javascript") =>
+  apiFetch<{ language: "python" | "javascript"; driver: string }>(`/api/problems/${problemId}/driver?language=${language}`);
+export interface TraceExplainBody { language: "python" | "javascript"; code: string; caseInput: string; expected?: string; question: "step" | "chapter" | "failure"; windowText: string }
+export const traceExplainStream = (problemId: string, body: TraceExplainBody, onDelta: (t: string) => void, signal?: AbortSignal) =>
+  new Promise<string>((resolve, reject) => {
+    let full = "";
+    sseFetch(`/api/problems/${problemId}/trace-explain`, body, (event, data) => {
+      const d = data as { text?: string; message?: string; code?: string };
+      if (event === "delta" && d.text) { full += d.text; onDelta(d.text); }
+      else if (event === "done") resolve(d.text ?? full);
+      else if (event === "error") reject(new ApiError(502, (d.code ?? "UPSTREAM") as never, d.message ?? "Explanation failed"));
+    }, signal).then(() => resolve(full)).catch(reject);
+  });

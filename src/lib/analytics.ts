@@ -18,7 +18,10 @@ export type AnalyticsEvent =
   | { name: "checkout_start"; params?: { plan: string } }
   | { name: "contact_submit"; params?: Record<string, never> }
   | { name: "demo_run"; params?: { language: string } }
-  | { name: "explore_pick_random"; params?: Record<string, never> };
+  | { name: "explore_pick_random"; params?: Record<string, never> }
+  // Module 07
+  | { name: "visualize"; params?: { language: string; steps: number; truncated: string; ms: number } }
+  | { name: "visualize_explain"; params?: { question: string } };
 
 type Gtag = (command: "event", name: string, params?: Record<string, unknown>) => void;
 

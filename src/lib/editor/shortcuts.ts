@@ -41,7 +41,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "closeTab", group: "general", label: "Close tab", combo: { code: "KeyW", alt: true }, toggleable: true, global: true },
   { id: "maximizePanel", group: "general", label: "Maximize / Exit Maximize Panel", combo: { code: "Equal", alt: true }, toggleable: true, global: true },
   { id: "fullscreen", group: "general", label: "Enter / Exit Full Screen", combo: { code: "KeyF", alt: true }, toggleable: true, global: true },
-  { id: "debugStart", group: "debug", label: "Start Debugging", combo: { code: "Quote", mod: true, alt: true }, toggleable: false, global: true },
+  { id: "debugStart", group: "debug", label: "Visualize (watch the code run)", combo: { code: "Quote", mod: true, alt: true }, toggleable: true, global: true },
   { id: "debugStop", group: "debug", label: "Stop", combo: { code: "Escape" }, toggleable: false, global: false },
   { id: "stepOver", group: "debug", label: "Step over", combo: { code: "F10" }, toggleable: false, global: true },
   { id: "stepInto", group: "debug", label: "Step into", combo: { code: "F11" }, toggleable: false, global: true },

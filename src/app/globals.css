@@ -407,6 +407,25 @@
 @keyframes ws-orb { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.08) rotate(180deg); } }
 .ws-orb { animation: ws-orb 3.2s var(--ease-out-quart) infinite; }
 
+/* ── Visualizer (Module 07) ────────────────────────────────────────────── */
+.trace-line-current { background: color-mix(in srgb, #6366f1 22%, transparent); }
+.trace-line-return { background: color-mix(in srgb, #2cbb5d 20%, transparent); }
+.trace-line-exception { background: color-mix(in srgb, #ef4743 22%, transparent); }
+.trace-heat { box-shadow: inset 3px 0 0 color-mix(in srgb, #22d3ee 35%, transparent); }
+.trace-heat-2 { box-shadow: inset 3px 0 0 color-mix(in srgb, #22d3ee 60%, transparent); }
+.trace-heat-3 { box-shadow: inset 3px 0 0 #22d3ee; }
+.trace-glyph-current::after { content: "▶"; color: #6366f1; font-size: 10px; display: block; text-align: center; line-height: inherit; }
+.trace-glyph-breakpoint::after { content: "●"; color: #ef4743; font-size: 11px; display: block; text-align: center; line-height: inherit; }
+.trace-glyph-current.trace-glyph-breakpoint::after { content: "▶"; }
+@keyframes trace-flash { 0% { background-color: color-mix(in srgb, #ffc01e 55%, transparent); } 100% { background-color: transparent; } }
+.trace-flash { animation: trace-flash 900ms var(--ease-out-quart) 1; }
+@keyframes trace-flash-svg { 0% { filter: drop-shadow(0 0 6px #ffc01e); } 100% { filter: none; } }
+.trace-flash-svg { animation: trace-flash-svg 900ms ease-out 1; }
+.trace-scrubber { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg-3) 30%, transparent); outline: none; }
+.trace-scrubber::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #6366f1; border: 2px solid var(--ws-panel); cursor: pointer; }
+.trace-scrubber::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #6366f1; border: 2px solid var(--ws-panel); cursor: pointer; }
+.trace-scrubber:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, #6366f1 40%, transparent); }
+
 /* ── Reduced motion: global guard (Module 05 §1) ───────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

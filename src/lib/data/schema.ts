@@ -28,7 +28,7 @@ export const ExperienceLevelSchema = z.enum(["beginner", "intermediate", "advanc
 export const GoalTypeSchema = z.enum(["learn-basics", "daily-practice", "interview-prep", "returning-after-break"]);
 export const PracticeStateSchema = z.enum(["warm-up", "learning", "strengthening", "revision", "interview-prep", "maintenance"]);
 export const PlanTierSchema = z.enum(["free", "pro"]);
-export const FeatureKeySchema = z.enum(["generate", "run", "submit", "hint3", "editorial", "chat", "completion", "review", "interview"]);
+export const FeatureKeySchema = z.enum(["generate", "run", "submit", "hint3", "editorial", "chat", "completion", "review", "interview", "visualizeExplain"]);
 export const ProblemStatusSchema = z.enum(["draft", "verified", "retired"]);
 export const ProblemSourceSchema = z.enum(["generated", "template", "curated"]);
 export const ItemStatusSchema = z.enum(["todo", "attempting", "solved"]);
@@ -141,6 +141,8 @@ export const QuotasSchema = z.object({
   completion: z.number().int().default(0),
   review: z.number().int().default(0),
   interview: z.number().int().default(0),
+  /** Module 07: AI narration of a visualizer step. */
+  visualizeExplain: z.number().int().default(0),
 });
 
 export const UserSchema = z.object({

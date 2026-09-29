@@ -19,10 +19,11 @@ export interface TopBarProps {
   nav: NextProblemApi;
   onRun: () => void;
   onSubmit: () => void;
+  onVisualize?: () => void;
   onFullscreen: () => void;
 }
 
-export function TopBar({ nav, onRun, onSubmit, onFullscreen }: TopBarProps) {
+export function TopBar({ nav, onRun, onSubmit, onVisualize, onFullscreen }: TopBarProps) {
   const setUi = useWorkspace((s) => s.setUi);
   const sidePanel = useWorkspace((s) => s.sidePanel);
   const placement = useSettings((s) => s.layout.runSubmitPlacement);
@@ -61,7 +62,7 @@ export function TopBar({ nav, onRun, onSubmit, onFullscreen }: TopBarProps) {
 
       {/* Center */}
       <div className="flex items-center gap-1">
-        {placement === "toolbar" && <RunSubmitCluster onRun={onRun} onSubmit={onSubmit} className="hidden lg:flex" />}
+        {placement === "toolbar" && <RunSubmitCluster onRun={onRun} onSubmit={onSubmit} onVisualize={onVisualize} className="hidden lg:flex" />}
         <div className="flex items-center rounded-[8px] bg-ws-panel p-0.5">
           <Tooltip><TooltipTrigger asChild>
             <button type="button" aria-label="Notes" onClick={() => toggleSide("notes")} aria-pressed={sidePanel === "notes"} className={pillBtn(sidePanel === "notes")}><NotebookPen className="size-4" /><span className="hidden xl:inline">Notes</span></button>

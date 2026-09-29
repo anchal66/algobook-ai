@@ -250,8 +250,10 @@ Estimated cost per **new verified problem** ≈ $0.006–$0.02 on Luna (vs ~$0.1
 | 03 | `03-MODULE-EDITOR-WORKSPACE.md` — LeetCode-parity problem page (+ AI extras) | 01, 02 | COMPLETE (2026-09-08) |
 | 04 | `04-MODULE-PRACTICE-INTELLIGENCE.md` — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard snapshots, achievements, daily challenge, mock interview, templates | 01, 02 | COMPLETE (2026-09-08) |
 | 05 | `05-MODULE-DESIGN-SYSTEM-PAGES.md` — design system, motion/3D, landing, dashboard, explore, project wizard, profile, leaderboard, settings, admin, final QA | 01–04 (pages consume their APIs) | COMPLETE (2026-09-08) |
+| 06 | `06-MODULE-COMPETITION-ROOMS.md` — live contest rooms: code/approval lobby, configurable problem sets, room-aware run/submit, scoring, anti-cheat + consent, contest rating; Judge0 budget mode on the free tier | 01–05 | NOT STARTED (plan 2026-09-29) |
+| 07 | `07-MODULE-CODE-VISUALIZER.md` — in-browser execution replay for Python/JavaScript (Pyodide, instrumentation), memory canvas, timeline, AI explanations | 01–03 (no Judge0) | NOT STARTED (plan 2026-09-29) |
 
-Suggested calendar: 01 → 02 → 03 → 04 → 05. Modules 03 and 04 can run in parallel by two assistants once 02 is complete.
+Suggested calendar: 01 → 02 → 03 → 04 → 05. Modules 03 and 04 can run in parallel by two assistants once 02 is complete. **v2.1:** 07 first (no judge dependency, strongest differentiator), then 06; they touch different files and can also run in parallel.
 
 ---
 

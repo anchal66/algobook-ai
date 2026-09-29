@@ -14,7 +14,7 @@ export function assembleJava(userCode: string, driverCode: string): string {
 
 const CPP_PRELUDE = `#include <bits/stdc++.h>\nusing namespace std;\n`;
 /** LeetCode pre-imports these in its Python runtime; users (and the AI) rely on it. */
-const PYTHON_PRELUDE = `from typing import List, Dict, Set, Tuple, Optional, Deque, DefaultDict, Any\nimport sys, math, bisect, heapq, itertools, functools, collections, string, re\nfrom collections import defaultdict, deque, Counter, OrderedDict\nfrom functools import lru_cache, reduce\nfrom heapq import heappush, heappop, heapify\nfrom itertools import permutations, combinations, accumulate, product\nfrom bisect import bisect_left, bisect_right\nfrom math import inf, gcd, sqrt, ceil, floor, log2\nsys.setrecursionlimit(10000)\n`;
+export const PYTHON_PRELUDE = `from typing import List, Dict, Set, Tuple, Optional, Deque, DefaultDict, Any\nimport sys, math, bisect, heapq, itertools, functools, collections, string, re\nfrom collections import defaultdict, deque, Counter, OrderedDict\nfrom functools import lru_cache, reduce\nfrom heapq import heappush, heappop, heapify\nfrom itertools import permutations, combinations, accumulate, product\nfrom bisect import bisect_left, bisect_right\nfrom math import inf, gcd, sqrt, ceil, floor, log2\nsys.setrecursionlimit(10000)\n`;
 /** Java: LeetCode implicitly imports java.util.*. */
 const JAVA_IMPLICIT_IMPORTS = ["import java.util.*;", "import java.io.*;", "import java.util.stream.*;"];
 
