@@ -88,6 +88,9 @@ function Hub() {
   const [filter, setFilter] = useState<Filter>("all");
   const [joining, setJoining] = useState<string | null>(null);
   const now = useNow();
+  // Opening the hub always re-checks the live-room banner against the server.
+  const uid = user?.uid ?? null;
+  useEffect(() => { if (uid) void useMe.getState().load(uid, true); }, [uid]);
   const list = useMemo(() => (pub.data?.rooms ?? []).filter((r) => filter === "all" || (filter === "rated" && r.rated) || (filter === "open" && r.joinApproval === "auto" && r.acceptedCount < r.maxMembers) || (filter === "starting" && r.scheduledAt && Date.parse(r.scheduledAt) - now < 30 * 60_000)), [pub.data, filter, now]);
   const join = async (r: RoomCard) => {
     setJoining(r.id);
@@ -95,7 +98,8 @@ function Hub() {
     catch (e) { toast.error(errorText(e)); setJoining(null); }
   };
   const live = mine.data?.rooms ?? [];
-  const active = me?.activeRoom;
+  // Trust the fresh list over a possibly stale profile: hide the banner if the list loaded and does not contain the room.
+  const active = me?.activeRoom && (!mine.data || live.some((r) => r.id === me.activeRoom!.id)) ? me.activeRoom : null;
 
   return (
     <>

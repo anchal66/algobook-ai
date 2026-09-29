@@ -28,7 +28,8 @@
     "qa:user": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-user.ts",
     "qa:lighthouse": "node scripts/qa-lighthouse.mjs",
     "room:smoke": "NODE_OPTIONS=--conditions=react-server tsx scripts/room-smoke.ts",
-    "openai:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/openai-check.ts"
+    "openai:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/openai-check.ts",
+    "rooms:inspect": "NODE_OPTIONS=--conditions=react-server tsx scripts/rooms-inspect.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

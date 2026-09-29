@@ -36,6 +36,21 @@ export function AppShell({ children, width = "default" }: { children: ReactNode;
     else void load(user.uid);
   }, [loading, user, router, path, load]);
 
+  // Module 06: the live-room banner/pill come from /api/me, which is otherwise cached for the whole session.
+  // While it says "you are in a room", re-check every 30 s and whenever the tab regains focus, so a contest that
+  // ended elsewhere (host ended it, cron finalised it, another tab) stops showing as live.
+  const hasActiveRoom = !!me?.activeRoom;
+  const uid = user?.uid ?? null;
+  useEffect(() => {
+    if (!uid || !hasActiveRoom) return;
+    // Browsers already throttle timers in background tabs; the check is one small request and stops once no room is live.
+    const refresh = () => { void useMe.getState().load(uid, true); };
+    const id = setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { clearInterval(id); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [uid, hasActiveRoom]);
+
   // A 401 from any API call means the Firebase session is gone: sign out cleanly and go to login.
   useEffect(() => {
     const onUnauth = () => { clearQueries(); useMe.getState().reset(); void signOut(auth).finally(() => router.replace(`/login?next=${encodeURIComponent(path)}`)); };
