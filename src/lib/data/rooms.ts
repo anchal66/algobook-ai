@@ -68,15 +68,17 @@ export async function listPublicLobbies(limit = 50): Promise<WithId<Room>[]> {
   }
 }
 
-/** Rooms the user hosts or joined (collection-group query on members.uid). */
+export const membershipRef = (uid: string, roomId: string) => adminDb.collection("users").doc(uid).collection("roomMemberships").doc(roomId);
+
+/** Rooms the user hosts or joined, via the per-user membership index (no collection-group index needed). */
 export async function listForUser(uid: string, limit = 40): Promise<{ room: WithId<Room>; member: WithId<RoomMember> }[]> {
-  const snap = await adminDb.collectionGroup("members").where("uid", "==", uid).limit(200).get();
-  const members = snap.docs.map((d) => ({ member: parseMember(d)!, roomId: d.ref.parent.parent!.id }));
-  if (!members.length) return [];
-  const roomSnaps = await adminDb.getAll(...members.map((m) => roomRef(m.roomId)));
+  const snap = await adminDb.collection("users").doc(uid).collection("roomMemberships").limit(300).get();
+  const ids = snap.docs.map((d) => d.id).sort((a, b) => ((snap.docs.find((x) => x.id === b)!.data().joinedAt as Timestamp)?.toMillis() ?? 0) - ((snap.docs.find((x) => x.id === a)!.data().joinedAt as Timestamp)?.toMillis() ?? 0)).slice(0, limit);
+  if (!ids.length) return [];
+  const [roomSnaps, memberSnaps] = await Promise.all([adminDb.getAll(...ids.map(roomRef)), adminDb.getAll(...ids.map((id) => memberRef(id, uid)))]);
   const out: { room: WithId<Room>; member: WithId<RoomMember> }[] = [];
-  roomSnaps.forEach((s, i) => { const r = parseRoom(s); if (r) out.push({ room: r, member: members[i].member }); });
-  return out.sort((a, b) => b.room.createdAt.toMillis() - a.room.createdAt.toMillis()).slice(0, limit);
+  roomSnaps.forEach((s, i) => { const r = parseRoom(s); const m = parseMember(memberSnaps[i]); if (r && m) out.push({ room: r, member: m }); });
+  return out.sort((a, b) => b.room.createdAt.toMillis() - a.room.createdAt.toMillis());
 }
 
 /** Rooms in a status whose `endsAt` / `createdAt` passed a threshold (cron sweep; equality + in-memory filter). */

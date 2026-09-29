@@ -50,8 +50,10 @@ export async function planSlots(settings: RoomSettings, exclude: Set<string>, se
       for (const topic of [...order, null]) {
         if (topic === null && slot.topics.length) break; // topic-restricted: no fallback to any topic
         const res = await problems.search({ tags: topic ? [topic] : undefined, difficulty, status: "verified", limit: 60, excludeIds: [...chosen] });
-        const pool = res.items.filter((p) => settings.languages.every((l) => p.languages.includes(l)) || p.languages.includes("java"))
-          .filter((p) => !exclude.has(p.id) || !settings.excludeSeen);
+        const unseen = res.items.filter((p) => !exclude.has(p.id) || !settings.excludeSeen);
+        // prefer problems that already have every allowed language (no on-demand driver generation at start)
+        const ready = unseen.filter((p) => settings.languages.every((l) => p.languages.includes(l)));
+        const pool = ready.length ? ready : unseen.filter((p) => settings.languages.some((l) => p.languages.includes(l)));
         if (!pool.length) continue;
         picked = pool[Math.floor(rand() * pool.length)].id;
         break outer;
@@ -107,6 +109,7 @@ export async function createRoom(user: AuthedUser, input: unknown): Promise<{ ro
   const batch = adminDb.batch();
   batch.set(ref, room);
   batch.set(rooms.memberRef(ref.id, user.uid), host);
+  batch.set(rooms.membershipRef(user.uid, ref.id), { roomId: ref.id, joinedAt: now, role: "host" });
   batch.update(adminDb.collection("users").doc(user.uid), { activeRoomId: ref.id, "rooms.hosted": FieldValue.increment(1), updatedAt: now });
   await batch.commit();
   await consumeQuota(user.uid, "roomCreate");
@@ -157,6 +160,7 @@ export async function joinRoom(user: AuthedUser, roomId: string): Promise<{ room
     if (r.status !== "lobby") throw new ApiError(409, "CONFLICT", "This contest has already started.", { code: "ROOM_STARTED" });
     if (auto && r.acceptedCount >= settings.maxMembers) throw new ApiError(409, "CONFLICT", "This room is full.", { code: "ROOM_FULL" });
     tx.set(rooms.memberRef(roomId, user.uid), member);
+    tx.set(rooms.membershipRef(user.uid, roomId), { roomId, joinedAt: now, role: "member" });
     tx.update(rooms.roomRef(roomId), { memberCount: FieldValue.increment(existing ? 0 : 1), acceptedCount: FieldValue.increment(auto ? 1 : 0), updatedAt: now });
     tx.update(adminDb.collection("users").doc(user.uid), { activeRoomId: roomId, updatedAt: now });
   });

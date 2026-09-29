@@ -4,8 +4,12 @@
  * Pure — no Firestore.
  */
 import { z } from "zod";
-import { DifficultySchema, LanguageSchema, type Difficulty, type Language } from "@/lib/data/schema";
+import type { Difficulty, Language } from "@/types";
 import { CORE_TOPICS } from "@/lib/practice/topics";
+
+// Local copies of the enums: `@/lib/data/schema` imports firebase-admin and must stay out of client bundles.
+const DifficultySchema = z.enum(["Easy", "Medium", "Hard"]);
+const LanguageSchema = z.enum(["java", "python", "cpp", "javascript"]);
 
 export const AVATAR_ICONS = ["swords", "trophy", "flame", "rocket", "zap", "target", "crown", "puzzle", "brain", "shield", "star", "gem"] as const;
 export type AvatarIcon = (typeof AVATAR_ICONS)[number];

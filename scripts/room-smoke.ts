@@ -108,9 +108,19 @@ async function main() {
   const H = await mintIdToken({ uid: hostUid });
   let r = await call(base, "/api/judge/budget", H.idToken);
   console.log(`judge budget: ${JSON.stringify(r.body)}`);
+  // clean up a live room left behind by a previous run (one live room per user)
+  for (const T of [H, M]) {
+    r = await call(base, "/api/me", T.idToken);
+    const ar = r.body?.activeRoom;
+    if (ar) {
+      if (ar.isHost) await call(base, `/api/rooms/${ar.id}/${ar.status === "lobby" ? "cancel" : "end"}`, T.idToken, { method: "POST" });
+      else await call(base, `/api/rooms/${ar.id}/leave`, T.idToken, { method: "POST" });
+      console.log(`cleaned up previous room ${ar.id} (${ar.status})`);
+    }
+  }
 
-  // create
-  r = await call(base, "/api/rooms", H.idToken, { method: "POST", json: { name: "Smoke room", description: "api smoke", count: 2, difficultyMode: "any", topicMode: "any", durationMin: 10, maxMembers: 4, rated: false, joinApproval: "manual", languages: ["python", "java"], caps: { maxSubmitsPerProblem: 3, maxRunsPerProblem: 2 } } });
+  // create (rated first so the solo-start guard can be checked, then unrated for the rest)
+  r = await call(base, "/api/rooms", H.idToken, { method: "POST", json: { name: "Smoke room", description: "api smoke", count: 2, difficultyMode: "any", topicMode: "any", durationMin: 10, maxMembers: 4, rated: true, joinApproval: "manual", languages: ["python", "java"], caps: { maxSubmitsPerProblem: 3, maxRunsPerProblem: 2 } } });
   check("host creates a room with a 6-digit code", r.status === 200 && /^\d{6}$/.test(r.body.code ?? ""), JSON.stringify(r.body).slice(0, 200));
   const roomId = r.body.room?.id as string, code = r.body.code as string;
   if (!roomId) process.exit(1);
@@ -125,8 +135,9 @@ async function main() {
   r = await call(base, `/api/rooms/${roomId}`, H.idToken);
   check("host sees the pending member and the code", r.body.members?.some((m: any) => m.uid === memberUid && m.state === "pending") && r.body.room?.code === code, `members=${r.body.members?.length} slots=${JSON.stringify(r.body.room?.slots?.map((s: any) => s.status))}`);
   r = await call(base, `/api/rooms/${roomId}/start`, H.idToken, { method: "POST", json: {} });
-  check("start with only the host (unrated) allowed → or refused by budget", r.status === 200 || r.body?.error?.details?.code === "JUDGE_BUDGET_LOW", JSON.stringify(r.body).slice(0, 160));
-  if (r.status === 200) { console.log("started early (host-only) — recreate with a member for the rest"); process.exit(failures ? 1 : 0); }
+  check("rated start with only the host → 400", r.status === 400, JSON.stringify(r.body).slice(0, 160));
+  r = await call(base, `/api/rooms/${roomId}`, H.idToken, { method: "PATCH", json: { rated: false } });
+  check("host patches the room to unrated", r.status === 200 && r.body.room?.rated === false);
   r = await call(base, `/api/rooms/${roomId}/members/${memberUid}`, H.idToken, { method: "POST", json: { action: "accept" } });
   check("host accepts the member", r.status === 200);
   r = await call(base, `/api/rooms/${roomId}`, M.idToken);
@@ -150,7 +161,8 @@ async function main() {
   r = await call(base, `/api/rooms/${roomId}/end`, H.idToken, { method: "POST" });
   check("host ends → finished", r.status === 200 && r.body.status === "finished", JSON.stringify(r.body));
   r = await call(base, `/api/rooms/${roomId}/results`, M.idToken);
-  check("results: standings, per-problem stats, my report with 2 events", r.status === 200 && r.body.standings?.length === 2 && r.body.perProblem?.[0]?.solved === 1 && r.body.me?.events?.length === 2 && r.body.me.rank === 1, JSON.stringify({ ranks: r.body.standings?.map((x: any) => [x.username, x.rank, x.final]), events: r.body.me?.events?.length }));
+  check("results: standings, per-problem stats, my report (2 client events + a reference-similarity flag)", r.status === 200 && r.body.standings?.length === 2 && r.body.perProblem?.[0]?.solved === 1 && r.body.me?.events?.length === 3 && r.body.me.events.some((e: any) => e.type === "similarity_strong" && e.meta?.with === "reference") && r.body.me.rank === 1, JSON.stringify({ ranks: r.body.standings?.map((x: any) => [x.username, x.rank, x.final]), events: r.body.me?.events?.map((e: any) => e.type) }));
+  check("results: similarity flag listed for the member, host may waive", r.body.similarity?.some((f: any) => f.uid === memberUid && f.with === "reference"), JSON.stringify(r.body.similarity));
   r = await call(base, `/api/rooms/${roomId}/results`, H.idToken);
   check("results: unrated room applied no rating", r.status === 200 && r.body.me?.ratingDelta === null && r.body.room.finalised.ratingsApplied === false);
   r = await call(base, "/api/me", M.idToken);

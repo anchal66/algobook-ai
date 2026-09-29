@@ -451,7 +451,8 @@ export async function results(user: AuthedUser | null, roomId: string) {
 
 export async function hostEvents(host: AuthedUser, roomId: string, uid?: string) {
   const room = await getRoomOrThrow(roomId);
-  if (room.hostUid !== host.uid && !host.isAdmin && uid !== host.uid) throw ApiError.forbidden("Only the host can see other participants' events");
+  const isHost = room.hostUid === host.uid || host.isAdmin;
+  if (!isHost) { await requireParticipant(roomId, host.uid); uid = host.uid; }
   const events = await rooms.listEvents(roomId, uid);
   return events.map((e) => ({ id: e.id, uid: e.uid, type: e.type, at: e.at.toDate().toISOString(), penaltyPct: e.penaltyPct, meta: e.meta }));
 }
