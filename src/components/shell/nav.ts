@@ -1,4 +1,4 @@
-import { BarChart3, CalendarCheck, Compass, FolderKanban, LayoutDashboard, Mic2, Settings, ShieldCheck, Trophy, User, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarCheck, Compass, FolderKanban, LayoutDashboard, Mic2, Settings, ShieldCheck, Swords, Trophy, User, type LucideIcon } from "lucide-react";
 
 export interface NavItem { href: string; label: string; icon: LucideIcon; admin?: boolean; match?: (path: string) => boolean }
 
@@ -10,6 +10,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/projects", label: "Projects", icon: FolderKanban, match: (p) => p.startsWith("/projects") || p.startsWith("/project/") },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/interview", label: "Interview", icon: Mic2 },
+  { href: "/rooms", label: "Rooms", icon: Swords, match: (p) => p.startsWith("/rooms") },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/admin", label: "Admin", icon: ShieldCheck, admin: true },

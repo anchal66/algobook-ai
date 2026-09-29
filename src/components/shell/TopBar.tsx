@@ -2,7 +2,7 @@
 /** App top bar (Module 05 §1): menu (mobile) · search/⌘K · streak flame · XP/level · plan · avatar. */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Flame, Menu, Search, Sparkles, Zap } from "lucide-react";
+import { Flame, Menu, Search, Sparkles, Swords, Zap } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import UserMenu from "@/components/UserMenu";
@@ -30,6 +30,11 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         <Menu className="size-5" />
       </button>
       <p className="hidden text-md font-semibold tracking-tight text-text-1 md:block" aria-hidden>{current?.label ?? "AlgoBook"}</p>
+      {me?.activeRoom && (
+        <Link href={me.activeRoom.status === "running" ? `/rooms/${me.activeRoom.id}/play/0` : `/rooms/${me.activeRoom.id}`} className={cn("ml-2 flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-colors", me.activeRoom.status === "running" ? "border-warn/50 bg-warn/10 text-text-1 hover:bg-warn/20" : "border-brand/40 bg-brand-soft text-brand hover:bg-brand/20")} aria-label="Your live room">
+          <Swords className="size-3.5" /><span className="hidden sm:inline">{me.activeRoom.status === "running" ? "Live contest" : "In a lobby"}</span>
+        </Link>
+      )}
 
       <button
         type="button"

@@ -7,8 +7,9 @@ import { ExperienceLevelSchema, GoalTypeSchema, serialize } from "@/lib/data/sch
 import type { AuthedUser } from "@/lib/auth/types";
 import { adminDb, getAdminAuth } from "@/lib/firebase-admin";
 import * as projects from "@/lib/data/projects";
+import * as roomsData from "@/lib/data/rooms";
 
-export function meResponse(user: AuthedUser, doc = user.doc) {
+export function meResponse(user: AuthedUser, doc = user.doc, activeRoom: ActiveRoomInfo | null = null) {
   const q = effectiveQuotas(doc.quotas);
   const { date: _d, ...used } = q;
   return {
@@ -16,10 +17,22 @@ export function meResponse(user: AuthedUser, doc = user.doc) {
     plan: user.plan,
     isAdmin: user.isAdmin,
     quotas: { date: q.date, used, limits: PLAN_LIMITS[user.plan.tier], resetAt: nextUtcMidnight().toISOString() },
+    activeRoom,
   };
 }
 
-export const GET = handler({ evt: "me.get" }, async ({ user }) => meResponse(user));
+export interface ActiveRoomInfo { id: string; name: string; status: string; startedAt: string | null; endsAt: string | null; isHost: boolean }
+
+/** Module 06: the one live room the user is in (lobby/running), if any. */
+async function activeRoomFor(user: AuthedUser): Promise<ActiveRoomInfo | null> {
+  const id = user.doc.activeRoomId;
+  if (!id) return null;
+  const room = await roomsData.getRoom(id);
+  if (!room || (room.status !== "lobby" && room.status !== "running" && room.status !== "finalising")) return null;
+  return { id: room.id, name: room.name, status: room.status, startedAt: room.startedAt?.toDate().toISOString() ?? null, endsAt: room.endsAt?.toDate().toISOString() ?? null, isHost: room.hostUid === user.uid };
+}
+
+export const GET = handler({ evt: "me.get" }, async ({ user }) => meResponse(user, user.doc, await activeRoomFor(user)));
 
 const PatchSchema = z.object({
   displayName: z.string().trim().min(1).max(60).optional(),

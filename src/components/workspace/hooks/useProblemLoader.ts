@@ -5,10 +5,10 @@
  */
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { ApiError, getProblem, getProject } from "@/lib/workspace/api";
+import { ApiError, getProblem, getProject, getRoomProblem } from "@/lib/workspace/api";
 import { readLocalDraft, resolveInitialCode } from "@/lib/workspace/drafts";
 import { toHuman } from "@/lib/judge/human";
-import { useWorkspace, type CaseDraft } from "@/store/workspace";
+import { useWorkspace, type CaseDraft, type RoomContext } from "@/store/workspace";
 import { useSettings } from "@/store/settings";
 import { useMe } from "@/store/me";
 import type { Language } from "@/types";
@@ -22,7 +22,7 @@ export function seedCases(problem: ProblemDTO): CaseDraft[] {
   return problem.sampleTests.map((t, i) => ({ id: `s${i}`, values: toHuman(problem.params, t.input), custom: false, expected: t.expectedOutput }));
 }
 
-export function useProblemLoader(problemId: string | null, projectId: string | null): void {
+export function useProblemLoader(problemId: string | null, projectId: string | null, room: RoomContext | null = null): void {
   const { user, loading: authLoading } = useAuth();
   const setContext = useWorkspace((s) => s.setContext);
   const reset = useWorkspace((s) => s.resetForProblem);
@@ -34,7 +34,7 @@ export function useProblemLoader(problemId: string | null, projectId: string | n
     let cancelled = false;
     const uid = user.uid;
     reset();
-    setContext({ projectId });
+    setContext({ projectId, room });
 
     (async () => {
       try {
@@ -50,11 +50,11 @@ export function useProblemLoader(problemId: string | null, projectId: string | n
         if (!problemId) { setContext({ loading: false }); return; }
 
         const preferred: Language = useSettings.getState().editor.language ?? me?.user.settings.editor.language ?? "java";
-        const res = await getProblem(problemId, preferred);
+        const res = room ? await getRoomProblem(room.id, room.index, preferred).then((r) => ({ ...r, draft: null })) : await getProblem(problemId, preferred);
         if (cancelled) return;
         const problem = res.problem;
         const ready = res.languages.filter((l) => l.ready).map((l) => l.key);
-        const language: Language = ready.includes(preferred) ? preferred : (ready[0] ?? "java");
+        const language: Language = ready.includes(preferred) ? preferred : (ready[0] ?? res.languages[0]?.key ?? "java");
 
         const serverDraft = res.draft?.code?.[language] ? { code: res.draft.code[language]!, updatedAt: res.draft.updatedAt } : null;
         const code = resolveInitialCode({ local: readLocalDraft(uid, problem.id, language), server: serverDraft, starter: problem.starter[language] ?? "" });
@@ -72,5 +72,5 @@ export function useProblemLoader(problemId: string | null, projectId: string | n
       }
     })();
     return () => { cancelled = true; };
-  }, [authLoading, user, problemId, projectId, setContext, reset, loadMe]);
+  }, [authLoading, user, problemId, projectId, room?.id, room?.index, setContext, reset, loadMe]); // eslint-disable-line react-hooks/exhaustive-deps
 }

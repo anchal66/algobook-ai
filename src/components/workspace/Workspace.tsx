@@ -37,12 +37,52 @@ import { ProblemListDrawer } from "@/components/workspace/Drawer/ProblemListDraw
 import { SettingsDialog } from "@/components/workspace/Settings/SettingsDialog";
 import { PanelErrorBoundary } from "@/components/workspace/Overlays/PanelErrorBoundary";
 import { MobileLayout } from "@/components/workspace/MobileLayout";
+import { useRouter } from "next/navigation";
+import { ShieldAlert, Trophy } from "lucide-react";
+import { RoomTopBar } from "@/components/rooms/RoomTopBar";
+import { IntegrityPanel, LeaderboardPanel } from "@/components/rooms/RoomSidePanels";
+import { ConsentDialog } from "@/components/rooms/ConsentDialog";
+import { useIntegrityMonitor } from "@/components/rooms/useIntegrityMonitor";
+import { rooms as roomsApi } from "@/lib/app/api";
+import { useRoom, serverNow } from "@/store/room";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-export interface WorkspaceProps { problemId: string | null; projectId: string | null }
+export interface WorkspaceProps { problemId: string | null; projectId: string | null; /** Module 06: contest arena */ room?: { id: string; index: number } | null }
 
-export function Workspace({ problemId, projectId }: WorkspaceProps) {
-  useProblemLoader(problemId, projectId);
+export function Workspace({ problemId, projectId, room = null }: WorkspaceProps) {
+  useProblemLoader(problemId, projectId, room);
+  const roomDetail = useRoom((s) => s.detail);
+  const loadRoom = useRoom((s) => s.load);
+  const router = useRouter();
+  const [consentBusy, setConsentBusy] = useState(false);
+  // Module 06: keep the room polled while the arena is open; leave when the contest is over.
+  useEffect(() => {
+    if (!room) return;
+    void loadRoom(room.id);
+    return () => { useRoom.getState().stop(); };
+  }, [room?.id, loadRoom]); // eslint-disable-line react-hooks/exhaustive-deps
+  const roomStatus = roomDetail?.room.status;
+  useEffect(() => {
+    if (!room || !roomStatus) return;
+    if (roomStatus === "finished" || roomStatus === "finalising" || roomStatus === "cancelled") { toast("The contest is over — here are the results."); router.replace(`/rooms/${room.id}`); }
+    if (roomStatus === "lobby") router.replace(`/rooms/${room.id}`);
+  }, [room, roomStatus, router]);
+  const roomSettings = roomDetail?.room.settings;
+  const consented = !!roomDetail?.me?.consented;
+  useIntegrityMonitor({ roomId: room?.id ?? "", enabled: !!room && consented && roomStatus === "running", blockPaste: roomSettings?.integrity.blockPaste ?? true, blockCopy: roomSettings?.integrity.blockCopy ?? true, requireFullscreen: roomSettings?.integrity.requireFullscreen ?? false });
+  const acceptConsent = useCallback(async () => {
+    if (!room) return;
+    setConsentBusy(true);
+    try { await roomsApi.consent(room.id); await loadRoom(room.id, true); if (roomSettings?.integrity.requireFullscreen) { try { await document.documentElement.requestFullscreen?.(); } catch { /* denied */ } } }
+    catch (e) { toast.error((e as Error)?.message ?? "Could not record your consent"); }
+    finally { setConsentBusy(false); }
+  }, [room, loadRoom, roomSettings]);
+  const declineConsent = useCallback(async () => {
+    if (!room) return;
+    try { await roomsApi.leave(room.id); } catch { /* ignore */ }
+    router.replace(`/rooms/${room.id}`);
+  }, [room, router]);
   const { onChange } = useAutosave();
   const { run, submit } = useRunSubmit();
   const { visualize } = useVisualize();
@@ -122,7 +162,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
 
   const leftSlot = useMemo<PanelSlot>(() => ({
     id: "left",
-    tabs: [
+    tabs: room ? [{ id: "description", label: "Description", icon: <FileText />, iconClass: "text-[#1a90ff]" }] : [
       { id: "description", label: "Description", icon: <FileText />, iconClass: "text-[#1a90ff]" },
       { id: "editorial", label: "Editorial", icon: <BookOpen />, iconClass: "text-[#ffa116]" },
       { id: "solutions", label: "Solutions", icon: <FlaskConical />, iconClass: "text-[#1a90ff]" },
@@ -139,7 +179,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
         {leftTab === "submissions" && <SubmissionsTab onLoadCode={onChange} />}
       </PanelErrorBoundary>
     ),
-  }), [leftTab, setUi, onChange]);
+  }), [leftTab, setUi, onChange, room]);
 
   const codeSlot = useMemo<PanelSlot>(() => ({
     id: "code",
@@ -171,16 +211,21 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
 
   const sideSlot = useMemo<PanelSlot | null>(() => sidePanel ? ({
     id: "side",
-    tabs: sidePanel === "notes" ? [{ id: "notes", label: "Notes", icon: <NotebookPen />, iconClass: "text-[#ffa116]" }] : [{ id: "tutor", label: "AI Tutor", icon: <Sparkles />, iconClass: "text-brand-to" }],
+    tabs: sidePanel === "notes" ? [{ id: "notes", label: "Notes", icon: <NotebookPen />, iconClass: "text-[#ffa116]" }]
+      : sidePanel === "leaderboard" ? [{ id: "leaderboard", label: "Leaderboard", icon: <Trophy />, iconClass: "text-medium" }]
+      : sidePanel === "integrity" ? [{ id: "integrity", label: "Integrity", icon: <ShieldAlert />, iconClass: "text-wrong" }]
+      : [{ id: "tutor", label: "AI Tutor", icon: <Sparkles />, iconClass: "text-brand-to" }],
     activeTab: sidePanel,
     minSize: "260px",
-    children: <PanelErrorBoundary name={sidePanel === "notes" ? "Notes" : "AI tutor"}>{sidePanel === "notes" ? <NotesPanel /> : <TutorChatPanel initialPrompt={tutorPrompt} />}</PanelErrorBoundary>,
+    children: <PanelErrorBoundary name={sidePanel}>{sidePanel === "notes" ? <NotesPanel /> : sidePanel === "leaderboard" ? <LeaderboardPanel /> : sidePanel === "integrity" ? <IntegrityPanel /> : <TutorChatPanel initialPrompt={tutorPrompt} />}</PanelErrorBoundary>,
   }) : null, [sidePanel, tutorPrompt]);
 
   return (
     <TooltipProvider delayDuration={300}>
       <main className={cn("ws-root flex h-dvh w-full flex-col overflow-hidden bg-ws-page text-fg-1", fullscreen && "fixed inset-0 z-40")}>
-        {!fullscreen && <TopBar nav={nav} onRun={() => void run()} onSubmit={() => void submit()} onVisualize={() => void visualize()} onFullscreen={toggleFullscreen} />}
+        {!fullscreen && (room
+          ? <RoomTopBar roomId={room.id} index={room.index} onRun={() => void run()} onSubmit={() => void submit()} onVisualize={() => void visualize()} onFullscreen={toggleFullscreen} />
+          : <TopBar nav={nav} onRun={() => void run()} onSubmit={() => void submit()} onVisualize={() => void visualize()} onFullscreen={toggleFullscreen} />)}
         <div className={cn("min-h-0 flex-1", fullscreen ? "p-2" : "px-2.5 pb-2.5 lg:px-[10px] lg:pb-[10px]")}>
           {isMobile ? (
             <MobileLayout left={leftSlot} code={codeSlot} console={consoleSlot} side={sideSlot} onRun={() => void run()} onSubmit={() => void submit()} />
@@ -188,7 +233,13 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
             <WorkspaceLayout left={leftSlot} code={codeSlot} console={consoleSlot} side={sideSlot} />
           )}
         </div>
-        <ProblemListDrawer />
+        {!room && <ProblemListDrawer />}
+        {room && roomDetail && roomStatus === "running" && (
+          <ConsentDialog open={!consented} roomName={roomDetail.room.name} summary={roomDetail.room.summary} rules={roomDetail.room.rules} onAccept={() => void acceptConsent()} onDecline={() => void declineConsent()} busy={consentBusy} />
+        )}
+        {room && roomDetail && roomStatus === "running" && roomDetail.room.startedAt && Date.parse(roomDetail.room.startedAt) > serverNow() && (
+          <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-black/60"><div className="rounded-[16px] bg-ws-panel px-10 py-8 text-center"><p className="text-sm text-fg-2">Get ready</p><p className="font-mono text-6xl font-semibold text-fg-1 tabular-nums">{Math.max(0, Math.ceil((Date.parse(roomDetail.room.startedAt) - serverNow()) / 1000))}</p></div></div>
+        )}
         <SettingsDialog />
         <Toaster position="bottom-right" theme={themePref === "system" ? "system" : themePref} closeButton toastOptions={{ className: "!bg-ws-panel !text-fg-1 !border-line" }} />
       </main>

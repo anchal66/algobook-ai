@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { CaseChips, type Chip } from "@/components/workspace/Console/CaseChips";
 import { CaseResultView } from "@/components/workspace/Console/CaseResultView";
 import { SubmissionResultView, type SubmissionResultViewProps } from "@/components/workspace/Console/SubmissionResultView";
+import { RoomSubmitResultView } from "@/components/rooms/RoomSubmitResultView";
 import { VERDICT_CLASS, VERDICT_LABEL } from "@/components/workspace/Console/verdict";
 import { ScanEye } from "lucide-react";
 import { canVisualize, useVisualize } from "@/components/workspace/hooks/useVisualize";
@@ -34,10 +35,12 @@ export function TestResultTab(props: SubmissionResultViewProps) {
   const submitResult = useWorkspace((s) => s.submitResult);
   const cases = useWorkspace((s) => s.cases);
   const language = useWorkspace((s) => s.language);
+  const roomSubmit = useWorkspace((s) => s.roomSubmit);
   const { visualize } = useVisualize();
 
   if (submitState === "running") return <RunningSkeleton label="Judging…" />;
   if (submitState === "error") return <ErrorState message={submitError ?? "Submit failed"} />;
+  if (submitState === "done" && roomSubmit) return <RoomSubmitResultView result={roomSubmit} />;
   if (submitState === "done" && submitResult) return <SubmissionResultView {...props} />;
   if (runState === "running") return <RunningSkeleton label="Running…" />;
   if (runState === "error") return <ErrorState message={runError ?? "Run failed"} />;

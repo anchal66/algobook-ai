@@ -26,6 +26,7 @@ export const PLANS: Record<string, Plan> = {
       "Inline AI code completion",
       "Post-solve AI code review",
       "Mock interview mode",
+      "Host competition rooms (up to 10 per day)",
       "Unlimited projects",
     ],
   },
@@ -46,6 +47,6 @@ export function getPlan(slug: string): Plan | undefined {
 
 /** Daily limits per plan tier (D-04). -1 = unlimited, 0 = not included. */
 export const PLAN_LIMITS: Record<PlanTier, Record<FeatureKey, number>> = {
-  free: { generate: 3, run: 30, submit: 50, hint3: 0, editorial: 0, chat: 0, completion: 0, review: 0, interview: 0, visualizeExplain: 5 },
-  pro: { generate: 200, run: 2000, submit: 2000, hint3: 500, editorial: -1, chat: 300, completion: 3000, review: 200, interview: 5, visualizeExplain: 200 },
+  free: { generate: 3, run: 30, submit: 50, hint3: 0, editorial: 0, chat: 0, completion: 0, review: 0, interview: 0, visualizeExplain: 5, roomCreate: 0, roomJoin: 3 },
+  pro: { generate: 200, run: 2000, submit: 2000, hint3: 500, editorial: -1, chat: 300, completion: 3000, review: 200, interview: 5, visualizeExplain: 200, roomCreate: 10, roomJoin: -1 },
 };
