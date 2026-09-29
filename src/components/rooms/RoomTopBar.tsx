@@ -2,7 +2,11 @@
 /** Arena top bar (Module 06 §3.7): room name · problem strip · countdown | Visualize · Run · Submit | Leaderboard · Integrity · settings. */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Code2, Lock, Settings, ShieldAlert, Trophy } from "lucide-react";
+import { Code2, Flag, Lock, Settings, ShieldAlert, Trophy } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { rooms } from "@/lib/app/api";
+import { ConfirmDialog } from "@/components/workspace/Overlays/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
@@ -33,6 +37,14 @@ export function RoomTopBar({ roomId, index, onRun, onSubmit, onVisualize, onFull
   const toggleSide = (p: "leaderboard" | "integrity") => setUi({ sidePanel: sidePanel === p ? null : p });
   const pillBtn = (active: boolean) => cn("flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-sm font-medium transition-colors duration-150 hover:bg-ws-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60", active ? "text-brand-to" : "text-fg-1");
   const violations = me?.violations.count ?? 0;
+  const isHost = !!detail && detail.room.hostUid === me?.uid && me?.role === "host";
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const endNow = async () => {
+    setEnding(true);
+    try { await rooms.end(roomId); toast.success("Contest ended — computing results…"); router.replace(`/rooms/${roomId}`); }
+    catch (e) { toast.error((e as Error)?.message ?? "Could not end the contest"); setEnding(false); }
+  };
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 px-3" role="banner">
@@ -81,10 +93,16 @@ export function RoomTopBar({ roomId, index, onRun, onSubmit, onVisualize, onFull
         <div className={cn("flex h-8 items-center gap-1.5 rounded-[8px] bg-ws-panel px-2.5 font-mono text-sm tabular-nums", remaining !== null && remaining < 5 * 60_000 ? "text-wrong" : "text-fg-1")} aria-live="off" aria-label="Time remaining">
           {preStart ? `starts in ${Math.ceil((startedAt! - now) / 1000)}s` : remaining === null ? "—" : formatClock(remaining)}
         </div>
+        {isHost && (
+          <Tooltip><TooltipTrigger asChild>
+            <button type="button" onClick={() => setConfirmEnd(true)} disabled={ending} aria-label="End contest" className={cn(iconBtn, "text-wrong hover:text-wrong")}><Flag className="size-4" /></button>
+          </TooltipTrigger><TooltipContent side="bottom">End the contest now (host)</TooltipContent></Tooltip>
+        )}
         <LayoutMenu onFullscreen={onFullscreen} />
         <Tooltip><TooltipTrigger asChild>
           <button type="button" onClick={() => setUi({ settingsOpen: true })} aria-label="Settings" className={iconBtn}><Settings className="size-4" /></button>
         </TooltipTrigger><TooltipContent side="bottom">Settings</TooltipContent></Tooltip>
+        <ConfirmDialog open={confirmEnd} onOpenChange={setConfirmEnd} description="End the contest for everyone now? Unsolved problems stay unsolved, the similarity check runs and the results page opens. This cannot be undone." onConfirm={() => void endNow()} />
         <div className="ml-1 flex items-center [&_img]:size-7 [&_button]:ring-1 [&_button]:ring-line"><UserMenu /></div>
       </div>
     </header>

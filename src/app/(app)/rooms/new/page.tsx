@@ -24,7 +24,7 @@ export default function NewRoomPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [s, setS] = useState<RoomSettings>(() => defaultSettings({ name: "" }));
+  const [s, setS] = useState<RoomSettings>(() => ({ ...defaultSettings({ name: "Contest" }), name: "" }));
   const set = (p: Partial<RoomSettings>) => setS((prev) => ({ ...prev, ...p }));
   const budget = useQuery(me ? "/api/judge/budget" : null, rooms.budget, { staleMs: 30_000 });
   const pro = me?.plan.tier === "pro";
@@ -69,7 +69,7 @@ export default function NewRoomPage() {
         ))}
       </ol>
       <div key={step} className="animate-in fade-in slide-in-from-bottom-2 duration-200">
-        {step === 0 && <StepIdentity s={s} set={set} errors={errors} />}
+        {step === 0 && <StepIdentity s={s} set={set} errors={s.name ? errors : { ...errors, name: "" }} />}
         {step === 1 && <StepProblems s={s} set={set} errors={errors} />}
         {step === 2 && <StepScoring s={s} set={set} budget={budget.data ?? null} />}
         {step === 3 && <StepReview s={s} budget={budget.data ?? null} />}

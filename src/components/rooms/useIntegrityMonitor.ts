@@ -30,7 +30,13 @@ export function useIntegrityMonitor(o: IntegrityOptions): void {
 
   useEffect(() => {
     if (!o.enabled) return;
-    if (!sessionId.current) sessionId.current = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random());
+    // One id per browser tab that survives reloads (sessionStorage is per tab): a refresh is not a second session, another tab is.
+    if (!sessionId.current) {
+      let id: string | null = null;
+      try { id = sessionStorage.getItem("algobook:roomSession"); } catch { /* unavailable */ }
+      if (!id) { id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()); try { sessionStorage.setItem("algobook:roomSession", id); } catch { /* ignore */ } }
+      sessionId.current = id;
+    }
     const push = (type: string, meta?: Record<string, unknown>) => {
       queue.current.push({ type, at: Date.now(), meta, clientSeq: ++seq.current, sessionId: sessionId.current });
     };

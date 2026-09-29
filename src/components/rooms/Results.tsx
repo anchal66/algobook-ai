@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Crown, Medal, RotateCcw, ShieldAlert, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useMe } from "@/store/me";
 import { useQuery, invalidate } from "@/lib/app/query";
 import { rooms, type LeaderboardRowDTO } from "@/lib/app/api";
 import { errorText } from "@/lib/app/errors";
@@ -46,6 +47,8 @@ export function Results({ roomId }: { roomId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   useEffect(() => { if (q.data?.room.status === "finalising") { const t = setTimeout(() => invalidate(`/api/rooms/${roomId}/results`), 3000); return () => clearTimeout(t); } }, [q.data?.room.status, roomId]);
+  // the "live room" pill in the shell reads /api/me — refresh it once the room is finished
+  useEffect(() => { if (q.data?.room.status === "finished" && user) void useMe.getState().load(user.uid, true); }, [q.data?.room.status, user]);
   if (q.error && !q.data) return <Card className="p-6 text-sm text-text-2">{errorText(q.error)}</Card>;
   if (!q.data) return <div className="space-y-4"><Skeleton className="h-24" /><Skeleton className="h-64" /></div>;
   const { room, standings, perProblem, similarity, me, isHost } = q.data;

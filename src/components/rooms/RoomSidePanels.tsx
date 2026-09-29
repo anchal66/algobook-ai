@@ -40,15 +40,18 @@ export function LeaderboardPanel() {
 
 export function IntegrityPanel() {
   const detail = useRoom((s) => s.detail);
+  const { user } = useAuth();
   const [events, setEvents] = useState<RoomEventDTO[] | null>(null);
   const roomId = detail?.room.id;
+  const uid = user?.uid;
   const count = detail?.me?.violations.count ?? 0;
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !uid) return;
     let cancelled = false;
-    void rooms.events(roomId).then((r) => { if (!cancelled) setEvents(r.events); }).catch(() => { if (!cancelled) setEvents([]); });
+    // always my own events here (the host sees everyone's on the results page)
+    void rooms.events(roomId, uid).then((r) => { if (!cancelled) setEvents(r.events); }).catch(() => { if (!cancelled) setEvents([]); });
     return () => { cancelled = true; };
-  }, [roomId, count]);
+  }, [roomId, uid, count]);
   if (!detail) return null;
   const rules = rulesFor(detail.room.settings.integrity.strictness);
   const me = detail.me;

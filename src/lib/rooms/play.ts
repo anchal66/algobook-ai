@@ -442,7 +442,7 @@ export async function results(user: AuthedUser | null, roomId: string) {
   const myEvents = uid ? await rooms.listEvents(roomId, uid) : [];
   const similarity = isHost ? members.flatMap((m) => m.similarity.map((x) => ({ uid: m.uid, username: m.username, ...x }))) : (me?.similarity.map((x) => ({ uid: me.uid, username: me.username, ...x })) ?? []);
   return {
-    room: { id: room.id, name: room.name, description: room.description, avatar: room.avatar, status: room.status, hostUid: room.hostUid, host: room.host, startedAt: room.startedAt?.toDate().toISOString() ?? null, endsAt: room.endsAt?.toDate().toISOString() ?? null, finishedAt: room.finishedAt?.toDate().toISOString() ?? null, settings: room.settings, problemSet: room.problemSet, finalised: room.finalised, rematchOf: room.rematchOf, capacityHit: room.capacityHit },
+    room: { id: room.id, name: room.name, description: room.description, avatar: room.avatar, status: room.status, hostUid: room.hostUid, host: room.host, startedAt: room.startedAt?.toDate().toISOString() ?? null, endsAt: room.endsAt?.toDate().toISOString() ?? null, finishedAt: room.finishedAt?.toDate().toISOString() ?? null, settings: settingsOf(room), problemSet: room.problemSet, finalised: room.finalised, rematchOf: room.rematchOf, capacityHit: room.capacityHit },
     standings: board.rows, perProblem, timeline, similarity,
     me: me ? { uid: me.uid, rank: me.rank, score: { raw: me.score.raw, final: me.score.final, solved: me.score.solved, penaltyPct: me.violations.penaltyPct }, ratingBefore: me.ratingBefore, ratingDelta: me.ratingDelta, events: myEvents.map((e) => ({ type: e.type, at: e.at.toDate().toISOString(), penaltyPct: e.penaltyPct, meta: e.meta })) } : null,
     isHost,

@@ -25,8 +25,15 @@ export const LOBBY_IDLE_MS = 6 * 60 * 60 * 1000;
 export const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 export const LIVE_STATUSES: Room["status"][] = ["lobby", "running", "finalising"];
 
+/** Firestore cannot store nested arrays: `perProblemTopics: string[][]` is stored as `{ topics: string[] }[]`. */
+export function storeSettings(s: RoomSettings): Record<string, unknown> {
+  return { ...s, perProblemTopics: s.perProblemTopics.map((topics) => ({ topics })) };
+}
+
 export function settingsOf(room: Pick<Room, "settings">): RoomSettings {
-  return RoomSettingsSchema.parse(room.settings);
+  const raw = room.settings as Record<string, unknown>;
+  const ppt = Array.isArray(raw.perProblemTopics) ? (raw.perProblemTopics as unknown[]).map((x) => (Array.isArray(x) ? x : (x as { topics?: string[] })?.topics ?? [])) : [];
+  return RoomSettingsSchema.parse({ ...raw, perProblemTopics: ppt });
 }
 
 export function identity(u: User): { username: string; displayName: string; photoURL: string } {
@@ -101,7 +108,7 @@ export async function createRoom(user: AuthedUser, input: unknown): Promise<{ ro
 
   const room = RoomSchema.parse({
     code, hostUid: user.uid, host: identity(user.doc), status: "lobby", name: settings.name, description: settings.description,
-    visibility: settings.visibility, avatar: settings.avatar, settings, slots, problemSet: [], memberCount: 1, acceptedCount: 1,
+    visibility: settings.visibility, avatar: settings.avatar, settings: storeSettings(settings), slots, problemSet: [], memberCount: 1, acceptedCount: 1,
     scheduledAt: settings.scheduledAt ? Timestamp.fromMillis(Date.parse(settings.scheduledAt)) : null,
     startedAt: null, endsAt: null, finishedAt: null, createdAt: now, updatedAt: now,
   });
@@ -227,10 +234,11 @@ export async function updateSettings(host: AuthedUser, roomId: string, patch: Re
   const room = await getRoomOrThrow(roomId);
   if (room.hostUid !== host.uid) throw ApiError.forbidden("Only the host can edit the room");
   if (room.status !== "lobby") throw ApiError.conflict("Settings are locked once the contest starts");
-  const settings = RoomSettingsSchema.parse({ ...room.settings, ...patch });
+  const settings = RoomSettingsSchema.parse({ ...settingsOf(room), ...patch });
   const problemKeys = ["count", "difficultyMode", "fixedDifficulty", "perProblemDifficulty", "topicMode", "topicPool", "perProblemTopics", "languages", "excludeSeen"] as const;
-  const replan = problemKeys.some((k) => JSON.stringify((patch as Record<string, unknown>)[k]) !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(room.settings[k]));
-  const updates: Record<string, unknown> = { settings, name: settings.name, description: settings.description, visibility: settings.visibility, avatar: settings.avatar, scheduledAt: settings.scheduledAt ? Timestamp.fromMillis(Date.parse(settings.scheduledAt)) : null, updatedAt: Timestamp.now() };
+  const before = settingsOf(room);
+  const replan = problemKeys.some((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(before[k]));
+  const updates: Record<string, unknown> = { settings: storeSettings(settings), name: settings.name, description: settings.description, visibility: settings.visibility, avatar: settings.avatar, scheduledAt: settings.scheduledAt ? Timestamp.fromMillis(Date.parse(settings.scheduledAt)) : null, updatedAt: Timestamp.now() };
   if (replan) {
     const seen = settings.excludeSeen ? await seenForMembers(roomId) : new Set<string>();
     const seed = Array.from(roomId).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 11) + Date.now() % 1000;
