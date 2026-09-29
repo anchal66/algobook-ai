@@ -177,3 +177,67 @@ export const sendContact = (body: { name: string; email: string; subject: string
   apiFetch<{ ok: true }>("/api/contact", { method: "POST", body, anonymous: true });
 
 export type { Difficulty, Language, ItemStatus, PracticeState };
+
+// ── Competition rooms (Module 06) ───────────────────────────────────────────
+import type { RoomSettings } from "@/lib/rooms/settings";
+import type { PenaltyRule } from "@/lib/rooms/integrity";
+export interface RoomCard {
+  id: string; name: string; description: string; avatar: { icon: string; hue: number }; status: "lobby" | "running" | "finalising" | "finished" | "cancelled"; visibility: "public" | "private";
+  host: { username: string; displayName: string; photoURL: string }; hostUid: string; memberCount: number; acceptedCount: number; maxMembers: number; count: number; durationMin: number;
+  difficultyMode: string; fixedDifficulty: Difficulty; topicMode: string; topicPool: string[]; languages: Language[]; rated: boolean; joinApproval: "manual" | "auto";
+  scheduledAt: string | null; startedAt: string | null; endsAt: string | null; finishedAt: string | null; createdAt: string; estimate: { need: number; likely: number };
+  mine: { state: string; role: string; rank: number | null; final: number; solved: number; ratingDelta: number | null } | null;
+}
+export interface RoomMemberDTO { uid: string; username: string; displayName: string; photoURL: string; role: "host" | "member"; state: string; ready: boolean; online: boolean; joinedAt: string }
+export interface RoomSlotDTO { index: number; difficulty: Difficulty | null; topics: string[]; status: "filled" | "missing" | "generating" | "failed" | "dropped"; error: string | null; problemId: string | null }
+export interface RoomProblemDTO { index: number; problemId: string; slug: string; title: string; difficulty: Difficulty; tags: string[]; points: number }
+export interface LeaderboardRowDTO {
+  uid: string; username: string; displayName: string; photoURL: string; state: string; rank: number | null; final: number; solved: number; totalTimeSec: number; violations: number; penaltyPct: number;
+  perProblem: Record<string, { status: string; points: number; attempts: number; acceptedAt: string | null }>; online: boolean; ratingDelta: number | null; leftEarly: boolean;
+}
+export interface LeaderboardDTO { rows: LeaderboardRowDTO[]; frozen: boolean; hidden: boolean; frozenAt: string | null }
+export interface RoomDetail {
+  room: RoomCard & { code: string | null; settings: RoomSettings; summary: string[]; slots: RoomSlotDTO[]; problemSet: RoomProblemDTO[]; capacityHit: boolean; finalised: { similarityChecked: boolean; ratingsApplied: boolean; rankedCount: number }; rematchOf: string | null; rules: PenaltyRule[]; consentVersion: string };
+  members: RoomMemberDTO[];
+  me: { uid: string; state: string; role: string; ready: boolean; consented: boolean; unlockedIndex: number; score: { raw: number; final: number; solved: number; penaltyPct: number }; violations: { count: number; byType: Record<string, number>; penaltyPct: number }; perProblem: Record<string, { status: string; points: number; attempts: number; runs: number }>; rank: number | null; ratingDelta: number | null } | null;
+  leaderboard: LeaderboardDTO | null;
+  budget: { date: string; used: number; cap: number; remaining: number; backgroundRemaining: number; reserve: number; estimate: { need: number; likely: number }; level: "ok" | "tight" | "over" | "unlimited" } | null;
+  now: string;
+}
+export const rooms = {
+  list: (scope: "public" | "mine" | "history") => apiFetch<{ rooms: RoomCard[] }>(`/api/rooms?scope=${scope}`),
+  create: (settings: Partial<RoomSettings> & { name: string }) => apiFetch<{ room: RoomCard; code: string; missing: number }>("/api/rooms", { method: "POST", body: settings }),
+  joinByCode: (code: string) => apiFetch<{ roomId: string; state: string }>("/api/rooms/join", { method: "POST", body: { code } }),
+  join: (id: string) => apiFetch<{ roomId: string; state: string }>(`/api/rooms/${id}/join`, { method: "POST" }),
+  get: (id: string) => apiFetch<RoomDetail>(`/api/rooms/${id}`),
+  patch: (id: string, patch: Partial<RoomSettings>) => apiFetch<{ room: RoomCard }>(`/api/rooms/${id}`, { method: "PATCH", body: patch }),
+  member: (id: string, uid: string, action: "accept" | "reject" | "kick") => apiFetch<{ ok: true }>(`/api/rooms/${id}/members/${uid}`, { method: "POST", body: { action } }),
+  leave: (id: string) => apiFetch<{ ok: true }>(`/api/rooms/${id}/leave`, { method: "POST" }),
+  cancel: (id: string) => apiFetch<{ ok: true }>(`/api/rooms/${id}/cancel`, { method: "POST" }),
+  ready: (id: string, ready: boolean) => apiFetch<{ ok: true }>(`/api/rooms/${id}/ready`, { method: "POST", body: { ready } }),
+  start: (id: string, force = false) => apiFetch<{ status: string; startedAt: string | null; endsAt: string | null }>(`/api/rooms/${id}/start`, { method: "POST", body: { force } }),
+  consent: (id: string) => apiFetch<{ consentVersion: string }>(`/api/rooms/${id}/consent`, { method: "POST" }),
+  end: (id: string) => apiFetch<{ status: string }>(`/api/rooms/${id}/end`, { method: "POST" }),
+  rematch: (id: string) => apiFetch<{ roomId: string; code: string }>(`/api/rooms/${id}/rematch`, { method: "POST" }),
+  leaderboard: (id: string) => apiFetch<LeaderboardDTO & { status: string; endsAt: string | null; now: string }>(`/api/rooms/${id}/leaderboard`),
+  results: (id: string) => apiFetch<RoomResults>(`/api/rooms/${id}/results`),
+  events: (id: string, uid?: string) => apiFetch<{ events: RoomEventDTO[] }>(`/api/rooms/${id}/events${uid ? `?uid=${uid}` : ""}`),
+  postEvents: (id: string, events: { type: string; at: number; meta?: Record<string, unknown>; clientSeq: number; sessionId?: string }[]) =>
+    apiFetch<{ violations: { count: number; byType: Record<string, number>; penaltyPct: number }; score: { raw: number; final: number; solved: number; penaltyPct: number }; spam: boolean }>(`/api/rooms/${id}/events`, { method: "POST", body: { events } }),
+  waive: (id: string, uid: string, problemId: string) => apiFetch<{ ok: true }>(`/api/rooms/${id}/waive`, { method: "POST", body: { uid, problemId } }),
+  chat: (id: string, after = 0) => apiFetch<{ messages: RoomChatDTO[] }>(`/api/rooms/${id}/chat?after=${after}`),
+  postChat: (id: string, text: string) => apiFetch<{ message: RoomChatDTO }>(`/api/rooms/${id}/chat`, { method: "POST", body: { text } }),
+  skip: (id: string, index: number) => apiFetch<{ unlockedIndex: number }>(`/api/rooms/${id}/problems/${index}`, { method: "POST" }),
+  budget: () => apiFetch<{ remaining: number | null; cap: number; reserve: number; date: string }>("/api/judge/budget"),
+};
+export interface RoomEventDTO { id?: string; uid?: string; type: string; at: string; penaltyPct: number; meta: Record<string, unknown> }
+export interface RoomChatDTO { id: string; uid: string; username: string; displayName: string; text: string; at: string }
+export interface RoomResults {
+  room: { id: string; name: string; description: string; avatar: { icon: string; hue: number }; status: string; hostUid: string; host: { username: string; displayName: string; photoURL: string }; startedAt: string | null; endsAt: string | null; finishedAt: string | null; settings: RoomSettings; problemSet: RoomProblemDTO[]; finalised: { similarityChecked: boolean; ratingsApplied: boolean; rankedCount: number }; rematchOf: string | null; capacityHit: boolean };
+  standings: LeaderboardRowDTO[];
+  perProblem: (RoomProblemDTO & { solved: number; attempted: number; firstSolver: { uid: string; username: string; at: string } | null })[];
+  timeline: { uid: string; problemId: string; at: string; pointsAfter: number }[];
+  similarity: { uid: string; username: string; problemId: string; with: string; score: number; level: "flag" | "strong"; waived: boolean }[];
+  me: { uid: string; rank: number | null; score: { raw: number; final: number; solved: number; penaltyPct: number }; ratingBefore: number | null; ratingDelta: number | null; events: RoomEventDTO[] } | null;
+  isHost: boolean;
+}

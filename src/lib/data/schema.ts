@@ -28,7 +28,7 @@ export const ExperienceLevelSchema = z.enum(["beginner", "intermediate", "advanc
 export const GoalTypeSchema = z.enum(["learn-basics", "daily-practice", "interview-prep", "returning-after-break"]);
 export const PracticeStateSchema = z.enum(["warm-up", "learning", "strengthening", "revision", "interview-prep", "maintenance"]);
 export const PlanTierSchema = z.enum(["free", "pro"]);
-export const FeatureKeySchema = z.enum(["generate", "run", "submit", "hint3", "editorial", "chat", "completion", "review", "interview", "visualizeExplain"]);
+export const FeatureKeySchema = z.enum(["generate", "run", "submit", "hint3", "editorial", "chat", "completion", "review", "interview", "visualizeExplain", "roomCreate", "roomJoin"]);
 export const ProblemStatusSchema = z.enum(["draft", "verified", "retired"]);
 export const ProblemSourceSchema = z.enum(["generated", "template", "curated"]);
 export const ItemStatusSchema = z.enum(["todo", "attempting", "solved"]);
@@ -143,6 +143,9 @@ export const QuotasSchema = z.object({
   interview: z.number().int().default(0),
   /** Module 07: AI narration of a visualizer step. */
   visualizeExplain: z.number().int().default(0),
+  /** Module 06: rooms created / joined today. */
+  roomCreate: z.number().int().default(0),
+  roomJoin: z.number().int().default(0),
 });
 
 export const UserSchema = z.object({
@@ -177,6 +180,9 @@ export const UserSchema = z.object({
   lastOpened: z.object({ problemId: z.string(), language: LanguageSchema, at: timestamp }).nullable().default(null),
   /** Module 05: public profile page + leaderboard visibility (Settings → Privacy). */
   publicProfile: z.boolean().default(true),
+  /** Module 06: contest counters and the one live room a user can be in. */
+  rooms: z.object({ hosted: z.number().int().default(0), played: z.number().int().default(0), wins: z.number().int().default(0), podiums: z.number().int().default(0) }).default({ hosted: 0, played: 0, wins: 0, podiums: 0 }),
+  activeRoomId: z.string().nullable().default(null),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
@@ -553,6 +559,148 @@ export const InterviewSchema = z.object({
 });
 export const AchievementsSchema = z.object({ unlocked: z.array(z.object({ id: z.string(), at: timestamp })).default([]) });
 
+// ── rooms (Module 06) ─────────────────────────────────────────────────────────
+
+export const RoomStatusSchema = z.enum(["lobby", "running", "finalising", "finished", "cancelled"]);
+export const RoomMemberStateSchema = z.enum(["pending", "accepted", "rejected", "kicked", "left"]);
+export const RoomProblemSchema = z.object({
+  index: z.number().int(),
+  problemId: z.string(),
+  slug: z.string().default(""),
+  title: z.string().default(""),
+  difficulty: DifficultySchema,
+  tags: z.array(z.string()).default([]),
+  points: z.number().int(),
+});
+export const RoomSlotSchema = z.object({
+  index: z.number().int(),
+  difficulty: DifficultySchema.nullable().default(null),
+  topics: z.array(z.string()).default([]),
+  problemId: z.string().nullable().default(null),
+  status: z.enum(["filled", "missing", "generating", "failed", "dropped"]).default("missing"),
+  error: z.string().nullable().default(null),
+});
+/** rooms/{id}. `settings` is validated by `RoomSettingsSchema` (lib/rooms/settings) — stored as-is. */
+export const RoomSchema = z.object({
+  code: z.string().nullable().default(null),
+  hostUid: z.string(),
+  host: z.object({ username: z.string().default(""), displayName: z.string().default(""), photoURL: z.string().default("") }).default({ username: "", displayName: "", photoURL: "" }),
+  status: RoomStatusSchema.default("lobby"),
+  name: z.string(),
+  description: z.string().default(""),
+  visibility: z.enum(["public", "private"]).default("private"),
+  avatar: z.object({ icon: z.string().default("swords"), hue: z.number().int().default(250) }).default({ icon: "swords", hue: 250 }),
+  settings: z.record(z.string(), z.unknown()),
+  /** Slot plan (ids only until start; titles revealed at start). */
+  slots: z.array(RoomSlotSchema).default([]),
+  /** Revealed problem set (empty until `running`). */
+  problemSet: z.array(RoomProblemSchema).default([]),
+  memberCount: z.number().int().default(0),
+  acceptedCount: z.number().int().default(0),
+  scheduledAt: timestamp.nullable().default(null),
+  startedAt: timestamp.nullable().default(null),
+  endsAt: timestamp.nullable().default(null),
+  finishedAt: timestamp.nullable().default(null),
+  finalised: z.object({ similarityChecked: z.boolean().default(false), ratingsApplied: z.boolean().default(false), rankedCount: z.number().int().default(0) }).default({ similarityChecked: false, ratingsApplied: false, rankedCount: 0 }),
+  /** Judge budget exhausted mid-contest (non-penalised "capacity" state). */
+  capacityHit: z.boolean().default(false),
+  rematchOf: z.string().nullable().default(null),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+export const RoomMemberProblemSchema = z.object({
+  status: z.enum(["todo", "attempting", "solved"]).default("todo"),
+  points: z.number().default(0),
+  attempts: z.number().int().default(0),
+  runs: z.number().int().default(0),
+  wrong: z.number().int().default(0),
+  acceptedAt: timestamp.nullable().default(null),
+  bestPassed: z.number().int().default(0),
+  total: z.number().int().default(0),
+});
+export const RoomMemberScoreSchema = z.object({
+  raw: z.number().default(0),
+  penaltyPct: z.number().default(0),
+  final: z.number().default(0),
+  solved: z.number().int().default(0),
+  totalTimeSec: z.number().int().default(0),
+  wrongSubmissions: z.number().int().default(0),
+  lastAcceptedAt: timestamp.nullable().default(null),
+});
+/** rooms/{id}/members/{uid} */
+export const RoomMemberSchema = z.object({
+  uid: z.string(),
+  username: z.string().default(""),
+  displayName: z.string().default(""),
+  photoURL: z.string().default(""),
+  role: z.enum(["host", "member"]).default("member"),
+  state: RoomMemberStateSchema.default("pending"),
+  joinedAt: timestamp,
+  acceptedAt: timestamp.nullable().default(null),
+  ready: z.boolean().default(false),
+  presence: z.object({ lastSeenAt: timestamp.nullable().default(null), tab: z.enum(["visible", "hidden"]).default("visible"), sessionId: z.string().nullable().default(null) }).default({ lastSeenAt: null, tab: "visible", sessionId: null }),
+  consentedAt: timestamp.nullable().default(null),
+  consentVersion: z.string().nullable().default(null),
+  score: RoomMemberScoreSchema.default(RoomMemberScoreSchema.parse({})),
+  perProblem: z.record(z.string(), RoomMemberProblemSchema).default({}),
+  violations: z.object({ count: z.number().int().default(0), byType: z.record(z.string(), z.number().int()).default({}), penaltyPct: z.number().default(0) }).default({ count: 0, byType: {}, penaltyPct: 0 }),
+  /** Similarity flags from finalisation (uids / "reference" it matched, level). */
+  similarity: z.array(z.object({ problemId: z.string(), with: z.string(), score: z.number(), level: z.enum(["flag", "strong"]), waived: z.boolean().default(false) })).default([]),
+  rank: z.number().int().nullable().default(null),
+  ratingBefore: z.number().nullable().default(null),
+  ratingDelta: z.number().nullable().default(null),
+  /** Current problem index in `sequential` mode. */
+  unlockedIndex: z.number().int().default(0),
+  leftEarly: z.boolean().default(false),
+});
+/** rooms/{id}/submissions/{subId} — contest submission (code kept for the similarity check). */
+export const RoomSubmissionSchema = z.object({
+  uid: z.string(),
+  roomId: z.string(),
+  problemId: z.string(),
+  problemIndex: z.number().int(),
+  language: LanguageSchema,
+  code: z.string(),
+  verdict: VerdictSchema,
+  passed: z.number().int(),
+  total: z.number().int(),
+  failedCase: FailedCaseSchema.nullable().default(null),
+  compileOutput: z.string().nullable().default(null),
+  runtimeMs: z.number().default(0),
+  memoryKb: z.number().default(0),
+  elapsedSec: z.number().int().default(0),
+  pointsAfter: z.number().default(0),
+  createdAt: timestamp,
+});
+/** rooms/{id}/events/{eventId} — integrity events. */
+export const RoomEventSchema = z.object({
+  uid: z.string(),
+  type: z.string(),
+  at: timestamp,
+  meta: z.record(z.string(), z.unknown()).default({}),
+  penaltyPct: z.number().default(0),
+  clientSeq: z.number().int().nullable().default(null),
+});
+/** rooms/{id}/chat/{msgId} */
+export const RoomChatSchema = z.object({
+  uid: z.string(),
+  username: z.string().default(""),
+  displayName: z.string().default(""),
+  text: z.string().max(300),
+  at: timestamp,
+  deleted: z.boolean().default(false),
+});
+/** roomCodes/{code} */
+export const RoomCodeSchema = z.object({ roomId: z.string(), expiresAt: timestamp });
+/** roomRating/{uid} */
+export const RoomRatingSchema = z.object({
+  rating: z.number().default(1500),
+  contests: z.number().int().default(0),
+  best: z.number().int().nullable().default(null),
+  history: z.array(z.object({ roomId: z.string(), name: z.string().default(""), rank: z.number().int(), of: z.number().int().default(0), delta: z.number(), at: timestamp })).default([]),
+  updatedAt: timestamp,
+});
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type Language = z.infer<typeof LanguageSchema>;
@@ -659,3 +807,15 @@ export function serialize<T>(value: T): Serialized<T> {
 export function todayKey(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
+
+export type RoomStatus = z.infer<typeof RoomStatusSchema>;
+export type RoomMemberState = z.infer<typeof RoomMemberStateSchema>;
+export type RoomProblem = z.infer<typeof RoomProblemSchema>;
+export type RoomSlot = z.infer<typeof RoomSlotSchema>;
+export type Room = z.infer<typeof RoomSchema>;
+export type RoomMember = z.infer<typeof RoomMemberSchema>;
+export type RoomMemberProblem = z.infer<typeof RoomMemberProblemSchema>;
+export type RoomSubmission = z.infer<typeof RoomSubmissionSchema>;
+export type RoomEvent = z.infer<typeof RoomEventSchema>;
+export type RoomChat = z.infer<typeof RoomChatSchema>;
+export type RoomRating = z.infer<typeof RoomRatingSchema>;

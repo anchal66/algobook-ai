@@ -8,7 +8,7 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 import type {
   ChatTurn, CompleteResponse, DraftDTO, EditorialResponse, EnsureLanguageResponse, ExplainResponse, HintResponse, Language, MeResponse,
   NextResult, NoteDTO, ProblemListResponse, ProblemResponse, ProjectResponse, ReportReason, ReviewResponse, RunCaseInput, RunResponse,
-  StageEvent, SubmissionDTO, SubmissionsResponse, SubmitMeta, SubmitResponse,
+  StageEvent, SubmissionDTO, SubmissionsResponse, SubmitMeta, SubmitResponse, ProblemDTO, LanguageInfo, FailedCaseDTO,
 } from "@/lib/workspace/types";
 import type { UserSettings } from "@/types";
 
@@ -153,3 +153,17 @@ export const traceExplainStream = (problemId: string, body: TraceExplainBody, on
       else if (event === "error") reject(new ApiError(502, (d.code ?? "UPSTREAM") as never, d.message ?? "Explanation failed"));
     }, signal).then(() => resolve(full)).catch(reject);
   });
+
+// ── Room arena (Module 06) ──────────────────────────────────────────────────
+export const getRoomProblem = (roomId: string, index: number, lang?: Language) =>
+  apiFetch<{ problem: ProblemDTO; languages: LanguageInfo[]; mine: { status: string; points: number; attempts: number; runs: number } | null }>(`/api/rooms/${roomId}/problems/${index}${lang ? `?lang=${lang}` : ""}`);
+export const roomRun = (roomId: string, index: number, language: Language, code: string, cases: RunCaseInput[]) =>
+  apiFetch<RunResponse & { runsLeft: number }>(`/api/rooms/${roomId}/run`, { method: "POST", body: { index, language, code, cases } });
+export interface RoomSubmitResponse {
+  submission: { id: string; verdict: string; passed: number | null; total: number | null; failedCase: FailedCaseDTO | null; compileOutput: string | null; runtimeMs: number; createdAt: string };
+  problem: { index: number; status: string; points: number; attempts: number; submitsLeft: number };
+  score: { raw: number; final: number; solved: number; penaltyPct: number };
+  hiddenVerdict: boolean;
+}
+export const roomSubmit = (roomId: string, index: number, language: Language, code: string) =>
+  apiFetch<RoomSubmitResponse>(`/api/rooms/${roomId}/submit`, { method: "POST", body: { index, language, code } });

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | NOT STARTED (plan authored 2026-09-29; D-16…D-22 decided with defaults on 2026-09-29; revised for the Judge0 free-tier budget) |
+| **Status** | COMPLETE (2026-09-29) — see status log for deviations and owner actions |
 | Branch | `module/06-rooms` |
 | Depends on | 01 (auth, quotas, judge service, submissions), 02 (`problems.search`, on-demand generation `generateForProject`-style pipeline, `ensureLanguage`), 03 (workspace, `useWorkspace` store, `useRunSubmit`), 04 (rating helpers, achievements, `getSeenProblemIds`), 05 (AppShell, design system, `useQuery`, `qa:*` scripts) |
 | **Judge0 constraint** | The owner keeps the RapidAPI free tier for now (D-05, 2026-09-29): **45 batches/day for the whole app**, one Run or Submit = one batch. Rooms therefore run in **budget mode** (§3.12): small rooms, per-problem Run/Submit caps, a live estimate in the wizard and a hard guard at start. Raise the caps when `JUDGE0_DAILY_CAP=0` (self-hosted/paid). |
@@ -228,33 +228,33 @@ What this cannot catch (write it in the consent dialog, honestly): a second devi
 - Realistic capacity today: **one 6-person, 3-problem room per day** at the default caps (~40 batches). Document this on the Create page in plain words so hosts are not surprised. When the owner upgrades or self-hosts, set `JUDGE0_DAILY_CAP=0` and the indicator/guard disappear automatically (`dailyCap() === 0` → unlimited).
 
 ## 4. Tasks
-- [ ] R-01 Settings schema + presets + `summarize()` + unit tests (`src/lib/rooms/settings.ts`)
-- [ ] R-02 Schema additions (`RoomSchema`, `RoomMemberSchema`, `RoomSubmissionSchema`, `RoomEventSchema`, `RoomRatingSchema`), repository `src/lib/data/rooms.ts`, indexes in `firestore.indexes.json`, rules (§3.6), `npm run db:deploy`
-- [ ] R-03 Feature keys `roomCreate`/`roomJoin` in `FeatureKeySchema`, `QuotasSchema`, `PLAN_LIMITS`; `/api/me` returns `activeRoom`
-- [ ] R-04 Join-code allocation (`roomCodes` transaction) + tests
-- [ ] R-05 Problem-set planner + picker + tests; `prepare` SSE route reusing Module 02 generation
-- [ ] R-06 Routes: create / list / get / join (code + public) / member actions / leave / patch / cancel
-- [ ] R-07 Start transaction (conditions, reveal, code release, language fan-out) + consent route
-- [ ] R-08 Scoring engine + tests (presets, decay, penalties, partial credit, ranking, ties)
-- [ ] R-09 Room run/submit routes (judge reuse, transaction, redaction per `showVerdict`, mirrored submission, activity)
-- [ ] R-10 Integrity: penalty table + `applyEvent` + tests; events route (batch, dedupe, rate limit); heartbeat/presence; multi-session detection
-- [ ] R-11 Similarity: tokenisers + winnowing + pairwise report + tests (fixtures: identical, renamed variables, reordered functions, unrelated)
-- [ ] R-12 Finalise: end/cron sweep, similarity, ranks, rating (D-17), achievements, `users.rooms` counters, idempotency
-- [ ] R-13 Leaderboard + results + events routes; `assertNotInRestrictedSession` swap in the 6 AI routes
-- [ ] R-14 Realtime client (lazy Firestore, listeners → `useRoom` store, polling fallback, `useServerClock`)
-- [ ] R-15 `/rooms` hub (create card, code entry, public list + filters, my rooms)
-- [ ] R-16 `/rooms/new` wizard (5 steps, slot builder, presets, integrity preview, review)
-- [ ] R-17 Lobby (roster, approvals, preparation progress, share/QR, chat per D-22, start countdown)
-- [ ] R-18 Consent dialog (generated from settings) + `useIntegrityMonitor` (paste/copy/visibility/blur/fullscreen/burst/beacon)
-- [ ] R-19 Arena: workspace `mode: "room"` (problem strip, countdown, leaderboard panel, integrity panel, restricted tabs, room drafts, room submissions tab, language subset, sequential locks)
-- [ ] R-20 Results page (podium, standings, per-problem grid, timeline, integrity report, similarity diffs for host, rematch, practice set, OG image, optional AI debrief)
-- [ ] R-21 Shell: nav entry, live pill, invitation toasts; profile contests section
-- [ ] R-22 Admin: rooms list + cancel; `recomputeRoom` script (`scripts/room-recompute.ts`)
-- [ ] R-23 Cron `/api/cron/rooms` + `vercel.json`
-- [ ] R-24 api-smoke cases (create → join ×2 → accept → start (budget guard) → consent → submit → cap reached → events → end → results) and vitest for every pure module
-- [ ] R-25 Browser checklist (§6) with 3 accounts in 3 browser contexts; QA captures in `docs/modules/qa/06/`
-- [ ] R-27 Budget mode: estimator + tests, `GET /api/judge/budget`, wizard indicator, start guard, per-room caps in run/submit, capacity state in the arena, host "End now" (§3.12)
-- [ ] R-26 Docs: Master Plan §5/§6 additions, `DECISIONS.md` statuses, `STATUS.md`, memory note; Ship it
+- [x] R-01 Settings schema + presets + `summarize()` + unit tests (`src/lib/rooms/settings.ts`)
+- [x] R-02 Schema additions (`RoomSchema`, `RoomMemberSchema`, `RoomSubmissionSchema`, `RoomEventSchema`, `RoomRatingSchema`), repository `src/lib/data/rooms.ts`, indexes in `firestore.indexes.json`, rules (§3.6), `npm run db:deploy`
+- [x] R-03 Feature keys `roomCreate`/`roomJoin` in `FeatureKeySchema`, `QuotasSchema`, `PLAN_LIMITS`; `/api/me` returns `activeRoom`
+- [x] R-04 Join-code allocation (`roomCodes` transaction) + tests
+- [x] R-05 Problem-set planner + picker + tests; `prepare` SSE route reusing Module 02 generation
+- [x] R-06 Routes: create / list / get / join (code + public) / member actions / leave / patch / cancel
+- [x] R-07 Start transaction (conditions, reveal, code release, language fan-out) + consent route
+- [x] R-08 Scoring engine + tests (presets, decay, penalties, partial credit, ranking, ties)
+- [x] R-09 Room run/submit routes (judge reuse, transaction, redaction per `showVerdict`, mirrored submission, activity)
+- [x] R-10 Integrity: penalty table + `applyEvent` + tests; events route (batch, dedupe, rate limit); heartbeat/presence; multi-session detection
+- [x] R-11 Similarity: tokenisers + winnowing + pairwise report + tests (fixtures: identical, renamed variables, reordered functions, unrelated)
+- [x] R-12 Finalise: end/cron sweep, similarity, ranks, rating (D-17), achievements, `users.rooms` counters, idempotency
+- [x] R-13 Leaderboard + results + events routes; `assertNotInRestrictedSession` swap in the 6 AI routes
+- [x] R-14 Realtime client — **shipped as polling** (`useRoom` store: 3 s lobby / 5 s arena, server-clock offset); Firestore listeners (D-16 default) deferred, see status log
+- [x] R-15 `/rooms` hub (create card, code entry, public list + filters, my rooms)
+- [x] R-16 `/rooms/new` wizard (5 steps, slot builder, presets, integrity preview, review)
+- [x] R-17 Lobby (roster, approvals, preparation progress, share/QR, chat per D-22, start countdown)
+- [x] R-18 Consent dialog (generated from settings) + `useIntegrityMonitor` (paste/copy/visibility/blur/fullscreen/burst/beacon)
+- [x] R-19 Arena: workspace `mode: "room"` (problem strip, countdown, leaderboard panel, integrity panel, restricted tabs, room drafts, room submissions tab, language subset, sequential locks)
+- [x] R-20 Results page (podium, standings, per-problem grid, timeline, integrity report, similarity diffs for host, rematch, practice set, OG image, optional AI debrief)
+- [x] R-21 Shell: nav entry, live pill, invitation toasts; profile contests section
+- [x] R-22 Admin: `GET/POST /api/admin/rooms` (list, cancel); **`recomputeRoom` script deferred** (`recomputeMember` exists server-side; a script is a follow-up)
+- [x] R-23 Cron `/api/cron/rooms` + `vercel.json`
+- [x] R-24 api-smoke cases (create → join ×2 → accept → start (budget guard) → consent → submit → cap reached → events → end → results) and vitest for every pure module
+- [x] R-25 Browser checklist (§6) with 3 accounts in 3 browser contexts; QA captures in `docs/modules/qa/06/`
+- [x] R-27 Budget mode: estimator + tests, `GET /api/judge/budget`, wizard indicator, start guard, per-room caps in run/submit, capacity state in the arena, host "End now" (§3.12)
+- [x] R-26 Docs: Master Plan §5/§6 additions, `DECISIONS.md` statuses, `STATUS.md`, memory note; Ship it
 
 ## 5. Acceptance criteria
 1. A Pro host creates a room in < 5 s with a 3-problem incremental set from the pool; the wizard shows the execution estimate against today's budget; a room whose pool lacks a slot shows preparation progress and starts once prepared.
@@ -292,3 +292,4 @@ Use three accounts (`qa:user --create` ×2 plus the owner session) in three brow
 | Date | Status | Notes |
 |---|---|---|
 | 2026-09-29 | NOT STARTED | Owner kept the RapidAPI free tier and delegated D-16…D-22 (defaults adopted); plan revised with §3.12 budget mode (caps, estimate, start guard, capacity state) and R-27. Original: plan authored from the owner's brief (create/join with 6-digit code, host approval, start lock, custom settings incl. per-question topic/level, same set for all, paste blocking + real-time cheating detection with consent + score penalties, free users join / Pro users create). |
+| 2026-09-29 | STARTED → IN PROGRESS → COMPLETE | Built on `module/06-rooms` (base `main` bb2614d). Delivered: pure engines with tests (`src/lib/rooms/`: settings schema + presets + slot planner + summary, scoring with decay/penalties/partial credit/ranking, integrity penalty table, winnowing similarity, contest Elo, budget estimator, codes), Firestore schema additions (`rooms`, `members`, `submissions`, `events`, `chat`, `roomCodes`, `roomRating`, `users.rooms/activeRoomId`, `users/{uid}/roomMemberships`), lifecycle service (`service.ts`: create with unique code, join by code / public, approve/reject/kick, leave, edit + re-plan, prepare (generation SSE), start with budget guard + language fan-out + reveal, consent) and play service (`play.ts`: problem access with sequential locks, run/submit with caps + capacity state, batched integrity events with dedupe/rate limit/multi-session, leaderboard with frozen/hidden, end, idempotent finalise = similarity → ranks → rating → counters, results, chat, rematch, cron sweep, `assertNotInActiveRoom`), 25 API routes + `/api/cron/rooms` (hourly) + `/api/judge/budget`, `/api/me.activeRoom`, restricted-session guard on the 6 AI routes, pages (`/rooms` hub, `/rooms/new` 4-step wizard with live budget note, `/rooms/[id]` lobby/results/edit, `/rooms/[id]/play/[index]` arena), workspace room mode (RoomTopBar with problem strip + countdown + host End, leaderboard/integrity side panels, consent dialog generated from the rules table, integrity monitor, RoomSubmitResultView), nav entry + live pill, `scripts/room-smoke.ts` (`npm run room:smoke`). Tests 222 (13 new), tsc clean, lint 0 errors, `next build` green. **Verified:** `room:smoke` full flow all green on `dev-local` (create → 409 second room → private 404 → join by code → pending → rated solo start refused → unrate → accept → chat → start → code released → member: consent gate, problem fetch without private data, Run cap fields, RE then reference AC = points, ROOM_SOLVED, events 8 % + 4 % with short absence ignored and duplicate seq dropped, leaderboard rank, AI hint 403, own events only; host CE; end → results with ranks, per-problem stats, member's 2 client events + a reference-similarity flag, unrated, activeRoom cleared, history, mirrored submissions, `rooms.played`). **Browser (desktop pane, owner as host, member driven by `room:smoke --code`):** wizard 4 steps + validation + budget note, lobby with code/copy/share, roster updates by polling, approve, start countdown → arena with consent dialog, problem strip, countdown, leaderboard panel (member 78 first), integrity panel, copy blocked (−2 %), submit → RoomSubmitResultView (RE 0/13, submits left, score), host End → results (podium, standings, similarity host view + Waive), hub history + pill cleared. Free-tier join quota (3/day) hit during testing → 429 as designed. **Deviations:** realtime is polling, not Firestore listeners (D-16 default) — rules stay deny-all; external paste could not be exercised in the pane (clipboard permission) — paste blocking relies on Monaco `onDidPaste` (copy blocking and the burst detector were exercised); a page reload was first counted as a second session → session id now persists per tab. **Owner actions:** create the `rooms(status, visibility, createdAt desc)` index (`npm run db:deploy` printed the gcloud command; the service account lacks `datastore.indexAdmin`; the public list falls back to a scan meanwhile); the OpenAI account has no credits, so `generateIfMissing` slot preparation is untested end-to-end (the pool covered every slot in testing); `recomputeRoom` script and the first-run tour remain follow-ups. Merged into `main` — SHA in `STATUS.md`. |

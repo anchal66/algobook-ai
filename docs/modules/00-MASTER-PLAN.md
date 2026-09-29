@@ -198,6 +198,8 @@ All routes: `Authorization: Bearer <FirebaseIdToken>` required unless marked pub
 | `GET /api/daily` | daily challenge | 04 |
 | `POST /api/interview/start`, `POST /api/interview/:id/finish` | mock interview | 04 |
 | `GET /api/templates` | templates from Firestore | 01 |
+| `POST/GET /api/rooms`, `POST /api/rooms/join`, `GET/PATCH /api/rooms/:id`, `/join /leave /cancel /ready /start /consent /prepare /end /rematch /waive /chat`, `/members/:uid`, `/problems/:index`, `/run`, `/submit`, `/events`, `/leaderboard`, `/results` | competition rooms (Module 06 §3.5) | 06 |
+| `GET /api/judge/budget`, `GET /api/cron/rooms`, `GET/POST /api/admin/rooms` | judge budget for the wizard, hourly room sweep, admin moderation | 06 |
 | `GET /api/problems/:id/driver?language=` | harness code for the in-browser visualizer (python/javascript) | 07 |
 | `POST /api/problems/:id/trace-explain` | AI narration of a real trace window (SSE, quota `visualizeExplain`) | 07 |
 | `POST /api/subscription/checkout`, `GET /api/subscription/activate`, `GET /api/subscription/status` | payments (hardened) | 01 |
@@ -253,7 +255,7 @@ Estimated cost per **new verified problem** ≈ $0.006–$0.02 on Luna (vs ~$0.1
 | 03 | `03-MODULE-EDITOR-WORKSPACE.md` — LeetCode-parity problem page (+ AI extras) | 01, 02 | COMPLETE (2026-09-08) |
 | 04 | `04-MODULE-PRACTICE-INTELLIGENCE.md` — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard snapshots, achievements, daily challenge, mock interview, templates | 01, 02 | COMPLETE (2026-09-08) |
 | 05 | `05-MODULE-DESIGN-SYSTEM-PAGES.md` — design system, motion/3D, landing, dashboard, explore, project wizard, profile, leaderboard, settings, admin, final QA | 01–04 (pages consume their APIs) | COMPLETE (2026-09-08) |
-| 06 | `06-MODULE-COMPETITION-ROOMS.md` — live contest rooms: code/approval lobby, configurable problem sets, room-aware run/submit, scoring, anti-cheat + consent, contest rating; Judge0 budget mode on the free tier | 01–05 | NOT STARTED (plan 2026-09-29) |
+| 06 | `06-MODULE-COMPETITION-ROOMS.md` — live contest rooms: code/approval lobby, configurable problem sets, room-aware run/submit, scoring, anti-cheat + consent, contest rating; Judge0 budget mode on the free tier | 01–05 | COMPLETE (2026-09-29) |
 | 07 | `07-MODULE-CODE-VISUALIZER.md` — in-browser execution replay for Python/JavaScript (Pyodide, instrumentation), memory canvas, timeline, AI explanations | 01–03 (no Judge0) | COMPLETE (2026-09-29) |
 
 Suggested calendar: 01 → 02 → 03 → 04 → 05. Modules 03 and 04 can run in parallel by two assistants once 02 is complete. **v2.1:** 07 first (no judge dependency, strongest differentiator), then 06; they touch different files and can also run in parallel.

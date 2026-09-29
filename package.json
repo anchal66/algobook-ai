@@ -26,7 +26,8 @@
     "db:migrate:stats": "NODE_OPTIONS=--conditions=react-server tsx scripts/migrate-stats.ts",
     "load:leaderboard": "NODE_OPTIONS=--conditions=react-server tsx scripts/load-test-leaderboard.ts",
     "qa:user": "NODE_OPTIONS=--conditions=react-server tsx scripts/qa-user.ts",
-    "qa:lighthouse": "node scripts/qa-lighthouse.mjs"
+    "qa:lighthouse": "node scripts/qa-lighthouse.mjs",
+    "room:smoke": "NODE_OPTIONS=--conditions=react-server tsx scripts/room-smoke.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

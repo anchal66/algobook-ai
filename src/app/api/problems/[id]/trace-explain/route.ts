@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/api/errors";
 import { sseResponse } from "@/lib/api/sse";
 import * as problems from "@/lib/data/problems";
 import * as cache from "@/lib/data/traceExplanations";
-import { assertNotInActiveInterview } from "@/lib/practice/interview";
+import { assertNotInRestrictedSession } from "@/lib/practice/restricted";
 import { consumeQuota } from "@/lib/auth/quotas";
 import { aiStream } from "@/lib/ai/client";
 import { TRACE_EXPLAIN_INSTRUCTIONS, buildTraceExplainInput } from "@/lib/ai/prompts/trace";
@@ -25,7 +25,7 @@ const BodySchema = z.object({
 export const POST = handler({ evt: "problems.trace_explain", feature: "visualizeExplain", body: BodySchema }, async ({ user, body, params }) => {
   const p = await problems.resolve(params.id);
   if (!p || p.status === "draft") throw ApiError.notFound("Problem not found");
-  await assertNotInActiveInterview(user.uid, p.id);
+  await assertNotInRestrictedSession(user.uid, p.id);
   const key = cache.explanationKey([p.id, body.language, body.code, body.question, body.caseInput, body.windowText]);
   const cached = await cache.get(key);
   return sseResponse(async (send) => {

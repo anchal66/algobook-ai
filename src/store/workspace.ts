@@ -12,7 +12,7 @@ import type {
 
 export type LeftTab = "description" | "editorial" | "solutions" | "submissions";
 export type ConsoleTab = "testcase" | "result" | "trace";
-export type SidePanel = "notes" | "tutor" | null;
+export type SidePanel = "notes" | "tutor" | "leaderboard" | "integrity" | null;
 export type SaveStatus = "saved" | "saving" | "unsaved";
 export type AsyncState = "idle" | "running" | "done" | "error";
 
@@ -21,9 +21,14 @@ export interface StageRecord { stage: GenerationStage; at: number; info?: Record
 export interface GenerationState { active: boolean; stages: StageRecord[]; error: string | null; prompt: string | null; startedAt: number | null }
 export interface TimerState { running: boolean; startedAt: number | null; accumulatedMs: number; countdownMs: number | null }
 
+export interface RoomContext { id: string; index: number }
+
 export interface WorkspaceState {
   // context
   projectId: string | null;
+  /** Module 06: contest arena mode (problem fetched from the room, run/submit through room routes). */
+  room: RoomContext | null;
+  roomSubmit: import("@/lib/workspace/api").RoomSubmitResponse | null;
   project: ProjectDTO | null;
   items: ProjectItemDTO[];
   problem: ProblemDTO | null;
@@ -66,7 +71,7 @@ export interface WorkspaceState {
   chat: ChatTurn[];
   generation: GenerationState;
   // actions
-  setContext: (p: Partial<Pick<WorkspaceState, "projectId" | "project" | "items" | "problem" | "languages" | "loading" | "error">>) => void;
+  setContext: (p: Partial<Pick<WorkspaceState, "projectId" | "project" | "items" | "problem" | "languages" | "loading" | "error" | "room" | "roomSubmit">>) => void;
   setLanguage: (l: Language) => void;
   setCode: (l: Language, code: string) => void;
   setSaveStatus: (s: SaveStatus) => void;
@@ -93,7 +98,7 @@ const initialTimer: TimerState = { running: false, startedAt: null, accumulatedM
 const initialGeneration: GenerationState = { active: false, stages: [], error: null, prompt: null, startedAt: null };
 
 export const useWorkspace = create<WorkspaceState>()((set, get) => ({
-  projectId: null, project: null, items: [], problem: null, languages: [], loading: true, error: null,
+  projectId: null, room: null, roomSubmit: null, project: null, items: [], problem: null, languages: [], loading: true, error: null,
   language: "java", code: {}, saveStatus: "saved", cursor: { line: 1, col: 1 }, preparingLanguage: null,
   cases: [], activeCase: 0,
   runState: "idle", runResult: null, runError: null, activeResultCase: 0,
@@ -130,7 +135,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     set({
       problem: null, languages: [], loading: true, error: null, code: {}, saveStatus: "saved", cursor: { line: 1, col: 1 }, preparingLanguage: null,
       cases: [], activeCase: 0, runState: "idle", runResult: null, runError: null, activeResultCase: 0,
-      submitState: "idle", submitResult: null, submitError: null, submittedAt: null,
+      submitState: "idle", submitResult: null, submitError: null, submittedAt: null, roomSubmit: null,
       leftTab: "description", consoleTab: "testcase", maximized: null,
       hintsRevealed: 0, hints: {}, editorialViewed: false, runCount: 0, openedAt: Date.now(),
       timer: { ...initialTimer, countdownMs: keepTimer.countdownMs }, chat: [], generation: initialGeneration,

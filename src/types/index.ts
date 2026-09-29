@@ -16,6 +16,7 @@ export type {
   Template, TemplateItem, LeaderboardEntry, LeaderboardSnapshot, DailyChallenge, Achievements,
   Interview, InterviewFeedback, InterviewStatus, LeaderboardMeta, CohortEntry, WeeklyEntry,
   WithId, Serialized,
+  RoomStatus, RoomMemberState, RoomProblem, RoomSlot, Room, RoomMember, RoomMemberProblem, RoomSubmission, RoomEvent, RoomChat, RoomRating,
 } from "@/lib/data/schema";
 
 export type { CaseResult, JudgeResult, CaseStatus } from "@/lib/judge/types";

@@ -13,7 +13,7 @@ Update this table **and** the header of the module file whenever a status change
 | 03 | Editor Workspace — LeetCode-parity problem page + AI extras | COMPLETE | `module/03-workspace` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | 14/14 browser checklist on `dev-local`, 78 tests, build green, QA captures in `qa/03`. Bundled Monaco (no CDN). Fixed Module 01 draft persistence + HMR Firestore singleton. Open: re-run once on real Judge0. |
 | 04 | Practice Intelligence — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard, achievements, daily, mock interview | COMPLETE | `module/04-intelligence` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | Built in parallel with 03 in its own worktree from `main` 75c61f7. 152 vitest (97 engine), api-smoke 80/80, acceptance script green (template reuse, calibration, freeze), rules v2.1 released, stats migration applied. Merged after Module 03 (`8b8dbc5`) as `1979fab`; merged tree build/tsc/175 tests green. Open: leaderboard p95 413–473 ms on the dev server from this machine vs the 300 ms target (auth baseline alone 325–400 ms; O(page) reads hold — expect < 300 ms in-region). |
 | 05 | Design System & Pages — tokens, motion/3D, landing, dashboard, explore, wizard, profile, leaderboard, settings, admin, final QA | COMPLETE | `module/05-design-pages` | 2026-09-08 | 2026-09-08 | Claude (Fable 5.1) | All pages + design system shipped; 180 tests, lint 0 errors, build green, axe 0 serious/critical on every page, Lighthouse desktop ≥ 92 perf / 100 bp; mobile perf on auth pages below the 80 target (client-rendered behind auth). QA in `qa/05`. Open: real-Judge0 pass of the whole app, notification emails, contact admin UI. |
-| 06 | Competition Rooms — create/join with code, host approval, configurable contests, live leaderboard, anti-cheat with consent, scoring/rating | NOT STARTED | `module/06-rooms` | — | — | — | Plan authored 2026-09-29 (`06-MODULE-COMPETITION-ROOMS.md`). Runs in Judge0 budget mode (§3.12) on the free tier; D-16…D-22 decided with defaults 2026-09-29. |
+| 06 | Competition Rooms — create/join with code, host approval, configurable contests, live leaderboard, anti-cheat with consent, scoring/rating | COMPLETE | `module/06-rooms` | 2026-09-29 | 2026-09-29 | Claude (Fable 5.1) | `room:smoke` all green on `dev-local`; browser walkthrough host + scripted member; 222 tests, build green. Runs in Judge0 budget mode. Deviations: polling instead of Firestore listeners (D-16), external paste not exercised in the pane. Owner: create the rooms composite index (gcloud command in the module log). |
 | 07 | Code Visualizer — in-browser line-by-line replay (Python via Pyodide, JavaScript via instrumentation), memory canvas, timeline, AI step explanations | COMPLETE | `module/07-visualizer` | 2026-09-29 | 2026-09-29 | Claude (Fable 5.1) | Browser-verified Python + JavaScript on `dev-local`; 209 tests, build green. Deferred: first-run tour, qa/07 captures, reference-solution replay, Java/C++ (D-23). OpenAI account had no credits during verification — AI explanations untested end-to-end. |
 
 ## Task roll-up (update counts when you tick tasks)
@@ -25,7 +25,7 @@ Update this table **and** the header of the module file whenever a status change
 | 03 | 35 | 35 | 0 | `8b8dbc5` (merge of `module/03-workspace`, pushed 2026-09-08) |
 | 04 | 25 | 25 | 0 | `1979fab` (merge of `module/04-intelligence`, pushed 2026-09-08) |
 | 05 | 29 | 29 | 0 | `4f527dc` (merge of `module/05-design-pages`, pushed 2026-09-08) · tag `v2.0.0` |
-| 06 | 27 | 0 | 0 | — |
+| 06 | 27 | 27 | 0 | (merge SHA below) |
 | 07 | 21 | 19 | 2 | `bb2614d` (merge of `module/07-visualizer`, pushed 2026-09-29) |
 
 The last task of every module is "Ship it": commit, merge the module branch into `main`, rebuild, push, and record the SHA above. A module is not `COMPLETE` until it is pushed.
@@ -54,3 +54,4 @@ The last task of every module is "Ship it": commit, merge the module branch into
 | 2026-09-29 | 06 | Plan authored for Competition Rooms (Module 06) and discussion paper for the code visualizer (D-23); decisions D-16…D-23 opened | Claude (Fable 5.1) |
 | 2026-09-29 | 06/07 | Owner kept the RapidAPI free tier and delegated D-16…D-23: Module 06 revised with budget mode; Module 07 (visualizer) plan authored | Claude (Fable 5.1) |
 | 2026-09-29 | 07 | NOT STARTED → COMPLETE: visualizer built and browser-verified; merged into `main` | Claude (Fable 5.1) |
+| 2026-09-29 | 06 | NOT STARTED → COMPLETE: rooms built, smoke + browser verified; merged into `main` | Claude (Fable 5.1) |

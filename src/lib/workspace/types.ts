@@ -53,6 +53,8 @@ export interface MeResponse {
   plan: PlanInfo;
   isAdmin: boolean;
   quotas: { date: string; used: Partial<Record<FeatureKey, number>>; limits: Record<FeatureKey, number>; resetAt: string };
+  /** Module 06: the live room the user is in, if any. */
+  activeRoom?: { id: string; name: string; status: string; startedAt: string | null; endsAt: string | null; isHost: boolean } | null;
 }
 
 export type GenerationStage = "searching" | "generating" | "validating" | "verifying" | "repairing" | "persisting" | "done";

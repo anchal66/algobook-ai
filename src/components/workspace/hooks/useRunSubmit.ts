@@ -2,7 +2,7 @@
 /** Run and Submit flows (Module 03 W-11/W-12). */
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { ApiError, runCode, submitCode } from "@/lib/workspace/api";
+import { ApiError, roomRun, roomSubmit, runCode, submitCode } from "@/lib/workspace/api";
 import { fromHuman } from "@/lib/judge/human";
 import { track } from "@/lib/analytics";
 import { timerElapsedMs, useWorkspace } from "@/store/workspace";
@@ -19,6 +19,7 @@ export function describeApiError(e: unknown): string {
     if (e.code === "UPSTREAM" && /judge|capacity|busy/i.test(e.message)) return e.message;
     if (e.code === "UPSTREAM") return "The code runner is temporarily unavailable. Please try again in a moment.";
     if (e.code === "CONFLICT") return e.message;
+    if (e.code === "FORBIDDEN") return e.message;
     return e.message;
   }
   return (e as Error)?.message ?? "Something went wrong";
@@ -48,7 +49,8 @@ export function useRunSubmit(): { run: () => Promise<void>; submit: () => Promis
     ws.setUi({ consoleTab: "result" });
     const runFor = problem.id;
     try {
-      const res = await runCode(problem.id, language, code, encoded);
+      const room = ws.room;
+      const res = room ? await roomRun(room.id, room.index, language, code, encoded) : await runCode(problem.id, language, code, encoded);
       if (useWorkspace.getState().problem?.id !== runFor) return; // navigated away — never paint a result on another problem
       const first = res.cases.findIndex((c) => !c.passed);
       useWorkspace.getState().setRun({ runState: "done", runResult: res.cases, activeResultCase: first >= 0 ? first : 0 });
@@ -71,6 +73,22 @@ export function useRunSubmit(): { run: () => Promise<void>; submit: () => Promis
     const submitFor = problem.id;
     ws.setSubmit({ submitState: "running", submitResult: null, submitError: null });
     ws.setUi({ consoleTab: "result" });
+    if (ws.room) {
+      // Module 06: contest submit — scored by the room, never touches mastery/SRS
+      try {
+        const res = await roomSubmit(ws.room.id, ws.room.index, language, code);
+        if (useWorkspace.getState().problem?.id !== submitFor) return;
+        const w = useWorkspace.getState();
+        w.setContext({ roomSubmit: res });
+        w.setSubmit({ submitState: "done", submitResult: null, submittedAt: Date.now() });
+        bumpQuota("submit");
+        track("submit", { language, verdict: res.submission.verdict, passed: res.submission.passed ?? 0, total: res.submission.total ?? 0 });
+      } catch (e) {
+        if (useWorkspace.getState().problem?.id !== submitFor) return;
+        useWorkspace.getState().setSubmit({ submitState: "error", submitError: describeApiError(e) });
+      }
+      return;
+    }
     try {
       const res = await submitCode(problem.id, language, code, {
         hintsUsed: ws.hintsRevealed, editorialViewed: ws.editorialViewed, timeSpentSec, runCount: ws.runCount,
