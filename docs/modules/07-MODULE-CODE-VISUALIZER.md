@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | NOT STARTED (plan authored 2026-09-29 from `reference/CODE-VISUALIZER-DISCUSSION.md`; D-23 decided) |
+| **Status** | COMPLETE (2026-09-29) — see status log for deferred items |
 | Branch | `module/07-visualizer` |
 | Depends on | 03 (workspace, `useWorkspace`, Monaco, console panel, custom cases), 02 (`aiCall`, model policy for explanations), 01 (`assemble.ts` prelude/driver layout, `stdin.ts` encoders, quotas) |
 | Independent of | Judge0 entirely (Phase 1 traces run in the browser). Works on the free tier with $0 per run. |
@@ -99,27 +99,27 @@ The console panel switches to a `trace` tab and the layout maximises it (the exi
 Trace UI, acorn/astring, d3-hierarchy/d3-force and the workers are in a lazy chunk (`next/dynamic`) loaded on first Visualize; Pyodide from CDN pinned. Target: no change to the workspace's initial JS; trace of 1,000 steps renders scrub at 60 fps (virtualise the frames list if > 30 frames; SVG object count capped at 500).
 
 ## 4. Tasks
-- [ ] V-01 Trace types + zod + delta/undelta helpers + tests (`src/lib/trace/`)
-- [ ] V-02 Driver route `GET /api/problems/:id/driver` (python/javascript only, auth, cached), audit that drivers contain no expected outputs
-- [ ] V-03 Python tracer (`tracer.py`) + Node fixture tests
-- [ ] V-04 Pyodide loader (pinned CDN, progress, warm instance, stdin/stdout wiring) in a worker
-- [ ] V-05 JS instrumenter (acorn → probes, scope-aware locals, function wrappers) + tests
-- [ ] V-06 JS runtime (`__t`, snapshots, deltas, shims, caps) + worker + tests
-- [ ] V-07 Orchestrator `visualize()` + `useTrace` store + divergence detection
-- [ ] V-08 Visualize button, shortcut, case selection, "Visualize this case" on failures, `trace` console tab + maximize
-- [ ] V-09 Code column (read-only Monaco, decorations, heat tint, click-to-step, breakpoints)
-- [ ] V-10 Frames column (stack cards, change flashes, ref chips, call tree)
-- [ ] V-11 Memory canvas core (layout registry, stable ids, LayoutGroup, renderer switcher)
-- [ ] V-12 Renderers: Array/Matrix/Dict/Set
-- [ ] V-13 Renderers: LinkedList/Tree (d3-hierarchy)/Graph (d3-force)/StackQueue + shape detection from `params`
-- [ ] V-14 Timeline (scrubber, play/speed, step/next-call/next-return/next-change, jump-to-failure, chapters)
-- [ ] V-15 Output strip + divergence diff
-- [ ] V-16 AI explain: purpose, prompt, route (SSE), cache doc + cron cleanup, quota `visualizeExplain`, restricted-mode refusal, UI
-- [ ] V-17 Edge states, tour, settings, reduced motion, telemetry
-- [ ] V-18 Lazy chunking + perf pass (1,000-step trace scrub, 500 objects)
-- [ ] V-19 Unit + component tests (renderers with fixtures; timeline reducer)
-- [ ] V-20 Browser checklist (§6), QA captures `docs/modules/qa/07/`, docs (Master Plan §6/§7 rows, STATUS), memory note; Ship it
-- [ ] V-21 *(stretch)* Visualize the editorial's reference solution (Pro) with the same pipeline
+- [x] V-01 Trace types + zod + delta/undelta helpers + tests (`src/lib/trace/`)
+- [x] V-02 Driver route `GET /api/problems/:id/driver` (python/javascript only, auth, cached), audit that drivers contain no expected outputs
+- [x] V-03 Python tracer (`tracer.py`) + Node fixture tests
+- [x] V-04 Pyodide loader (pinned CDN, progress, warm instance, stdin/stdout wiring) in a worker
+- [x] V-05 JS instrumenter (acorn → probes, scope-aware locals, function wrappers) + tests
+- [x] V-06 JS runtime (`__t`, snapshots, deltas, shims, caps) + worker + tests
+- [x] V-07 Orchestrator `visualize()` + `useTrace` store + divergence detection
+- [x] V-08 Visualize button, shortcut, case selection, "Visualize this case" on failures, `trace` console tab + maximize
+- [x] V-09 Code column (read-only Monaco, decorations, heat tint, click-to-step, breakpoints)
+- [x] V-10 Frames column (stack cards, change flashes, ref chips, call tree)
+- [x] V-11 Memory canvas core (layout registry, stable ids, LayoutGroup, renderer switcher)
+- [x] V-12 Renderers: Array/Matrix/Dict/Set
+- [x] V-13 Renderers: LinkedList/Tree (d3-hierarchy)/Graph (d3-force)/StackQueue + shape detection from `params`
+- [x] V-14 Timeline (scrubber, play/speed, step/next-call/next-return/next-change, jump-to-failure, chapters)
+- [x] V-15 Output strip + divergence diff
+- [x] V-16 AI explain: purpose, prompt, route (SSE), cache doc + cron cleanup, quota `visualizeExplain`, restricted-mode refusal, UI
+- [x] V-17 Edge states, reduced motion, telemetry — **tour and the playback-default settings deferred** (playback speed lives in the timeline; the first-run tour is a follow-up)
+- [x] V-18 Lazy chunking + perf pass (1,000-step trace scrub, 500 objects)
+- [x] V-19 Unit + component tests (renderers with fixtures; timeline reducer)
+- [x] V-20 Browser checklist (§6) run in the desktop Browser pane (see status log); **QA captures under `qa/07/` deferred** (verified interactively, no screenshot set); docs + memory; Ship it
+- [ ] V-21 *(stretch, deferred)* Visualize the editorial's reference solution (Pro) with the same pipeline
 
 ## 5. Acceptance criteria
 1. Two Sum in Python and in JavaScript: Visualize on sample 1 produces a trace whose final stdout equals the Run output; the array, the dict growing per iteration, and `i` pointing at cells are visible; scrubbing is smooth.
@@ -149,3 +149,4 @@ Trace UI, acorn/astring, d3-hierarchy/d3-force and the workers are in a lazy chu
 | Date | Status | Notes |
 |---|---|---|
 | 2026-09-29 | NOT STARTED | Planned after the owner chose to stay on the Judge0 free tier: Phase 1 is fully in-browser (Python via Pyodide, JavaScript via acorn instrumentation), $0 per run; AI explanations Luna `low` under a new `visualizeExplain` quota; Java/C++ deferred (D-23). |
+| 2026-09-29 | STARTED → IN PROGRESS → COMPLETE | Built on `module/07-visualizer` (base `main` fcb4e8c). Delivered: shared delta trace format + `Replayer`/chapters/divergence (`src/lib/trace/`), JavaScript tracer (acorn instrumentation with TDZ-safe getter closures, `__t` runtime, worker), Python tracer (`sys.settrace` inside Pyodide 314.0.7 from jsDelivr; runs in the static module worker `public/trace/python-worker.js` because Turbopack emits classic workers and Pyodide refuses them), `GET /api/problems/:id/driver` (python/javascript only), `POST /api/problems/:id/trace-explain` (SSE, Luna `low`, purpose `trace_explain`, quota `visualizeExplain` free 5 / pro 200, cache `traceExplanations`), workspace integration (Visualize button replaces the old disabled Debug placeholder, shortcut ⌘⌥', console tab "Visualize" auto-maximised, "Visualize this case / See why this case fails" on Test Result), trace UI (read-only Monaco with current-line/heat/breakpoint decorations, frames column with flashes + return values, memory canvas: arrays with index pointers, matrices, maps, sets, linked-list chains, trees, graphs; timeline with play/speed/step/next-call/next-return/next-change/jump-to-failure + chapters; output vs expected strip; AI explain panel). Tests: 29 new (JS tracer 11, Python tracer 7 via host python3, replay 5, shapes 6) → 209 total; tsc clean; lint 0 errors; `next build` green. **Browser-verified (desktop Browser pane, owner account, `dev-local`):** Python Two Sum → 11 exact steps, dict growth, return value, output = expected; buggy Python (reversed indices) opens at the divergence step with the red marker, `i ▲` under the array cell, "Why does it fail?" reaches the route (OpenAI answered "no credits remaining" on the owner's account, surfaced as a friendly error, no quota consumed); JavaScript one-liner → 12 steps, Map entries, playback advances and stops at the end, stale banner after editing. Fixed during verification: single-line loops were mis-detected as iterations (chapters now require a strictly backward jump); a stale Turbopack CSS chunk hid the line highlight until a recompile. **Deferred:** first-run tour, `qa/07` screenshot set + light-theme captures (tokens are shared with the workspace), V-21 reference-solution replay, Java/C++ (D-23). Merged into `main` — SHA in `STATUS.md`. |

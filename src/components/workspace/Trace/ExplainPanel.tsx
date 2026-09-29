@@ -76,7 +76,9 @@ export function ExplainPanel({ trace }: { trace: Trace }) {
       track("visualize_explain", { question });
     } catch (e) {
       if ((e as Error)?.name === "AbortError") return;
-      const msg = e instanceof ApiError ? (e.code === "PAYMENT_REQUIRED" ? "Explanations are part of the Pro plan." : e.code === "QUOTA_EXCEEDED" ? "You have used today's visualizer explanations." : e.code === "FORBIDDEN" ? e.message : e.message) : "The explanation is unavailable right now";
+      const msg = e instanceof ApiError
+        ? (e.code === "PAYMENT_REQUIRED" ? "Explanations are part of the Pro plan." : e.code === "QUOTA_EXCEEDED" ? "You have used today's visualizer explanations." : e.code === "FORBIDDEN" ? e.message : e.code === "UPSTREAM" ? "The AI service is unavailable right now — the trace above is still exact. Please try again later." : e.message)
+        : "The explanation is unavailable right now";
       setExplain({ streaming: false, error: msg });
     }
   };

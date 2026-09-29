@@ -198,6 +198,8 @@ All routes: `Authorization: Bearer <FirebaseIdToken>` required unless marked pub
 | `GET /api/daily` | daily challenge | 04 |
 | `POST /api/interview/start`, `POST /api/interview/:id/finish` | mock interview | 04 |
 | `GET /api/templates` | templates from Firestore | 01 |
+| `GET /api/problems/:id/driver?language=` | harness code for the in-browser visualizer (python/javascript) | 07 |
+| `POST /api/problems/:id/trace-explain` | AI narration of a real trace window (SSE, quota `visualizeExplain`) | 07 |
 | `POST /api/subscription/checkout`, `GET /api/subscription/activate`, `GET /api/subscription/status` | payments (hardened) | 01 |
 | `POST /api/admin/pregen`, `POST /api/admin/leaderboard-snapshot`, `GET /api/admin/ai-usage` | admin (env `ADMIN_UIDS`) | 02/04 |
 
@@ -218,6 +220,7 @@ Verified against the OpenAI model list on 2026-09-07 and public model cards. Pri
 | Inline completion | `gpt-5.6-luna` | `none` | 96 | 600 ms debounce, opt-in setting, cached prefix. |
 | Project insights / plan | `gpt-5.6-luna` | `low` | 2,500 | |
 | Embeddings for dedupe | `text-embedding-3-small` | — | — | 1536 dims, stored on the problem doc. |
+| Visualizer step narration | `gpt-5.6-luna` | `low` | 400 | Input = code + ±10 real trace steps; cached per (code, case, question). |
 | Nightly pool pre-generation | `gpt-5.6-luna` via **Batch API** | `high` | 16,000 | 50% cheaper; fills topic×difficulty matrix. |
 
 Rules: Responses API only (`client.responses.create`/`parse`); zod schemas → `text.format` (json_schema, `strict: true`); `store: false`; **`max_output_tokens` includes reasoning tokens** (Module 02 measured 3–8k reasoning tokens per `high` generation, hence the budgets above — only produced tokens are billed); static instructions first, dynamic context last (prompt cache); `max_output_tokens` always set; no `temperature`; log every call to `aiUsage`. Full prompt texts live in Module 02.
@@ -251,7 +254,7 @@ Estimated cost per **new verified problem** ≈ $0.006–$0.02 on Luna (vs ~$0.1
 | 04 | `04-MODULE-PRACTICE-INTELLIGENCE.md` — mastery/SRS fixes, recommender v2, rating, streaks, leaderboard snapshots, achievements, daily challenge, mock interview, templates | 01, 02 | COMPLETE (2026-09-08) |
 | 05 | `05-MODULE-DESIGN-SYSTEM-PAGES.md` — design system, motion/3D, landing, dashboard, explore, project wizard, profile, leaderboard, settings, admin, final QA | 01–04 (pages consume their APIs) | COMPLETE (2026-09-08) |
 | 06 | `06-MODULE-COMPETITION-ROOMS.md` — live contest rooms: code/approval lobby, configurable problem sets, room-aware run/submit, scoring, anti-cheat + consent, contest rating; Judge0 budget mode on the free tier | 01–05 | NOT STARTED (plan 2026-09-29) |
-| 07 | `07-MODULE-CODE-VISUALIZER.md` — in-browser execution replay for Python/JavaScript (Pyodide, instrumentation), memory canvas, timeline, AI explanations | 01–03 (no Judge0) | NOT STARTED (plan 2026-09-29) |
+| 07 | `07-MODULE-CODE-VISUALIZER.md` — in-browser execution replay for Python/JavaScript (Pyodide, instrumentation), memory canvas, timeline, AI explanations | 01–03 (no Judge0) | COMPLETE (2026-09-29) |
 
 Suggested calendar: 01 → 02 → 03 → 04 → 05. Modules 03 and 04 can run in parallel by two assistants once 02 is complete. **v2.1:** 07 first (no judge dependency, strongest differentiator), then 06; they touch different files and can also run in parallel.
 

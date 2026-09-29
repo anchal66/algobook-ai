@@ -117,7 +117,7 @@ export function chapters(trace: Trace): Chapter[] {
     const top = stack[stack.length - 1];
     if (top && s.ev === "line") {
       const pl = prevLine.get(top.id);
-      if (pl !== undefined && s.line <= pl) {
+      if (pl !== undefined && s.line < pl) {
         const it = iterations.get(top.id);
         if (it && it.line === s.line) { out.push({ kind: "loop", label: `iteration ${it.count}`, from: it.from, to: s.i - 1, depth: stack.length }); iterations.set(top.id, { count: it.count + 1, from: s.i, line: s.line }); }
         else if (!it) iterations.set(top.id, { count: 1, from: s.i, line: s.line });
