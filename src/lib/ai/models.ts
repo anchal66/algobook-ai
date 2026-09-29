@@ -3,7 +3,7 @@
  * `AI_MODEL_OVERRIDE_<PURPOSE>` (e.g. AI_MODEL_OVERRIDE_GENERATE=gpt-5.6-terra) overrides per purpose.
  */
 export type AiPurpose =
-  | "generate" | "repair" | "driver" | "hint3" | "editorial" | "review" | "explain" | "chat" | "complete" | "insights" | "embed";
+  | "generate" | "repair" | "driver" | "hint3" | "editorial" | "review" | "explain" | "chat" | "complete" | "insights" | "embed" | "trace_explain";
 
 export type ModelId = "gpt-5.6-luna" | "gpt-5.6-terra" | "gpt-5.6-sol" | "gpt-6-astra" | "text-embedding-3-small";
 export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -36,6 +36,7 @@ export const MODEL_POLICY: Record<AiPurpose, PurposePolicy> = {
   chat: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 1500 },
   complete: { model: "gpt-5.6-luna", reasoning: "none", verbosity: "low", maxOutputTokens: 96 },
   insights: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 2500 },
+  trace_explain: { model: "gpt-5.6-luna", reasoning: "low", verbosity: "low", maxOutputTokens: 400 }, // Module 07 visualizer narration
   embed: { model: "text-embedding-3-small", maxOutputTokens: 0 },
 };
 

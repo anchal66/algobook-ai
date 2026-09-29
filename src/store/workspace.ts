@@ -11,7 +11,7 @@ import type {
 } from "@/lib/workspace/types";
 
 export type LeftTab = "description" | "editorial" | "solutions" | "submissions";
-export type ConsoleTab = "testcase" | "result";
+export type ConsoleTab = "testcase" | "result" | "trace";
 export type SidePanel = "notes" | "tutor" | null;
 export type SaveStatus = "saved" | "saving" | "unsaved";
 export type AsyncState = "idle" | "running" | "done" | "error";

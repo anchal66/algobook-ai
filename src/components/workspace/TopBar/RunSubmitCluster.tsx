@@ -1,22 +1,29 @@
 "use client";
 /** Debug · Run · Submit pill group (Module 03 §1.1). Rendered in the toolbar or in the Code panel header per settings. */
-import { Bug, CloudUpload, Loader2, Play } from "lucide-react";
+import { CloudUpload, Loader2, Play, ScanEye } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { comboLabel, shortcutById } from "@/lib/editor/shortcuts";
 import { useWorkspace } from "@/store/workspace";
+import { useTrace } from "@/store/trace";
+import { canVisualize } from "@/components/workspace/hooks/useVisualize";
 
 export interface RunSubmitClusterProps {
   onRun: () => void;
   onSubmit: () => void;
+  onVisualize?: () => void;
   compact?: boolean;
   className?: string;
 }
 
-export function RunSubmitCluster({ onRun, onSubmit, compact, className }: RunSubmitClusterProps) {
+export function RunSubmitCluster({ onRun, onSubmit, onVisualize, compact, className }: RunSubmitClusterProps) {
   const runState = useWorkspace((s) => s.runState);
   const submitState = useWorkspace((s) => s.submitState);
   const hasProblem = useWorkspace((s) => !!s.problem);
+  const language = useWorkspace((s) => s.language);
+  const traceStatus = useTrace((s) => s.status);
+  const tracing = traceStatus === "preparing" || traceStatus === "loading" || traceStatus === "running";
+  const visualizable = canVisualize(language);
   const busy = runState === "running" || submitState === "running";
   const btn = "flex h-8 items-center gap-1.5 rounded-[6px] px-3 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-from/60";
 
@@ -25,13 +32,13 @@ export function RunSubmitCluster({ onRun, onSubmit, compact, className }: RunSub
       <Tooltip>
         <TooltipTrigger asChild>
           <span>
-            <button type="button" disabled aria-label="Debug" className={cn(btn, "text-fg-3")}>
-              <Bug className="size-4" />
-              {!compact && <span className="hidden lg:inline">Debug</span>}
+            <button type="button" onClick={onVisualize} disabled={!onVisualize || !hasProblem || !visualizable || tracing} aria-label="Visualize" className={cn(btn, visualizable ? "text-fg-1 hover:bg-ws-hover" : "text-fg-3")}>
+              {tracing ? <Loader2 className="size-4 animate-spin" /> : <ScanEye className="size-4" />}
+              {!compact && <span className="hidden lg:inline">Visualize</span>}
             </button>
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Debugger is coming soon</TooltipContent>
+        <TooltipContent side="bottom">{visualizable ? `Watch your code run step by step ${comboLabel(shortcutById("debugStart").combo)}` : "Visualize is available for Python and JavaScript"}</TooltipContent>
       </Tooltip>
       <span className="h-4 w-px bg-line/70" />
       <Tooltip>

@@ -6,6 +6,8 @@ import { CaseChips, type Chip } from "@/components/workspace/Console/CaseChips";
 import { CaseResultView } from "@/components/workspace/Console/CaseResultView";
 import { SubmissionResultView, type SubmissionResultViewProps } from "@/components/workspace/Console/SubmissionResultView";
 import { VERDICT_CLASS, VERDICT_LABEL } from "@/components/workspace/Console/verdict";
+import { ScanEye } from "lucide-react";
+import { canVisualize, useVisualize } from "@/components/workspace/hooks/useVisualize";
 
 function RunningSkeleton({ label }: { label: string }) {
   return (
@@ -31,6 +33,8 @@ export function TestResultTab(props: SubmissionResultViewProps) {
   const submitError = useWorkspace((s) => s.submitError);
   const submitResult = useWorkspace((s) => s.submitResult);
   const cases = useWorkspace((s) => s.cases);
+  const language = useWorkspace((s) => s.language);
+  const { visualize } = useVisualize();
 
   if (submitState === "running") return <RunningSkeleton label="Judging…" />;
   if (submitState === "error") return <ErrorState message={submitError ?? "Submit failed"} />;
@@ -53,7 +57,16 @@ export function TestResultTab(props: SubmissionResultViewProps) {
         <h2 className={cn("text-lg font-semibold", allPassed ? "text-accepted" : VERDICT_CLASS[worst.status])}>{allPassed ? "Accepted" : VERDICT_LABEL[worst.status]}</h2>
         <span className="text-xs text-fg-3">Runtime: {maxMs} ms</span>
       </div>
-      {worst.status !== "CE" && <CaseChips chips={chips} active={Math.min(active, runResult.length - 1)} onSelect={(i) => setRun({ activeResultCase: i })} />}
+      {worst.status !== "CE" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <CaseChips chips={chips} active={Math.min(active, runResult.length - 1)} onSelect={(i) => setRun({ activeResultCase: i })} />
+          {canVisualize(language) && (
+            <button type="button" onClick={() => void visualize(current.index)} className="ml-auto flex h-7 items-center gap-1.5 rounded-[6px] bg-brand-from/15 px-2.5 text-xs font-medium text-brand-to transition-colors hover:bg-brand-from/25">
+              <ScanEye className="size-3.5" /> {current.passed ? "Visualize this case" : "See why this case fails"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-4">
         <CaseResultView params={problem.params} result={current} custom={cases[current.index]?.custom} />
       </div>

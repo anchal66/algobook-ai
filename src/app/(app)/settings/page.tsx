@@ -30,7 +30,7 @@ import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [["account", "Account"], ["plan", "Plan & billing"], ["appearance", "Appearance"], ["editor", "Editor defaults"], ["notifications", "Notifications"], ["privacy", "Privacy"], ["danger", "Danger zone"]] as const;
-const FEATURE_LABEL: Record<string, string> = { generate: "AI generations", run: "Runs", submit: "Submits", hint3: "Level-3 hints", editorial: "Editorials", chat: "Tutor messages", completion: "Inline completions", review: "Code reviews", interview: "Mock interviews" };
+const FEATURE_LABEL: Record<string, string> = { generate: "AI generations", run: "Runs", submit: "Submits", hint3: "Level-3 hints", editorial: "Editorials", chat: "Tutor messages", completion: "Inline completions", review: "Code reviews", interview: "Mock interviews", visualizeExplain: "Visualizer explanations" };
 
 function Section({ id, title, description, children }: { id: string; title: string; description?: string; children: React.ReactNode }) {
   return (

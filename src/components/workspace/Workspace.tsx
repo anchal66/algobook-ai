@@ -6,13 +6,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Toaster } from "sonner";
-import { BookOpen, CheckSquare, FileText, FlaskConical, History, NotebookPen, Play, Sparkles, SquareCode } from "lucide-react";
+import { BookOpen, CheckSquare, FileText, FlaskConical, History, NotebookPen, Play, ScanEye, Sparkles, SquareCode } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useWorkspace, type LeftTab } from "@/store/workspace";
 import { useSettings } from "@/store/settings";
 import { useProblemLoader } from "@/components/workspace/hooks/useProblemLoader";
 import { useAutosave } from "@/components/workspace/hooks/useAutosave";
 import { useRunSubmit } from "@/components/workspace/hooks/useRunSubmit";
+import { useVisualize } from "@/components/workspace/hooks/useVisualize";
 import { useNextProblem } from "@/components/workspace/hooks/useNextProblem";
 import { useShortcuts } from "@/components/workspace/hooks/useShortcuts";
 import { useMediaQuery } from "@/components/workspace/hooks/useMediaQuery";
@@ -28,6 +29,8 @@ import { CodeBody, CodeHeaderActions, CodeHeaderExtra, formatCurrentCode } from 
 import { focusEditor } from "@/components/workspace/Code/editorRef";
 import { TestcaseTab } from "@/components/workspace/Console/TestcaseTab";
 import { TestResultTab } from "@/components/workspace/Console/TestResultTab";
+import { TraceTab } from "@/components/workspace/Trace/TraceTab";
+import { useTrace } from "@/store/trace";
 import { NotesPanel } from "@/components/workspace/Side/NotesPanel";
 import { TutorChatPanel } from "@/components/workspace/Side/TutorChatPanel";
 import { ProblemListDrawer } from "@/components/workspace/Drawer/ProblemListDrawer";
@@ -42,6 +45,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
   useProblemLoader(problemId, projectId);
   const { onChange } = useAutosave();
   const { run, submit } = useRunSubmit();
+  const { visualize } = useVisualize();
   const nav = useNextProblem();
   const { setTheme } = useTheme();
   const themePref = useSettings((s) => s.editor.theme);
@@ -89,9 +93,14 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
 
   const togglePanel = useCallback((id: string) => { const p = getPanel(id); if (!p) return; if (p.isCollapsed()) p.expand(); else p.collapse(); }, []);
 
+  // A new problem invalidates the previous trace.
+  const problemKey = useWorkspace((s) => s.problem?.id ?? null);
+  useEffect(() => { useTrace.getState().reset(); }, [problemKey]);
+
   useShortcuts({
     run: () => void run(),
     submit: () => void submit(),
+    debugStart: () => void visualize(),
     fullscreen: toggleFullscreen,
     maximizePanel: () => setUi({ maximized: maximized ? null : "code" }),
     closeTab: () => { if (sidePanel) setUi({ sidePanel: null }); else if (maximized) setUi({ maximized: null }); },
@@ -137,24 +146,25 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
     tabs: [{ id: "code", label: "Code", icon: <SquareCode />, iconClass: "text-accepted" }],
     activeTab: "code",
     extra: <CodeHeaderExtra />,
-    actions: <CodeHeaderActions onRun={() => void run()} onSubmit={() => void submit()} onChange={onChange} />,
+    actions: <CodeHeaderActions onRun={() => void run()} onSubmit={() => void submit()} onVisualize={() => void visualize()} onChange={onChange} />,
     keepMounted: true,
     minSize: "120px",
     children: <PanelErrorBoundary name="Code"><CodeBody onChange={onChange} /></PanelErrorBoundary>,
-  }), [run, submit, onChange]);
+  }), [run, submit, visualize, onChange]);
 
   const consoleSlot = useMemo<PanelSlot>(() => ({
     id: "console",
     tabs: [
       { id: "testcase", label: "Testcase", icon: <CheckSquare />, iconClass: "text-accepted" },
       { id: "result", label: "Test Result", icon: <Play />, iconClass: "text-accepted" },
+      { id: "trace", label: "Visualize", icon: <ScanEye />, iconClass: "text-brand-to" },
     ],
     activeTab: consoleTab,
-    onTabChange: (id) => setUi({ consoleTab: id as "testcase" | "result" }),
+    onTabChange: (id) => setUi({ consoleTab: id as "testcase" | "result" | "trace" }),
     minSize: "100px",
     children: (
       <PanelErrorBoundary name="Console">
-        {consoleTab === "testcase" ? <TestcaseTab /> : <TestResultTab onNext={nav.goNext} onViewEditorial={viewEditorial} onAskTutor={askTutor} />}
+        {consoleTab === "testcase" ? <TestcaseTab /> : consoleTab === "trace" ? <TraceTab /> : <TestResultTab onNext={nav.goNext} onViewEditorial={viewEditorial} onAskTutor={askTutor} />}
       </PanelErrorBoundary>
     ),
   }), [consoleTab, setUi, nav.goNext, viewEditorial, askTutor]);
@@ -170,7 +180,7 @@ export function Workspace({ problemId, projectId }: WorkspaceProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <main className={cn("ws-root flex h-dvh w-full flex-col overflow-hidden bg-ws-page text-fg-1", fullscreen && "fixed inset-0 z-40")}>
-        {!fullscreen && <TopBar nav={nav} onRun={() => void run()} onSubmit={() => void submit()} onFullscreen={toggleFullscreen} />}
+        {!fullscreen && <TopBar nav={nav} onRun={() => void run()} onSubmit={() => void submit()} onVisualize={() => void visualize()} onFullscreen={toggleFullscreen} />}
         <div className={cn("min-h-0 flex-1", fullscreen ? "p-2" : "px-2.5 pb-2.5 lg:px-[10px] lg:pb-[10px]")}>
           {isMobile ? (
             <MobileLayout left={leftSlot} code={codeSlot} console={consoleSlot} side={sideSlot} onRun={() => void run()} onSubmit={() => void submit()} />

@@ -61,7 +61,7 @@ export function CodeHeaderExtra({ onBeforeSwitch }: { onBeforeSwitch?: () => Pro
   );
 }
 
-export function CodeHeaderActions({ onRun, onSubmit, onChange }: { onRun: () => void; onSubmit: () => void; onChange: (code: string) => void }) {
+export function CodeHeaderActions({ onRun, onSubmit, onVisualize, onChange }: { onRun: () => void; onSubmit: () => void; onVisualize?: () => void; onChange: (code: string) => void }) {
   const { user } = useAuth();
   const problem = useWorkspace((s) => s.problem);
   const language = useWorkspace((s) => s.language);
@@ -86,7 +86,7 @@ export function CodeHeaderActions({ onRun, onSubmit, onChange }: { onRun: () => 
 
   return (
     <div className="flex items-center gap-0.5">
-      {placement === "editor" && <RunSubmitCluster onRun={onRun} onSubmit={onSubmit} compact className="mr-1 bg-ws-bar" />}
+      {placement === "editor" && <RunSubmitCluster onRun={onRun} onSubmit={onSubmit} onVisualize={onVisualize} compact className="mr-1 bg-ws-bar" />}
       <Tooltip><TooltipTrigger asChild>
         <button type="button" onClick={onBookmark} aria-pressed={bookmarked} aria-label="Bookmark" className={cn(actionBtn, bookmarked && "text-medium")}><Bookmark className={cn("size-4", bookmarked && "fill-current")} /></button>
       </TooltipTrigger><TooltipContent side="bottom">{bookmarked ? "Remove bookmark" : "Bookmark"}</TooltipContent></Tooltip>

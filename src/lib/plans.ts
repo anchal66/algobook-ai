@@ -46,6 +46,6 @@ export function getPlan(slug: string): Plan | undefined {
 
 /** Daily limits per plan tier (D-04). -1 = unlimited, 0 = not included. */
 export const PLAN_LIMITS: Record<PlanTier, Record<FeatureKey, number>> = {
-  free: { generate: 3, run: 30, submit: 50, hint3: 0, editorial: 0, chat: 0, completion: 0, review: 0, interview: 0 },
-  pro: { generate: 200, run: 2000, submit: 2000, hint3: 500, editorial: -1, chat: 300, completion: 3000, review: 200, interview: 5 },
+  free: { generate: 3, run: 30, submit: 50, hint3: 0, editorial: 0, chat: 0, completion: 0, review: 0, interview: 0, visualizeExplain: 5 },
+  pro: { generate: 200, run: 2000, submit: 2000, hint3: 500, editorial: -1, chat: 300, completion: 3000, review: 200, interview: 5, visualizeExplain: 200 },
 };
